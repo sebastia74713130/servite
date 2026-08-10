@@ -467,9 +467,9 @@ export default function PublicMenuClient({
       setShowCart(false);
       setShowTakeawayPaymentQR(false);
       
-      // Si el pedido se pagó exitosamente, redirigir a la pestaña de Mi Cuenta
+      // Si el pedido se pagó exitosamente, redirigir a la pestaña de Mi Cuenta y actualizar los datos
       if (isPaid) {
-        setShowBill(true);
+        handleFetchBill();
       }
 
       setServiceMessage(isPaid ? "¡Pago exitoso! Tu pedido ha sido enviado a cocina. Recibirás un aviso cuando esté listo." : "¡Pedido enviado a la cocina con éxito!");
