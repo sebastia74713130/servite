@@ -74,7 +74,16 @@ export default function TablesPage() {
             >
               <div className="flex items-start justify-between mb-4">
                 <div>
-                  <h2 className="text-xl font-bold text-[#1F2933]">Mesa {table.table_number}</h2>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-xl font-bold text-[#1F2933]">
+                      {table.type === 'takeaway' ? 'Mostrador' : 'Mesa'} {table.table_number}
+                    </h2>
+                    {table.type === 'takeaway' && (
+                      <span className="text-[10px] uppercase font-bold bg-[#1F2933] text-white px-2 py-0.5 rounded-md tracking-wider">
+                        Barra
+                      </span>
+                    )}
+                  </div>
                   <p className="text-sm text-[#6B7280] font-mono mt-1">{table.table_code}</p>
                 </div>
                 <span className={`text-xs font-medium px-3 py-1 rounded-full ${
@@ -273,6 +282,7 @@ function NewTableModal({
   onSaved: () => void;
 }) {
   const [tableNumber, setTableNumber] = useState('');
+  const [type, setType] = useState<'dine_in'|'takeaway'>('dine_in');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -293,6 +303,7 @@ function NewTableModal({
         table_number: tableNumber.trim(),
         table_code: tableCode,
         is_active: true,
+        type,
       });
 
     if (err) {
@@ -331,6 +342,18 @@ function NewTableModal({
                 Código generado: <span className="font-mono font-medium text-[#1F2933]">MESA-{tableNumber.trim()}</span>
               </p>
             )}
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-[#1F2933] mb-1.5 block">Tipo de Mesa</label>
+            <select
+              value={type}
+              onChange={e => setType(e.target.value as 'dine_in'|'takeaway')}
+              className="w-full border border-[#E5E7EB] rounded-xl px-4 py-3 text-[#1F2933] focus:outline-none focus:ring-2 focus:ring-[#E76F51]/30 focus:border-[#E76F51] transition-colors bg-white"
+            >
+              <option value="dine_in">Mesa Normal (Dine-in)</option>
+              <option value="takeaway">Pedidos en Barra / Fila (Takeaway)</option>
+            </select>
           </div>
 
           {error && (

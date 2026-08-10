@@ -6,13 +6,15 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function run() {
   const { data, error } = await supabase.rpc('exec_sql', {
-    sql_string: 'CREATE POLICY "Public can update tables" ON public.tables FOR UPDATE USING (true);'
+    sql_string: `
+      ALTER TABLE public.tables ADD COLUMN IF NOT EXISTS type TEXT DEFAULT 'dine_in' CHECK (type IN ('dine_in', 'takeaway'));
+    `
   });
   
   if (error) {
-    console.error('Error applying policy:', error);
+    console.error('Error applying schema:', error);
   } else {
-    console.log('Policy applied successfully!');
+    console.log('Schema applied successfully!');
   }
 }
 

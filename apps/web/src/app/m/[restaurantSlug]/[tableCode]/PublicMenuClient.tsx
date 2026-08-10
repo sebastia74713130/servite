@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ShoppingCart, X, Plus, Minus, FileText, LayoutGrid, ChevronLeft, Search, Maximize, Minimize } from 'lucide-react';
+import { ShoppingCart, X, Plus, Minus, FileText, LayoutGrid, ChevronLeft, Search, Maximize, Minimize, CheckCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { QRCodeSVG } from 'qrcode.react';
 
 import { Product } from '@shared/types';
 
@@ -34,6 +35,7 @@ export default function PublicMenuClient({
 }) {
   const [selectedCatId, setSelectedCatId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [deviceSessionId, setDeviceSessionId] = useState<string | null>(null);
   const [sessionEnded, setSessionEnded] = useState(false);
 
   useEffect(() => {
@@ -44,29 +46,60 @@ export default function PublicMenuClient({
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const isEnded = sessionStorage.getItem(`session_ended_${table.id}`) === 'true';
-      if (isEnded) {
-        setSessionEnded(true);
-      } else if (sessionStorage.getItem(`has_ordered_${table.id}`) === 'true') {
-        const checkUnpaid = async () => {
-          try {
-            const { data, error } = await supabase
-              .from('orders')
-              .select('id')
-              .eq('table_id', table.id)
-              .eq('is_paid', false)
-              .neq('status', 'cancelled');
-            
-            if (!error && data && data.length === 0) {
-              setSessionEnded(true);
-              sessionStorage.setItem(`session_ended_${table.id}`, 'true');
-            }
-          } catch (e) {}
-        };
-        checkUnpaid();
+      if (table.type === 'takeaway') {
+        let sid = localStorage.getItem(`device_session_id_${table.id}`);
+        if (!sid) {
+          sid = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+          localStorage.setItem(`device_session_id_${table.id}`, sid);
+        }
+        setDeviceSessionId(sid);
+      } else {
+        const isEnded = sessionStorage.getItem(`session_ended_${table.id}`) === 'true';
+        if (isEnded) {
+          setSessionEnded(true);
+        } else if (sessionStorage.getItem(`has_ordered_${table.id}`) === 'true') {
+          const checkUnpaid = async () => {
+            try {
+              const { data, error } = await supabase
+                .from('orders')
+                .select('id')
+                .eq('table_id', table.id)
+                .eq('is_paid', false)
+                .neq('status', 'cancelled');
+              
+              if (!error && data && data.length === 0) {
+                setSessionEnded(true);
+                sessionStorage.setItem(`session_ended_${table.id}`, 'true');
+              }
+            } catch (e) {}
+          };
+          checkUnpaid();
+        }
       }
     }
-  }, [table.id]);
+  }, [table.id, table.type]);
+
+  useEffect(() => {
+    if (table.type === 'takeaway' && deviceSessionId) {
+      const channel = supabase
+        .channel(`public:orders:${deviceSessionId}`)
+        .on('postgres_changes', {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'orders',
+          filter: `customer_session_id=eq.${deviceSessionId}`
+        }, (payload) => {
+          if (payload.new.status === 'ready' && payload.old.status !== 'ready') {
+            setServiceMessage("¡Tu pedido está listo! Por favor acércate a la barra a recogerlo.");
+          }
+        })
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [table.type, deviceSessionId]);
 
 
   // Modals state
@@ -320,18 +353,23 @@ export default function PublicMenuClient({
 
         if (!targetOrderId) {
           // Create new order for this station
+          const orderPayload: any = {
+            restaurant_id: restaurant.id,
+            branch_id: table.branch_id,
+            table_id: table.id,
+            table_number: table.table_number,
+            status: 'sent',
+            subtotal: groupTotal,
+            total: groupTotal,
+            customer_session_id: 'web-session-' + Math.random().toString(36).substring(7),
+          };
+          if (table.type === 'takeaway' && deviceSessionId) {
+            orderPayload.customer_session_id = deviceSessionId;
+          }
+
           const { data: newOrder, error: orderError } = await supabase
             .from('orders')
-            .insert({
-              restaurant_id: restaurant.id,
-              branch_id: table.branch_id,
-              table_id: table.id,
-              table_number: table.table_number,
-              status: 'sent',
-              subtotal: groupTotal,
-              total: groupTotal,
-              customer_session_id: 'web-session-' + Math.random().toString(36).substring(7),
-            })
+            .insert(orderPayload)
             .select()
             .single();
 
@@ -385,7 +423,7 @@ export default function PublicMenuClient({
       setShowCart(false);
     }
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('orders')
         .select(`
           *,
@@ -395,11 +433,17 @@ export default function PublicMenuClient({
         .eq('is_paid', false)
         .neq('status', 'cancelled')
         .order('created_at', { ascending: false });
+
+      if (table.type === 'takeaway' && deviceSessionId) {
+        query = query.eq('customer_session_id', deviceSessionId);
+      }
+
+      const { data, error } = await query;
         
       if (error) throw error;
 
-      if (isRefresh && billOrders.length > 0 && (!data || data.length === 0)) {
-        // Tenía pedidos sin pagar, y ahora no tiene. Significa que pagaron la cuenta.
+      if (table.type !== 'takeaway' && isRefresh && billOrders.length > 0 && (!data || data.length === 0)) {
+        // Tenía pedidos sin pagar, y ahora no tiene. Significa que pagaron la cuenta (solo en mesas normales).
         setSessionEnded(true);
         sessionStorage.setItem(`session_ended_${table.id}`, 'true');
       }
@@ -408,6 +452,25 @@ export default function PublicMenuClient({
     } catch (err: any) {
       console.error(err);
       alert("Error al cargar la cuenta");
+    } finally {
+      setIsFetchingBill(false);
+    }
+  };
+
+  const handleSimulatePayment = async () => {
+    if (billOrders.length === 0) return;
+    setIsFetchingBill(true);
+    try {
+      for (const order of billOrders) {
+        await supabase
+          .from('orders')
+          .update({ is_paid: true })
+          .eq('id', order.id);
+      }
+      setServiceMessage("Pago simulado exitosamente. Recibirás un aviso cuando tu pedido esté listo.");
+      handleFetchBill(true);
+    } catch (err: any) {
+      alert("Error al simular pago");
     } finally {
       setIsFetchingBill(false);
     }
@@ -1022,28 +1085,53 @@ export default function PublicMenuClient({
           
           <div className="p-6 pb-[100px] bg-white border-t border-gray-200">
             <div className="flex justify-between items-center mb-6">
-              <span className="text-xl font-bold text-gray-900">Total acumulado</span>
+              <span className="text-xl font-bold text-gray-900">Total a pagar</span>
               <span className="text-2xl font-bold" style={{ color: brandColor }}>
                 Bs {totalBill.toLocaleString('es-BO')}
               </span>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                disabled={serviceRequestLoading}
-                onClick={() => handleServiceRequest('calling_waiter')}
-                className="py-3 rounded-xl font-bold text-gray-700 bg-gray-100 border border-gray-200 active:scale-95 transition-transform"
-              >
-                Llamar al mesero
-              </button>
-              <button
-                disabled={serviceRequestLoading || billOrders.length === 0}
-                onClick={() => handleServiceRequest('requesting_bill')}
-                className="py-3 rounded-xl font-bold text-white active:scale-95 transition-transform disabled:opacity-50"
-                style={{ backgroundColor: brandColor }}
-              >
-                Pedir la cuenta
-              </button>
-            </div>
+            
+            {table.type === 'takeaway' ? (
+              <div className="flex flex-col items-center">
+                {totalBill > 0 ? (
+                  <>
+                    <p className="text-sm text-gray-600 mb-4 text-center">Escanea el QR para pagar, o presiona el botón para simular el pago.</p>
+                    <div className="p-4 bg-white border border-gray-200 rounded-2xl shadow-sm mb-4">
+                      <QRCodeSVG value={`payment-sim-${Date.now()}`} size={150} />
+                    </div>
+                    <button
+                      disabled={isFetchingBill}
+                      onClick={handleSimulatePayment}
+                      className="w-full py-3 rounded-xl font-bold text-white flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-50"
+                      style={{ backgroundColor: brandColor }}
+                    >
+                      <CheckCircle size={20} />
+                      Simular Pago Exitoso
+                    </button>
+                  </>
+                ) : (
+                  <p className="text-sm text-gray-500 text-center">Agrega productos y haz un pedido para poder pagar.</p>
+                )}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  disabled={serviceRequestLoading}
+                  onClick={() => handleServiceRequest('calling_waiter')}
+                  className="py-3 rounded-xl font-bold text-gray-700 bg-gray-100 border border-gray-200 active:scale-95 transition-transform"
+                >
+                  Llamar al mesero
+                </button>
+                <button
+                  disabled={serviceRequestLoading || billOrders.length === 0}
+                  onClick={() => handleServiceRequest('requesting_bill')}
+                  className="py-3 rounded-xl font-bold text-white active:scale-95 transition-transform disabled:opacity-50"
+                  style={{ backgroundColor: brandColor }}
+                >
+                  Pedir la cuenta
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -29,6 +29,7 @@ export interface Table {
   table_number: string;
   table_code: string;
   qr_url: string | null;
+  type?: 'dine_in' | 'takeaway';
   is_active: boolean;
 }
 
