@@ -103,8 +103,11 @@ export default function PublicMenuClient({
           if (payload.new.status === 'ready' && payload.old.status !== 'ready') {
             setServiceMessage("¡Tu pedido está listo! Por favor acércate a la barra a recogerlo.");
             if (alarmAudioRef.current) {
-              // Detener el audio en silencio para no causar conflictos y reproducir la alarma
-              if (keepAwakeAudioRef.current) keepAwakeAudioRef.current.pause();
+              // Si estaba silenciado (como truco de desbloqueo), le quitamos el silencio
+              alarmAudioRef.current.muted = false;
+              // Nos aseguramos que empiece desde el principio
+              alarmAudioRef.current.currentTime = 0;
+              // Reproducimos por si acaso
               alarmAudioRef.current.play().catch(() => {});
               setIsAlarmRinging(true);
             }
@@ -345,10 +348,10 @@ export default function PublicMenuClient({
       if (keepAwakeAudioRef.current) {
         keepAwakeAudioRef.current.play().catch(() => {});
       }
-      // "Desbloquear" el audio de la alarma reproduciéndolo y pausándolo de inmediato
+      // "Desbloquear" el audio de la alarma reproduciéndolo en silencio
       if (alarmAudioRef.current) {
+        alarmAudioRef.current.muted = true;
         alarmAudioRef.current.play().catch(() => {});
-        alarmAudioRef.current.pause();
       }
     }
 
@@ -1249,6 +1252,7 @@ export default function PublicMenuClient({
                 onClick={() => {
                   if (alarmAudioRef.current) {
                     alarmAudioRef.current.pause();
+                    alarmAudioRef.current.muted = true;
                     alarmAudioRef.current.currentTime = 0;
                   }
                   setIsAlarmRinging(false);
