@@ -145,6 +145,7 @@ export default function PublicMenuClient({
   // Form state for selected product
   const [quantity, setQuantity] = useState(1);
   const [notes, setNotes] = useState('');
+  const [showTakeawayPaymentQR, setShowTakeawayPaymentQR] = useState(false);
 
   // Fullscreen state
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -293,7 +294,7 @@ export default function PublicMenuClient({
     setCartItems(cartItems.filter(item => item.id !== id));
   };
 
-  const handleSubmitOrder = async () => {
+  const handleSubmitOrder = async (isPaid: boolean = false) => {
     if (cartItems.length === 0) return;
     setIsSubmitting(true);
     
@@ -315,7 +316,7 @@ export default function PublicMenuClient({
         .select('id, subtotal, total, order_items(station_id)')
         .eq('table_id', table.id)
         .eq('status', 'sent')
-        .eq('is_paid', false)
+        .eq('is_paid', isPaid)
         .gte('created_at', today.toISOString());
 
       // We need to process each station group separately
@@ -361,6 +362,7 @@ export default function PublicMenuClient({
             status: 'sent',
             subtotal: groupTotal,
             total: groupTotal,
+            is_paid: isPaid,
             customer_session_id: 'web-session-' + Math.random().toString(36).substring(7),
           };
           if (table.type === 'takeaway' && deviceSessionId) {
@@ -407,7 +409,8 @@ export default function PublicMenuClient({
       sessionStorage.setItem(`has_ordered_${table.id}`, 'true');
       setCartItems([]);
       setShowCart(false);
-      setServiceMessage("¡Pedido enviado a la cocina con éxito!");
+      setShowTakeawayPaymentQR(false);
+      setServiceMessage(isPaid ? "¡Pago exitoso! Tu pedido ha sido enviado a cocina. Recibirás un aviso cuando esté listo." : "¡Pedido enviado a la cocina con éxito!");
 
     } catch (err: any) {
       alert("Error al enviar el pedido: " + err.message);
@@ -430,12 +433,15 @@ export default function PublicMenuClient({
           order_items (*)
         `)
         .eq('table_id', table.id)
-        .eq('is_paid', false)
         .neq('status', 'cancelled')
         .order('created_at', { ascending: false });
 
       if (table.type === 'takeaway' && deviceSessionId) {
-        query = query.eq('customer_session_id', deviceSessionId);
+        // En takeaway, queremos ver los pedidos pagados que nos pertenecen para ver su estado
+        query = query.eq('customer_session_id', deviceSessionId).eq('is_paid', true);
+      } else {
+        // En mesas normales, queremos ver los pedidos sin pagar
+        query = query.eq('is_paid', false);
       }
 
       const { data, error } = await query;
@@ -1007,18 +1013,42 @@ export default function PublicMenuClient({
               <span className="text-2xl font-bold text-gray-900">Bs {cartTotal.toLocaleString('es-BO')}</span>
             </div>
             
-            <button 
-              onClick={handleSubmitOrder}
-              disabled={cartItems.length === 0 || isSubmitting}
-              className="w-full text-white font-bold text-lg py-4 rounded-2xl shadow-lg disabled:opacity-50 transition-transform active:scale-[0.98] flex justify-center"
-              style={{ backgroundColor: brandColor }}
-            >
-              {isSubmitting ? (
-                <span className="animate-pulse">Enviando a cocina...</span>
-              ) : (
-                'Confirmar y enviar a cocina'
-              )}
-            </button>
+            {showTakeawayPaymentQR ? (
+              <div className="flex flex-col items-center">
+                <p className="text-sm text-gray-600 mb-4 text-center">Escanea el QR para pagar, o presiona el botón para simular el pago.</p>
+                <div className="p-4 bg-white border border-gray-200 rounded-2xl shadow-sm mb-4">
+                  <QRCodeSVG value={`payment-sim-${Date.now()}`} size={150} />
+                </div>
+                <button
+                  disabled={isSubmitting}
+                  onClick={() => handleSubmitOrder(true)}
+                  className="w-full py-3 rounded-xl font-bold text-white flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-50"
+                  style={{ backgroundColor: brandColor }}
+                >
+                  <CheckCircle size={20} />
+                  {isSubmitting ? 'Procesando pago...' : 'Simular Pago Exitoso'}
+                </button>
+              </div>
+            ) : (
+              <button 
+                onClick={() => {
+                  if (table.type === 'takeaway') {
+                    setShowTakeawayPaymentQR(true);
+                  } else {
+                    handleSubmitOrder(false);
+                  }
+                }}
+                disabled={cartItems.length === 0 || isSubmitting}
+                className="w-full text-white font-bold text-lg py-4 rounded-2xl shadow-lg disabled:opacity-50 transition-transform active:scale-[0.98] flex justify-center"
+                style={{ backgroundColor: brandColor }}
+              >
+                {isSubmitting ? (
+                  <span className="animate-pulse">Enviando a cocina...</span>
+                ) : (
+                  table.type === 'takeaway' ? 'Pagar y confirmar orden' : 'Confirmar y enviar a cocina'
+                )}
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -1094,23 +1124,11 @@ export default function PublicMenuClient({
             {table.type === 'takeaway' ? (
               <div className="flex flex-col items-center">
                 {totalBill > 0 ? (
-                  <>
-                    <p className="text-sm text-gray-600 mb-4 text-center">Escanea el QR para pagar, o presiona el botón para simular el pago.</p>
-                    <div className="p-4 bg-white border border-gray-200 rounded-2xl shadow-sm mb-4">
-                      <QRCodeSVG value={`payment-sim-${Date.now()}`} size={150} />
-                    </div>
-                    <button
-                      disabled={isFetchingBill}
-                      onClick={handleSimulatePayment}
-                      className="w-full py-3 rounded-xl font-bold text-white flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-50"
-                      style={{ backgroundColor: brandColor }}
-                    >
-                      <CheckCircle size={20} />
-                      Simular Pago Exitoso
-                    </button>
-                  </>
+                  <p className="text-sm text-gray-500 text-center font-medium bg-gray-100 p-3 rounded-lg w-full">
+                    Sigue el estado de tus pedidos aquí. Te avisaremos cuando estén listos.
+                  </p>
                 ) : (
-                  <p className="text-sm text-gray-500 text-center">Agrega productos y haz un pedido para poder pagar.</p>
+                  <p className="text-sm text-gray-500 text-center font-medium">Agrega productos y haz un pedido para poder ver su estado aquí.</p>
                 )}
               </div>
             ) : (
