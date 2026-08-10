@@ -1177,7 +1177,7 @@ export default function PublicMenuClient({
                     <div className="bg-blue-50 border border-blue-100 p-3 rounded-xl text-left">
                       <p className="text-xs text-blue-800 font-medium flex items-start gap-2">
                         <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
-                        <span>Mantén esta pantalla abierta. Si bloqueas el teléfono y usas otras apps multimedia, la alarma de 'pedido listo' no sonará.</span>
+                        <span>Mantén esta pantalla abierta. Si utilizas otras apps multimedia, la alarma de 'pedido listo' no sonará.</span>
                       </p>
                     </div>
                   </>
