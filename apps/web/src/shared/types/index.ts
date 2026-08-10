@@ -41,10 +41,11 @@ export interface RestaurantTable {
   table_number: string;
   table_code: string;
   qr_url: string | null;
+  type?: 'dine_in' | 'takeaway';
   service_status?: string | null;
   is_active: boolean;
-  created_at: string;
-  updated_at: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface KitchenStation {
