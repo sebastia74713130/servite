@@ -88,6 +88,7 @@ export default function PublicMenuClient({
   const [isFetchingBill, setIsFetchingBill] = useState(false);
   const [serviceRequestLoading, setServiceRequestLoading] = useState(false);
   const [serviceMessage, setServiceMessage] = useState<string | null>(null);
+  const [isAlarmRinging, setIsAlarmRinging] = useState(false);
 
   useEffect(() => {
     if (table.type === 'takeaway' && deviceSessionId) {
@@ -101,21 +102,12 @@ export default function PublicMenuClient({
         }, (payload) => {
           if (payload.new.status === 'ready' && payload.old.status !== 'ready') {
             setServiceMessage("¡Tu pedido está listo! Por favor acércate a la barra a recogerlo.");
-            try {
-              const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-              const ctx = new AudioContext();
-              const osc = ctx.createOscillator();
-              const gain = ctx.createGain();
-              osc.connect(gain);
-              gain.connect(ctx.destination);
-              osc.type = 'sine';
-              osc.frequency.setValueAtTime(880, ctx.currentTime);
-              osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.1);
-              gain.gain.setValueAtTime(1, ctx.currentTime);
-              gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
-              osc.start();
-              osc.stop(ctx.currentTime + 0.5);
-            } catch(e) {}
+            if (alarmAudioRef.current) {
+              // Detener el audio en silencio para no causar conflictos y reproducir la alarma
+              if (keepAwakeAudioRef.current) keepAwakeAudioRef.current.pause();
+              alarmAudioRef.current.play().catch(() => {});
+              setIsAlarmRinging(true);
+            }
           }
           // Actualizar el estado de la orden en la vista "Mi Cuenta"
           setBillOrders(prev => prev.map(o => o.id === payload.new.id ? { ...o, status: payload.new.status } : o));
@@ -160,7 +152,7 @@ export default function PublicMenuClient({
   }, [showCart, showBill, selectedCatId, isPreviewMode]);
 
   // Audio elements for notifications and keep-awake
-  const dingAudioRef = useRef<HTMLAudioElement | null>(null);
+  const alarmAudioRef = useRef<HTMLAudioElement | null>(null);
   const keepAwakeAudioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
@@ -170,8 +162,10 @@ export default function PublicMenuClient({
     keepAwakeAudioRef.current.loop = true;
     keepAwakeAudioRef.current.setAttribute('playsinline', 'true');
     
-    // Configurar el ding. Como no tenemos archivo, usaremos AudioContext más adelante
-    // pero mantendremos estas referencias por si acaso.
+    // Configurar la alarma real y fuerte
+    alarmAudioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+    alarmAudioRef.current.loop = true;
+    alarmAudioRef.current.setAttribute('playsinline', 'true');
   }, []);
 
   // Form state for selected product
@@ -328,6 +322,13 @@ export default function PublicMenuClient({
 
   const handleSubmitOrder = async (isPaid: boolean = false) => {
     if (cartItems.length === 0) return;
+    
+    // INICIAR AUDIO SILENCIOSO DE FORMA SÍNCRONA
+    // Esto es vital para iOS, si se hace después de un 'await', iOS lo bloquea
+    if (isPaid && keepAwakeAudioRef.current) {
+      keepAwakeAudioRef.current.play().catch(() => {});
+    }
+
     setIsSubmitting(true);
     
     try {
@@ -442,11 +443,6 @@ export default function PublicMenuClient({
       setCartItems([]);
       setShowCart(false);
       setShowTakeawayPaymentQR(false);
-      
-      if (isPaid && keepAwakeAudioRef.current) {
-        // Iniciar el audio silencioso para mantener vivo el proceso en segundo plano
-        keepAwakeAudioRef.current.play().catch(() => {});
-      }
 
       setServiceMessage(isPaid ? "¡Pago exitoso! Tu pedido ha sido enviado a cocina. Recibirás un aviso cuando esté listo." : "¡Pedido enviado a la cocina con éxito!");
 
@@ -1200,24 +1196,40 @@ export default function PublicMenuClient({
         </div>
       )}
 
-      {/* Service Message Modal */}
+      {/* Success / Notification Modal */}
       {serviceMessage && (
-        <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-6 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[70] bg-black/60 flex items-center justify-center p-6 animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl scale-in-center">
             <div className="p-8 text-center">
-              <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">¡Listo!</h3>
-              <p className="text-gray-600">{serviceMessage}</p>
+              {isAlarmRinging ? (
+                <div className="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M22 17v1a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-1"/><path d="M22 17c0-2-2-5-2-10a8 8 0 0 0-16 0c0 5-2 8-2 10"/><path d="M4 2v3"/><path d="M20 2v3"/></svg>
+                </div>
+              ) : (
+                <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+              )}
+              
+              <h3 className="text-xl font-bold text-gray-900 mb-2">
+                {isAlarmRinging ? "¡Atención!" : "¡Listo!"}
+              </h3>
+              <p className="text-gray-600 text-lg">{serviceMessage}</p>
             </div>
             <div className="p-4 bg-gray-50 border-t border-gray-100">
               <button 
-                onClick={() => setServiceMessage(null)}
-                className="w-full py-3 rounded-xl font-bold text-white transition-colors"
-                style={{ backgroundColor: brandColor }}
+                onClick={() => {
+                  if (alarmAudioRef.current) {
+                    alarmAudioRef.current.pause();
+                    alarmAudioRef.current.currentTime = 0;
+                  }
+                  setIsAlarmRinging(false);
+                  setServiceMessage(null);
+                }}
+                className={`w-full py-4 rounded-xl font-bold text-white transition-all active:scale-95 text-lg ${isAlarmRinging ? 'bg-red-500 hover:bg-red-600 shadow-[0_0_15px_rgba(239,68,68,0.5)]' : ''}`}
+                style={isAlarmRinging ? {} : { backgroundColor: brandColor }}
               >
-                Aceptar
+                {isAlarmRinging ? "APAGAR ALARMA" : "Aceptar"}
               </button>
             </div>
           </div>
