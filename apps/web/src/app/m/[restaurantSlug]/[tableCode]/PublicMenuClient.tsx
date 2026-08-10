@@ -1163,13 +1163,13 @@ export default function PublicMenuClient({
               <div className="flex flex-col items-center">
                 {totalBill > 0 ? (
                   <>
-                    <p className="text-sm text-gray-500 text-center font-medium bg-gray-100 p-3 rounded-lg w-full">
-                      Sigue el estado de tus pedidos aquí. Te avisaremos cuando estén listos.
+                    <p className="text-xs text-gray-500 text-center font-medium bg-gray-100 p-2 rounded-lg w-full mb-2">
+                      Sigue el estado de tu pedido aquí.
                     </p>
-                    <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl mt-4 text-left">
-                      <p className="text-sm text-blue-800 font-medium flex items-start gap-2">
-                        <AlertCircle size={24} className="flex-shrink-0" />
-                        <span>Recomendamos mantener esta pantalla abierta. Si bloqueas tu teléfono y usas otras apps de música o video, la notificación de tu pedido podría no sonar.</span>
+                    <div className="bg-blue-50 border border-blue-100 p-3 rounded-xl text-left">
+                      <p className="text-xs text-blue-800 font-medium flex items-start gap-2">
+                        <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
+                        <span>Mantén esta pantalla abierta. Si bloqueas el teléfono y usas otras apps multimedia, la alarma de 'pedido listo' no sonará.</span>
                       </p>
                     </div>
                   </>
