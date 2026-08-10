@@ -79,6 +79,16 @@ export default function PublicMenuClient({
     }
   }, [table.id, table.type]);
 
+
+  // Modals state
+  const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
+  const [showCart, setShowCart] = useState(false);
+  const [showBill, setShowBill] = useState(false);
+  const [billOrders, setBillOrders] = useState<any[]>([]);
+  const [isFetchingBill, setIsFetchingBill] = useState(false);
+  const [serviceRequestLoading, setServiceRequestLoading] = useState(false);
+  const [serviceMessage, setServiceMessage] = useState<string | null>(null);
+
   useEffect(() => {
     if (table.type === 'takeaway' && deviceSessionId) {
       const channel = supabase
@@ -91,7 +101,24 @@ export default function PublicMenuClient({
         }, (payload) => {
           if (payload.new.status === 'ready' && payload.old.status !== 'ready') {
             setServiceMessage("¡Tu pedido está listo! Por favor acércate a la barra a recogerlo.");
+            try {
+              const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+              const ctx = new AudioContext();
+              const osc = ctx.createOscillator();
+              const gain = ctx.createGain();
+              osc.connect(gain);
+              gain.connect(ctx.destination);
+              osc.type = 'sine';
+              osc.frequency.setValueAtTime(880, ctx.currentTime);
+              osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.1);
+              gain.gain.setValueAtTime(1, ctx.currentTime);
+              gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+              osc.start();
+              osc.stop(ctx.currentTime + 0.5);
+            } catch(e) {}
           }
+          // Actualizar el estado de la orden en la vista "Mi Cuenta"
+          setBillOrders(prev => prev.map(o => o.id === payload.new.id ? { ...o, status: payload.new.status } : o));
         })
         .subscribe();
 
@@ -100,16 +127,6 @@ export default function PublicMenuClient({
       };
     }
   }, [table.type, deviceSessionId]);
-
-
-  // Modals state
-  const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
-  const [showCart, setShowCart] = useState(false);
-  const [showBill, setShowBill] = useState(false);
-  const [billOrders, setBillOrders] = useState<any[]>([]);
-  const [isFetchingBill, setIsFetchingBill] = useState(false);
-  const [serviceRequestLoading, setServiceRequestLoading] = useState(false);
-  const [serviceMessage, setServiceMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
