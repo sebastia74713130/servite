@@ -10,9 +10,10 @@ import { Printer } from "lucide-react";
 interface OrderCardProps {
   orders: Order[];
   stations: any[];
+  onDismiss?: () => void;
 }
 
-export function OrderCard({ orders, stations }: OrderCardProps) {
+export function OrderCard({ orders, stations, onDismiss }: OrderCardProps) {
   const { updateStatus, loading } = useUpdateOrderStatus();
   const [isExpanded, setIsExpanded] = useState(false);
   const primaryOrder = orders[0];
@@ -119,13 +120,24 @@ export function OrderCard({ orders, stations }: OrderCardProps) {
           </p>
         </div>
         <div className="flex flex-col items-end gap-2 flex-shrink-0 ml-2">
+          <div className="flex items-center gap-1">
           <button 
             onClick={handlePrint}
-            className="text-gray-400 hover:text-gray-700 transition-colors p-1"
-            title="Imprimir pedido"
+            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+            title="Imprimir comanda"
           >
-            <Printer size={16} />
+            <Printer size={18} />
           </button>
+          {onDismiss && (
+            <button 
+              onClick={onDismiss}
+              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              title="Ocultar pedido"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            </button>
+          )}
+        </div>
           <span className="text-xs text-[#6B7280] whitespace-nowrap">{getTimeAgo(primaryOrder.created_at)}</span>
         </div>
       </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { useRestaurantSession } from "@/hooks/useRestaurantSession";
 import { useOrders } from "@/hooks/useOrders";
 import { useKitchenStations } from "@/hooks/useKitchenStations";
@@ -13,6 +14,25 @@ export default function OrdersPage() {
   const { restaurant, loading: sessionLoading } = useRestaurantSession();
   const { orders, loading: ordersLoading } = useOrders(restaurant?.id);
   const { stations, loading: stationsLoading } = useKitchenStations(restaurant?.id);
+
+  // Allow kitchen to manually dismiss delivered orders
+  const [hiddenKeys, setHiddenKeys] = useState<string[]>([]);
+  
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('kitchen_hidden_orders');
+      if (saved) setHiddenKeys(JSON.parse(saved));
+    } catch (e) {}
+  }, []);
+
+  const handleHideCard = (key: string) => {
+    const newHidden = [...hiddenKeys, key];
+    setHiddenKeys(newHidden);
+    try {
+      // Keep only last 100 to prevent localstorage bloat
+      localStorage.setItem('kitchen_hidden_orders', JSON.stringify(newHidden.slice(-100)));
+    } catch (e) {}
+  };
 
   if (sessionLoading || ordersLoading) return <LoadingState />;
 
@@ -45,18 +65,23 @@ export default function OrdersPage() {
               return o.status === col.id;
             });
             
-            // Limit delivered orders so they don't pile up infinitely
-            if (col.id === "delivered") {
-              columnOrders = columnOrders.slice(0, 15);
-            }
+            const groupedMap = columnOrders.reduce((acc, order) => {
+              // Group by session ID if it exists, otherwise fallback to table_id
+              // This ensures takeaway orders from different customers aren't merged into one giant card
+              const key = order.customer_session_id ? `session_${order.customer_session_id}` : `table_${order.table_id}`;
+              if (!acc[key]) acc[key] = [];
+              acc[key].push(order);
+              return acc;
+            }, {} as Record<string, typeof orders>);
+
+            let groupedOrders = Object.entries(groupedMap)
+              .filter(([key]) => !hiddenKeys.includes(key))
+              .map(([, groupOrders]) => groupOrders);
             
-            const groupedOrders = Object.values(
-              columnOrders.reduce((acc, order) => {
-                if (!acc[order.table_id]) acc[order.table_id] = [];
-                acc[order.table_id].push(order);
-                return acc;
-              }, {} as Record<string, typeof orders>)
-            );
+            // Limit delivered cards so they don't pile up infinitely and slow down the browser
+            if (col.id === "delivered") {
+              groupedOrders = groupedOrders.slice(0, 15);
+            }
 
             return (
               <div key={col.id} className="w-80 flex-shrink-0 flex flex-col bg-[#F9FAFB] rounded-2xl p-4">
@@ -68,13 +93,18 @@ export default function OrdersPage() {
                 </div>
                 
                 <div className="flex-1 overflow-y-auto pr-2">
-                  {groupedOrders.map(tableOrders => (
-                    <OrderCard 
-                      key={tableOrders[0].id} 
-                      orders={tableOrders} 
-                      stations={stations}
-                    />
-                  ))}
+                  {groupedOrders.map(tableOrders => {
+                    const order = tableOrders[0];
+                    const key = order.customer_session_id ? `session_${order.customer_session_id}` : `table_${order.table_id}`;
+                    return (
+                      <OrderCard 
+                        key={key} 
+                        orders={tableOrders} 
+                        stations={stations}
+                        onDismiss={col.id === "delivered" ? () => handleHideCard(key) : undefined}
+                      />
+                    );
+                  })}
                 </div>
               </div>
             );
