@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { ShoppingCart, X, Plus, Minus, FileText, LayoutGrid, ChevronLeft, Search, Maximize, Minimize, CheckCircle } from 'lucide-react';
+import { useEffect, useState, useRef } from 'react';
+import { ShoppingCart, X, Plus, Minus, FileText, LayoutGrid, ChevronLeft, Search, Maximize, Minimize, CheckCircle, AlertCircle, ChevronRight } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -155,9 +155,24 @@ export default function PublicMenuClient({
       if (selectedCatId) url.searchParams.set('cat', selectedCatId);
       else url.searchParams.delete('cat');
 
-      window.history.replaceState({}, '', url);
+      window.history.replaceState({}, '', url.toString());
     }
   }, [showCart, showBill, selectedCatId, isPreviewMode]);
+
+  // Audio elements for notifications and keep-awake
+  const dingAudioRef = useRef<HTMLAudioElement | null>(null);
+  const keepAwakeAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    // Generar un pequeño tono silencioso en formato WAV
+    const silentWav = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
+    keepAwakeAudioRef.current = new Audio(silentWav);
+    keepAwakeAudioRef.current.loop = true;
+    keepAwakeAudioRef.current.setAttribute('playsinline', 'true');
+    
+    // Configurar el ding. Como no tenemos archivo, usaremos AudioContext más adelante
+    // pero mantendremos estas referencias por si acaso.
+  }, []);
 
   // Form state for selected product
   const [quantity, setQuantity] = useState(1);
@@ -427,6 +442,12 @@ export default function PublicMenuClient({
       setCartItems([]);
       setShowCart(false);
       setShowTakeawayPaymentQR(false);
+      
+      if (isPaid && keepAwakeAudioRef.current) {
+        // Iniciar el audio silencioso para mantener vivo el proceso en segundo plano
+        keepAwakeAudioRef.current.play().catch(() => {});
+      }
+
       setServiceMessage(isPaid ? "¡Pago exitoso! Tu pedido ha sido enviado a cocina. Recibirás un aviso cuando esté listo." : "¡Pedido enviado a la cocina con éxito!");
 
     } catch (err: any) {
@@ -1141,9 +1162,17 @@ export default function PublicMenuClient({
             {table.type === 'takeaway' ? (
               <div className="flex flex-col items-center">
                 {totalBill > 0 ? (
-                  <p className="text-sm text-gray-500 text-center font-medium bg-gray-100 p-3 rounded-lg w-full">
-                    Sigue el estado de tus pedidos aquí. Te avisaremos cuando estén listos.
-                  </p>
+                  <>
+                    <p className="text-sm text-gray-500 text-center font-medium bg-gray-100 p-3 rounded-lg w-full">
+                      Sigue el estado de tus pedidos aquí. Te avisaremos cuando estén listos.
+                    </p>
+                    <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl mt-4 text-left">
+                      <p className="text-sm text-blue-800 font-medium flex items-start gap-2">
+                        <AlertCircle size={24} className="flex-shrink-0" />
+                        <span>Recomendamos mantener esta pantalla abierta. Si bloqueas tu teléfono y usas otras apps de música o video, la notificación de tu pedido podría no sonar.</span>
+                      </p>
+                    </div>
+                  </>
                 ) : (
                   <p className="text-sm text-gray-500 text-center font-medium">Agrega productos y haz un pedido para poder ver su estado aquí.</p>
                 )}
