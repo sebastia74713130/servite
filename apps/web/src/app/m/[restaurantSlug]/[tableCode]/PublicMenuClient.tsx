@@ -102,14 +102,27 @@ export default function PublicMenuClient({
         }, (payload) => {
           if (payload.new.status === 'ready' && payload.old.status !== 'ready') {
             setServiceMessage("¡Tu pedido está listo! Por favor acércate a la barra a recogerlo.");
-            if (alarmAudioRef.current) {
-              // Si estaba silenciado (como truco de desbloqueo), le quitamos el silencio
-              alarmAudioRef.current.muted = false;
-              // Nos aseguramos que empiece desde el principio
-              alarmAudioRef.current.currentTime = 0;
-              // Reproducimos por si acaso
-              alarmAudioRef.current.play().catch(() => {});
-              setIsAlarmRinging(true);
+            // Usar Web Audio API para reproducir la alarma (no es afectado por restricciones de muting en background de iOS)
+            if (audioCtxRef.current && alarmBufferRef.current) {
+              if (audioCtxRef.current.state === 'suspended') {
+                audioCtxRef.current.resume().catch(() => {});
+              }
+              try {
+                // Detener cualquier alarma previa por si acaso
+                if (activeAlarmNodeRef.current) {
+                  activeAlarmNodeRef.current.stop();
+                  activeAlarmNodeRef.current.disconnect();
+                }
+                const source = audioCtxRef.current.createBufferSource();
+                source.buffer = alarmBufferRef.current;
+                source.loop = true;
+                source.connect(audioCtxRef.current.destination);
+                source.start();
+                activeAlarmNodeRef.current = source;
+                setIsAlarmRinging(true);
+              } catch (e) {
+                console.error("Error reproduciendo alarma WebAudio", e);
+              }
             }
           }
           // Actualizar el estado de la orden en la vista "Mi Cuenta"
@@ -171,20 +184,35 @@ export default function PublicMenuClient({
   }, [showCart, showBill, selectedCatId, isPreviewMode]);
 
   // Audio elements for notifications and keep-awake
-  const alarmAudioRef = useRef<HTMLAudioElement | null>(null);
   const keepAwakeAudioRef = useRef<HTMLAudioElement | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const alarmBufferRef = useRef<AudioBuffer | null>(null);
+  const activeAlarmNodeRef = useRef<AudioBufferSourceNode | null>(null);
 
   useEffect(() => {
-    // Generar un pequeño tono silencioso en formato WAV
-    const silentWav = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
-    keepAwakeAudioRef.current = new Audio(silentWav);
+    // 1. Usar un archivo de audio real y silenciarlo para mantener vivo el hilo JS y WebSockets en iOS.
+    // Un WAV de 0 segundos no sirve porque termina al instante.
+    keepAwakeAudioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
     keepAwakeAudioRef.current.loop = true;
+    keepAwakeAudioRef.current.muted = true;
     keepAwakeAudioRef.current.setAttribute('playsinline', 'true');
     
-    // Configurar la alarma real y fuerte
-    alarmAudioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-    alarmAudioRef.current.loop = true;
-    alarmAudioRef.current.setAttribute('playsinline', 'true');
+    // 2. Inicializar Web Audio API para reproducir la alarma MP3
+    try {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioContextClass) {
+        audioCtxRef.current = new AudioContextClass();
+        
+        // Cargar el MP3 en memoria
+        fetch('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3')
+          .then(res => res.arrayBuffer())
+          .then(buffer => audioCtxRef.current?.decodeAudioData(buffer))
+          .then(decoded => {
+            if (decoded) alarmBufferRef.current = decoded;
+          })
+          .catch(() => {});
+      }
+    } catch (e) {}
   }, []);
 
   // Form state for selected product
@@ -348,10 +376,21 @@ export default function PublicMenuClient({
       if (keepAwakeAudioRef.current) {
         keepAwakeAudioRef.current.play().catch(() => {});
       }
-      // "Desbloquear" el audio de la alarma reproduciéndolo en silencio
-      if (alarmAudioRef.current) {
-        alarmAudioRef.current.muted = true;
-        alarmAudioRef.current.play().catch(() => {});
+      // Desbloquear el Web Audio API
+      if (audioCtxRef.current) {
+        if (audioCtxRef.current.state === 'suspended') {
+          audioCtxRef.current.resume().catch(() => {});
+        }
+        // Reproducir un oscilador de 1ms para forzar el desbloqueo del contexto
+        try {
+          const osc = audioCtxRef.current.createOscillator();
+          const gain = audioCtxRef.current.createGain();
+          gain.gain.value = 0; // Silencio
+          osc.connect(gain);
+          gain.connect(audioCtxRef.current.destination);
+          osc.start();
+          osc.stop(audioCtxRef.current.currentTime + 0.01);
+        } catch (e) {}
       }
     }
 
@@ -1250,10 +1289,12 @@ export default function PublicMenuClient({
             <div className="p-4 bg-gray-50 border-t border-gray-100">
               <button 
                 onClick={() => {
-                  if (alarmAudioRef.current) {
-                    alarmAudioRef.current.pause();
-                    alarmAudioRef.current.muted = true;
-                    alarmAudioRef.current.currentTime = 0;
+                  if (activeAlarmNodeRef.current) {
+                    try {
+                      activeAlarmNodeRef.current.stop();
+                      activeAlarmNodeRef.current.disconnect();
+                    } catch (e) {}
+                    activeAlarmNodeRef.current = null;
                   }
                   setIsAlarmRinging(false);
                   setServiceMessage(null);
