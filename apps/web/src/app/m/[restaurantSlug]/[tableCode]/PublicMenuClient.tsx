@@ -183,6 +183,24 @@ export default function PublicMenuClient({
     alarmAudioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
     alarmAudioRef.current.loop = true;
     alarmAudioRef.current.setAttribute('playsinline', 'true');
+
+    // 3. Auto-desbloquear el audio en la primera interacción del usuario (útil si recargan la página)
+    const unlockAudio = () => {
+      if (keepAwakeAudioRef.current && keepAwakeAudioRef.current.paused) {
+        keepAwakeAudioRef.current.play().catch(() => {});
+      }
+      // Solo necesitamos desbloquearlo una vez
+      document.removeEventListener('touchstart', unlockAudio);
+      document.removeEventListener('click', unlockAudio);
+    };
+
+    document.addEventListener('touchstart', unlockAudio, { passive: true });
+    document.addEventListener('click', unlockAudio, { passive: true });
+
+    return () => {
+      document.removeEventListener('touchstart', unlockAudio);
+      document.removeEventListener('click', unlockAudio);
+    };
   }, []);
 
   // Form state for selected product
