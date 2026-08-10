@@ -325,8 +325,15 @@ export default function PublicMenuClient({
     
     // INICIAR AUDIO SILENCIOSO DE FORMA SÍNCRONA
     // Esto es vital para iOS, si se hace después de un 'await', iOS lo bloquea
-    if (isPaid && keepAwakeAudioRef.current) {
-      keepAwakeAudioRef.current.play().catch(() => {});
+    if (isPaid) {
+      if (keepAwakeAudioRef.current) {
+        keepAwakeAudioRef.current.play().catch(() => {});
+      }
+      // "Desbloquear" el audio de la alarma reproduciéndolo y pausándolo de inmediato
+      if (alarmAudioRef.current) {
+        alarmAudioRef.current.play().catch(() => {});
+        alarmAudioRef.current.pause();
+      }
     }
 
     setIsSubmitting(true);
@@ -443,6 +450,11 @@ export default function PublicMenuClient({
       setCartItems([]);
       setShowCart(false);
       setShowTakeawayPaymentQR(false);
+      
+      // Si el pedido se pagó exitosamente, redirigir a la pestaña de Mi Cuenta
+      if (isPaid) {
+        setShowBill(true);
+      }
 
       setServiceMessage(isPaid ? "¡Pago exitoso! Tu pedido ha sido enviado a cocina. Recibirás un aviso cuando esté listo." : "¡Pedido enviado a la cocina con éxito!");
 
