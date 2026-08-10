@@ -11,7 +11,7 @@ import { useOrders } from '@/hooks/useOrders';
 
 export default function AccountsPage() {
   const { restaurant, loading: sessionLoading } = useRestaurantSession();
-  const { orders } = useOrders(restaurant?.id);
+  const { orders } = useOrders(restaurant?.id, { onlyUnpaid: true });
   const [tables, setTables] = useState<RestaurantTable[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTable, setSelectedTable] = useState<RestaurantTable | null>(null);

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { Order } from "@shared/types";
 
-export function useOrders(restaurantId: string | undefined) {
+export function useOrders(restaurantId: string | undefined, options: { onlyUnpaid?: boolean } = { onlyUnpaid: false }) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -14,16 +14,21 @@ export function useOrders(restaurantId: string | undefined) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const { data, error } = await supabase
+    let query = supabase
       .from("orders")
       .select(`
         *,
         order_items (*)
       `)
       .eq("restaurant_id", restaurantId)
-      .eq("is_paid", false)
       .gte("created_at", today.toISOString())
       .order("created_at", { ascending: false });
+
+    if (options.onlyUnpaid) {
+      query = query.eq("is_paid", false);
+    }
+
+    const { data, error } = await query;
 
     if (!error && data) {
       setOrders(data as Order[]);
