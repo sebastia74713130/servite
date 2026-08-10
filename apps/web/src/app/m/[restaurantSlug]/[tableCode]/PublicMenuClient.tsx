@@ -120,6 +120,22 @@ export default function PublicMenuClient({
     }
   }, [table.type, deviceSessionId]);
 
+  // Efecto para finalizar la sesión cuando todos los pedidos de la barra estén entregados
+  useEffect(() => {
+    if (table.type === 'takeaway' && billOrders.length > 0) {
+      const allDelivered = billOrders.every(o => o.status === 'delivered' || o.status === 'cancelled');
+      if (allDelivered) {
+        // Le damos un pequeño retraso para que alcance a leer "¡Tu pedido está listo!" si estaba en otra vista
+        const timer = setTimeout(() => {
+          setSessionEnded(true);
+          // Borramos la sesión para que si vuelve a escanear, empiece de cero
+          localStorage.removeItem(`device_session_id_${table.id}`);
+        }, 5000); // 5 segundos después de que el último pedido se marca como entregado
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [billOrders, table.id, table.type]);
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);

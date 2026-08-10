@@ -241,7 +241,7 @@ export default function AccountsPage() {
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
-          {tables.map(table => {
+          {tables.filter(t => t.type !== 'takeaway').map(table => {
             const isCalling = table.service_status === 'calling_waiter';
             const isRequestingBill = table.service_status === 'requesting_bill';
             const isOccupied = activeTableIdsWithOrders.has(table.id);
