@@ -208,6 +208,12 @@ export default function PublicMenuClient({
   const [notes, setNotes] = useState('');
   const [showTakeawayPaymentQR, setShowTakeawayPaymentQR] = useState(false);
 
+  // Bill Request SIAT Data
+  const [showBillRequestModal, setShowBillRequestModal] = useState(false);
+  const [customerNit, setCustomerNit] = useState('');
+  const [customerName, setCustomerName] = useState('');
+  const [customerEmail, setCustomerEmail] = useState('');
+
   // Fullscreen state
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -577,6 +583,31 @@ export default function PublicMenuClient({
       if (status === 'requesting_bill') setShowBill(false);
     } catch (err: any) {
       alert("Error al solicitar el servicio");
+    } finally {
+      setServiceRequestLoading(false);
+    }
+  };
+
+  const handleRequestBillWithData = async (omit: boolean = false) => {
+    setServiceRequestLoading(true);
+    try {
+      const { error } = await supabase
+        .from('tables')
+        .update({ 
+          service_status: 'requesting_bill',
+          siat_customer_nit: omit ? '0' : customerNit,
+          siat_customer_name: omit ? 'S/N' : customerName,
+          siat_customer_email: omit ? null : customerEmail,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', table.id);
+      if (error) throw error;
+      
+      setServiceMessage("¡Cuenta solicitada! Enseguida te la llevarán.");
+      setShowBill(false);
+      setShowBillRequestModal(false);
+    } catch (err: any) {
+      alert("Error al solicitar la cuenta");
     } finally {
       setServiceRequestLoading(false);
     }
@@ -1230,7 +1261,7 @@ export default function PublicMenuClient({
                 </button>
                 <button
                   disabled={serviceRequestLoading || billOrders.length === 0}
-                  onClick={() => handleServiceRequest('requesting_bill')}
+                  onClick={() => setShowBillRequestModal(true)}
                   className="py-3 rounded-xl font-bold text-white active:scale-95 transition-transform disabled:opacity-50"
                   style={{ backgroundColor: brandColor }}
                 >
@@ -1238,6 +1269,75 @@ export default function PublicMenuClient({
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* SIAT Bill Request Modal */}
+      {showBillRequestModal && (
+        <div className="fixed inset-0 z-[70] bg-black/60 flex items-center justify-center p-6 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl">
+            <div className="p-6">
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Datos para tu Factura</h3>
+              <p className="text-sm text-gray-500 mb-6">Si deseas una factura electrónica a tu nombre, por favor ingresa los siguientes datos.</p>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">NIT o Carnet de Identidad</label>
+                  <input 
+                    type="text" 
+                    value={customerNit}
+                    onChange={(e) => setCustomerNit(e.target.value)}
+                    placeholder="Ej. 1234567"
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Razón Social (Nombre)</label>
+                  <input 
+                    type="text" 
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                    placeholder="Ej. Juan Perez"
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Correo Electrónico (Opcional)</label>
+                  <input 
+                    type="email" 
+                    value={customerEmail}
+                    onChange={(e) => setCustomerEmail(e.target.value)}
+                    placeholder="correo@ejemplo.com"
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2"
+                  />
+                </div>
+              </div>
+            </div>
+            
+            <div className="p-4 bg-gray-50 flex flex-col gap-3">
+              <button 
+                onClick={() => handleRequestBillWithData(false)}
+                disabled={!customerNit || !customerName || serviceRequestLoading}
+                className="w-full py-3.5 rounded-xl font-bold text-white transition-all active:scale-95 text-md disabled:opacity-50"
+                style={{ backgroundColor: brandColor }}
+              >
+                Solicitar Factura a mi Nombre
+              </button>
+              <button 
+                onClick={() => handleRequestBillWithData(true)}
+                disabled={serviceRequestLoading}
+                className="w-full py-3.5 rounded-xl font-bold text-gray-600 bg-gray-200 hover:bg-gray-300 transition-all active:scale-95 text-md"
+              >
+                Omitir datos (Factura Sin Nombre)
+              </button>
+              <button 
+                onClick={() => setShowBillRequestModal(false)}
+                className="w-full py-2 text-sm text-gray-500 font-medium mt-1"
+              >
+                Cancelar
+              </button>
+            </div>
           </div>
         </div>
       )}
