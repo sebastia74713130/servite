@@ -3,8 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { buildFacturaXml, FacturaParams } from "@/lib/siat/xml/invoiceBuilder";
 import { extractKeysFromP12, signXml } from "@/lib/siat/crypto/signer";
 import { generarCUF } from "@/lib/siat/crypto/cufGenerator";
-// TODO: import { emitirFacturaSIAT } from "@/lib/siat/services/emitirFactura"; 
-
+import { emitirFacturaSIAT } from "@/lib/siat/services/emitirFactura";
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -73,7 +72,7 @@ export async function POST(req: Request) {
     const xmlFirmado = signXml(xmlBase, keys.privateKeyPem, keys.certPem);
 
     // 6. Enviar al SIAT (WSDL)
-    // const respuestaSiat = await emitirFacturaSIAT(xmlFirmado, siatSettings);
+    const respuestaSiat = await emitirFacturaSIAT(xmlFirmado, siatSettings);
 
     // Guardar en base de datos la confirmación
     /*
@@ -82,16 +81,29 @@ export async function POST(req: Request) {
       restaurant_id: restaurantId,
       cuf: cuf,
       xml_signed: xmlFirmado,
-      // siat_reception_code: respuestaSiat.codigoRecepcion
+      siat_reception_code: respuestaSiat.RespuestaServicioFacturacion?.codigoRecepcion || null
     });
     */
 
-    return NextResponse.json({
-      success: true,
-      message: "Factura emitida y firmada localmente (Modo de Prueba)",
-      cuf: cuf,
-      // xml_preview: xmlFirmado // Opcional para debug
-    });
+    // Interpretar respuesta del SIAT
+    const resp = respuestaSiat.RespuestaServicioFacturacion;
+    if (resp && (resp.codigoEstado === 904 || resp.codigoEstado === 908)) {
+      // 904 = Validada Exitosamente, 908 = Observada (pero recibida)
+      return NextResponse.json({
+        success: true,
+        message: "Factura validada y recepcionada por el SIAT.",
+        cuf: cuf,
+        codigoRecepcion: resp.codigoRecepcion
+      });
+    } else {
+      // Rechazada u otro error
+      return NextResponse.json({
+        success: false,
+        error: "Factura rechazada por el SIAT",
+        cuf: cuf,
+        detalles: resp?.mensajesList || resp
+      }, { status: 400 });
+    }
 
   } catch (error: any) {
     console.error("Error en la emisión:", error);

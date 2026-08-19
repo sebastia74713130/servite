@@ -12,5 +12,8 @@ export const siatConfig = {
   wsdlOperacionesPiloto: "https://pilotosiatservicios.impuestos.gob.bo/v2/FacturacionOperaciones?wsdl",
   
   // WSDL del ambiente Piloto para Códigos (CUIS, CUFD)
-  wsdlCodigosPiloto: "https://pilotosiatservicios.impuestos.gob.bo/v2/FacturacionCodigos?wsdl"
+  wsdlCodigosPiloto: "https://pilotosiatservicios.impuestos.gob.bo/v2/FacturacionCodigos?wsdl",
+
+  // WSDL del ambiente Piloto para Facturación Compra Venta (Emisión)
+  wsdlCompraVentaPiloto: "https://pilotosiatservicios.impuestos.gob.bo/v2/ServicioFacturacionCompraVenta?wsdl"
 };
