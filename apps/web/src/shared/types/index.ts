@@ -43,6 +43,9 @@ export interface RestaurantTable {
   qr_url: string | null;
   type?: 'dine_in' | 'takeaway';
   service_status?: string | null;
+  siat_customer_nit?: string | null;
+  siat_customer_name?: string | null;
+  siat_customer_email?: string | null;
   is_active: boolean;
   created_at?: string;
   updated_at?: string;
