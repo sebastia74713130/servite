@@ -1,1 +1,6 @@
 .vercel
+# Certificados SIAT (Privados)
+*.p12
+*.pem
+*.key
+*.csr
