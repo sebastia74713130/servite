@@ -229,9 +229,10 @@ export default function PublicMenuClient({
   const [notes, setNotes] = useState('');
   const [showTakeawayPaymentQR, setShowTakeawayPaymentQR] = useState(false);
 
-  // Bill Request SIAT Data
+  // Bill Request SIAT Data & Payment Method
   const [showBillRequestModal, setShowBillRequestModal] = useState(false);
   const [customerEmail, setCustomerEmail] = useState('');
+  const [requestedPaymentMethod, setRequestedPaymentMethod] = useState('Efectivo');
 
   // Fullscreen state
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -640,6 +641,7 @@ export default function PublicMenuClient({
           siat_customer_nit: omit ? '0' : customerNit,
           siat_customer_name: omit ? 'S/N' : customerName,
           siat_customer_email: omit ? null : customerEmail,
+          requested_payment_method: requestedPaymentMethod,
           updated_at: new Date().toISOString()
         })
         .eq('id', table.id);
@@ -1470,6 +1472,20 @@ export default function PublicMenuClient({
                     placeholder="correo@ejemplo.com"
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2"
                   />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Método de Pago</label>
+                  <select 
+                    value={requestedPaymentMethod}
+                    onChange={(e) => setRequestedPaymentMethod(e.target.value)}
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2"
+                    style={{ '--tw-ring-color': brandColor } as React.CSSProperties}
+                  >
+                    <option value="Efectivo">Efectivo</option>
+                    <option value="Tarjeta">Tarjeta</option>
+                    <option value="QR / Transferencia">QR / Transferencia</option>
+                  </select>
                 </div>
               </div>
             </div>
