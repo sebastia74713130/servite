@@ -1,9 +1,11 @@
 import { extractKeysFromP12, signXml } from "./src/lib/siat/crypto/signer";
+import * as fs from "fs";
 
 async function main() {
   try {
     console.log("Probando extracción de .p12...");
-    const keys = extractKeysFromP12("certs/softoken.p12", "Aleida25007566");
+    const p12Buffer = fs.readFileSync("certs/softoken.p12");
+    const keys = extractKeysFromP12(p12Buffer, "Aleida25007566");
     console.log("✅ Llave Privada y Certificado extraídos correctamente.");
     
     // Un XML mínimo de prueba

@@ -5,11 +5,9 @@ import * as path from "path";
 import { siatConfig } from "../config";
 
 /**
- * Lee un archivo .p12 y extrae la llave privada y el certificado en formato PEM.
+ * Lee un archivo .p12 desde un Buffer y extrae la llave privada y el certificado en formato PEM.
  */
-export function extractKeysFromP12(p12Path: string, password: string) {
-  const absolutePath = path.resolve(process.cwd(), p12Path);
-  const p12Buffer = fs.readFileSync(absolutePath);
+export function extractKeysFromP12(p12Buffer: Buffer, password: string) {
   const p12Asn1 = forge.asn1.fromDer(p12Buffer.toString('binary'));
   const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, false, password);
 

@@ -2,6 +2,7 @@ import { buildFacturaXml, FacturaParams } from "./src/lib/siat/xml/invoiceBuilde
 import { signXml, extractKeysFromP12 } from "./src/lib/siat/crypto/signer";
 import { siatConfig } from "./src/lib/siat/config";
 import { generarCUF } from "./src/lib/siat/crypto/cufGenerator";
+import * as fs from "fs";
 import * as dotenv from "dotenv";
 dotenv.config({ path: ".env.local" });
 
@@ -71,7 +72,8 @@ async function main() {
     console.log(xmlBase.substring(0, 300) + "...\n");
 
     // 3. Firmar el XML
-    const keys = extractKeysFromP12("certs/softoken.p12", "Aleida25007566");
+    const p12Buffer = fs.readFileSync("certs/softoken.p12");
+    const keys = extractKeysFromP12(p12Buffer, "Aleida25007566");
     const xmlFirmado = signXml(xmlBase, keys.privateKeyPem, keys.certPem);
     
     console.log("✅ Factura Compra Venta Construida y Firmada Exitosamente.");

@@ -133,24 +133,126 @@ export default function AccountsPage() {
     setTables(prev => prev.map(t => t.id === selectedTable.id ? { ...t, service_status: null } : t));
     
     try {
-      // 1. Mark all active orders for this table as paid
       const orderIds = tableOrders.map(o => o.id);
-      if (orderIds.length > 0) {
-        await supabase
-          .from('orders')
-          .update({ 
-            is_paid: true,
-            payment_method: paymentMethod,
-            cash_register_id: activeRegister?.id || null,
-            paid_at: new Date().toISOString()
-          })
-          .in('id', orderIds);
+      if (orderIds.length === 0) throw new Error("No hay órdenes");
+
+      let generatedCuf = null;
+
+      // 1. SIAT Emission Logic (If requested)
+      if (selectedTable.service_status === 'requesting_bill' && selectedTable.siat_customer_name) {
+        try {
+          const totalAmount = tableOrders.reduce((acc, o) => acc + o.total, 0);
+          const facturaParams = {
+            cabecera: {
+              fechaEmision: new Date().toISOString(),
+              numeroFactura: Math.floor(Math.random() * 10000) + 1, // Número correlativo simulado
+              montoTotal: totalAmount,
+              montoTotalSujetoIva: totalAmount,
+              nombreRazonSocial: selectedTable.siat_customer_name,
+              numeroDocumento: selectedTable.siat_customer_nit || '0'
+            },
+            detalle: tableOrders.flatMap(o => o.order_items).map((item: any) => ({
+              codigoProducto: item.product_id ? item.product_id.substring(0, 8) : '00000000',
+              descripcion: item.product_name,
+              cantidad: item.quantity,
+              precioUnitario: item.unit_price,
+              montoDescuento: 0,
+              subTotal: item.total_price
+            }))
+          };
+
+          const response = await fetch('/api/siat/emitir', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              restaurantId: restaurant?.id,
+              orderId: orderIds[0],
+              facturaParams
+            })
+          });
+
+          const result = await response.json();
+          if (result.success) {
+            generatedCuf = result.cuf;
+            
+            // Print the Factura automatically
+            const printWindow = window.open("", "_blank");
+            if (printWindow) {
+              const html = `
+                <html>
+                  <head>
+                    <title>Factura SIAT</title>
+                    <style>
+                      body { font-family: monospace; padding: 20px; color: #000; width: 300px; margin: 0 auto; text-align: center;}
+                      h1 { font-size: 20px; margin-bottom: 5px; }
+                      h2 { font-size: 16px; margin-top: 0; margin-bottom: 20px;}
+                      .items { text-align: left; margin-top: 20px; margin-bottom: 20px;}
+                      .footer { font-size: 11px; margin-top: 20px; text-align: center;}
+                    </style>
+                  </head>
+                  <body>
+                    <h1>FACTURA ELECTRÓNICA</h1>
+                    <h2>${restaurant?.name || "Servido"}</h2>
+                    <div style="text-align:left; font-size:12px; margin-bottom: 10px;">
+                      NIT/CI: ${selectedTable.siat_customer_nit}<br/>
+                      Razón Social: ${selectedTable.siat_customer_name}
+                    </div>
+                    <div class="items">
+                      ${tableOrders.flatMap(o => (o.order_items || [])).map(item => `
+                        <div style="margin-bottom: 5px; display: flex; justify-content: space-between; font-size: 12px;">
+                          <span>${item.quantity}x ${item.product_name}</span>
+                          <span>Bs ${item.total_price.toLocaleString('es-BO')}</span>
+                        </div>
+                      `).join('')}
+                    </div>
+                    <div style="text-align: right; font-weight: bold; font-size: 16px; border-top: 1px dashed #000; padding-top: 10px;">
+                      TOTAL: Bs ${totalAmount.toLocaleString('es-BO')}
+                    </div>
+                    <div class="footer">
+                      CUF: ${generatedCuf}<br/><br/>
+                      "ESTA FACTURA CONTRIBUYE AL DESARROLLO DEL PAÍS, EL USO ILÍCITO SERÁ SANCIONADO PENALMENTE DE ACUERDO A LEY"
+                    </div>
+                    <script>
+                      window.onload = function() { window.print(); window.close(); }
+                    </script>
+                  </body>
+                </html>
+              `;
+              printWindow.document.write(html);
+              printWindow.document.close();
+            }
+            
+            alert('✅ Factura SIAT emitida exitosamente.\nCUF: ' + generatedCuf.substring(0, 15) + '...');
+          } else {
+            console.error("SIAT Error:", result.error);
+            alert("⚠️ Atención: Hubo un problema al emitir la factura SIAT: " + result.error);
+          }
+        } catch (e) {
+          console.error("Excepción en emisión SIAT:", e);
+        }
       }
+
+      // 2. Mark all active orders for this table as paid
+      await supabase
+        .from('orders')
+        .update({ 
+          is_paid: true,
+          payment_method: paymentMethod,
+          cash_register_id: activeRegister?.id || null,
+          paid_at: new Date().toISOString()
+          // Nota: Guardar el CUF en la BD requeriría una columna 'siat_cuf' en 'orders'
+        })
+        .in('id', orderIds);
       
-      // 2. Clear table service status
+      // 3. Clear table service status and temporary SIAT data
       await supabase
         .from('tables')
-        .update({ service_status: null })
+        .update({ 
+          service_status: null,
+          siat_customer_nit: null,
+          siat_customer_name: null,
+          siat_customer_email: null
+        })
         .eq('id', selectedTable.id);
 
       setSelectedTable(null);
@@ -331,6 +433,23 @@ export default function AccountsPage() {
                   >
                     Atendido
                   </button>
+                </div>
+              )}
+
+              {/* SIAT Billing Data Display */}
+              {selectedTable.service_status === 'requesting_bill' && selectedTable.siat_customer_name && (
+                <div className="mb-6 bg-blue-50 border border-blue-200 rounded-xl p-4">
+                  <div className="flex items-center gap-3 text-blue-900 mb-3">
+                    <Receipt size={24} />
+                    <h3 className="font-bold">El cliente solicitó Factura (SIAT):</h3>
+                  </div>
+                  <div className="text-sm text-blue-800 grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-4 bg-white/50 p-3 rounded-lg">
+                    <p><span className="font-semibold text-blue-900">NIT/CI:</span> {selectedTable.siat_customer_nit}</p>
+                    <p><span className="font-semibold text-blue-900">Razón Social:</span> {selectedTable.siat_customer_name}</p>
+                    {selectedTable.siat_customer_email && (
+                      <p className="col-span-1 sm:col-span-2"><span className="font-semibold text-blue-900">Correo:</span> {selectedTable.siat_customer_email}</p>
+                    )}
+                  </div>
                 </div>
               )}
 
