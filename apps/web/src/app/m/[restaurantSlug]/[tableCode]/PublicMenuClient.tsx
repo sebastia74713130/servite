@@ -231,8 +231,6 @@ export default function PublicMenuClient({
 
   // Bill Request SIAT Data
   const [showBillRequestModal, setShowBillRequestModal] = useState(false);
-  const [customerNit, setCustomerNit] = useState('');
-  const [customerName, setCustomerName] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
 
   // Fullscreen state
