@@ -36,7 +36,13 @@ export default function PublicMenuClient({
   const [selectedCatId, setSelectedCatId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [deviceSessionId, setDeviceSessionId] = useState<string | null>(null);
+  const [foodCourtSessionId, setFoodCourtSessionId] = useState<string | null>(null);
   const [sessionEnded, setSessionEnded] = useState(false);
+
+  // Customer data for takeaway orders (name for calling, NIT for invoicing)
+  const [customerName, setCustomerName] = useState('');
+  const [customerNit, setCustomerNit] = useState('');
+  const [showCustomerDataStep, setShowCustomerDataStep] = useState(false);
 
   useEffect(() => {
     if (externalSelectedCatId !== undefined) {
@@ -53,6 +59,20 @@ export default function PublicMenuClient({
           localStorage.setItem(`device_session_id_${table.id}`, sid);
         }
         setDeviceSessionId(sid);
+
+        // Food court session: shared across all restaurants on the same device
+        let fcid = localStorage.getItem('food_court_session_id');
+        if (!fcid) {
+          fcid = 'fc_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+          localStorage.setItem('food_court_session_id', fcid);
+        }
+        setFoodCourtSessionId(fcid);
+
+        // Restore saved customer name/NIT for this session
+        const savedName = localStorage.getItem('customer_name') || '';
+        const savedNit = localStorage.getItem('customer_nit') || '';
+        if (savedName) setCustomerName(savedName);
+        if (savedNit) setCustomerNit(savedNit);
       } else {
         const isEnded = sessionStorage.getItem(`session_ended_${table.id}`) === 'true';
         if (isEnded) {
@@ -91,14 +111,15 @@ export default function PublicMenuClient({
   const [isAlarmRinging, setIsAlarmRinging] = useState(false);
 
   useEffect(() => {
-    if (table.type === 'takeaway' && deviceSessionId) {
+    if (table.type === 'takeaway' && foodCourtSessionId) {
+      // Listen for updates on all orders in the food court session (multi-restaurant)
       const channel = supabase
-        .channel(`public:orders:${deviceSessionId}`)
+        .channel(`public:orders:fc:${foodCourtSessionId}`)
         .on('postgres_changes', {
           event: 'UPDATE',
           schema: 'public',
           table: 'orders',
-          filter: `customer_session_id=eq.${deviceSessionId}`
+          filter: `food_court_session_id=eq.${foodCourtSessionId}`
         }, (payload) => {
           if (payload.new.status === 'ready' && payload.old.status !== 'ready') {
             setServiceMessage("¡Tu pedido está listo! Por favor acércate a la barra a recogerlo.");
@@ -108,7 +129,7 @@ export default function PublicMenuClient({
               setIsAlarmRinging(true);
             }
           }
-          // Actualizar el estado de la orden en la vista "Mi Cuenta"
+          // Update order status in the bill view
           setBillOrders(prev => prev.map(o => o.id === payload.new.id ? { ...o, status: payload.new.status } : o));
         })
         .subscribe();
@@ -117,7 +138,7 @@ export default function PublicMenuClient({
         supabase.removeChannel(channel);
       };
     }
-  }, [table.type, deviceSessionId]);
+  }, [table.type, foodCourtSessionId]);
 
   // Efecto para finalizar la sesión cuando todos los pedidos de la barra estén entregados
   useEffect(() => {
@@ -448,6 +469,12 @@ export default function PublicMenuClient({
           if (table.type === 'takeaway' && deviceSessionId) {
             orderPayload.customer_session_id = deviceSessionId;
           }
+          // Add customer data and food court session for takeaway orders
+          if (table.type === 'takeaway') {
+            if (customerName.trim()) orderPayload.customer_name = customerName.trim();
+            if (customerNit.trim()) orderPayload.customer_nit = customerNit.trim();
+            if (foodCourtSessionId) orderPayload.food_court_session_id = foodCourtSessionId;
+          }
 
           const { data: newOrder, error: orderError } = await supabase
             .from('orders')
@@ -512,30 +539,47 @@ export default function PublicMenuClient({
       setShowCart(false);
     }
     try {
-      let query = supabase
-        .from('orders')
-        .select(`
-          *,
-          order_items (*)
-        `)
-        .eq('table_id', table.id)
-        .neq('status', 'cancelled')
-        .order('created_at', { ascending: false });
+      let data: any[] = [];
+      let error: any = null;
 
-      if (table.type === 'takeaway' && deviceSessionId) {
-        // En takeaway, queremos ver los pedidos pagados que nos pertenecen para ver su estado
-        query = query.eq('customer_session_id', deviceSessionId).eq('is_paid', true);
+      if (table.type === 'takeaway' && foodCourtSessionId) {
+        // Food court mode: fetch ALL paid orders in this session across all restaurants
+        const result = await supabase
+          .from('orders')
+          .select(`*, order_items (*), restaurants(name, logo_url)`)
+          .eq('food_court_session_id', foodCourtSessionId)
+          .eq('is_paid', true)
+          .neq('status', 'cancelled')
+          .order('created_at', { ascending: false });
+        data = result.data || [];
+        error = result.error;
+      } else if (table.type === 'takeaway' && deviceSessionId) {
+        // Fallback: no food court session yet, use device session
+        const result = await supabase
+          .from('orders')
+          .select(`*, order_items (*), restaurants(name, logo_url)`)
+          .eq('customer_session_id', deviceSessionId)
+          .eq('is_paid', true)
+          .neq('status', 'cancelled')
+          .order('created_at', { ascending: false });
+        data = result.data || [];
+        error = result.error;
       } else {
-        // En mesas normales, queremos ver los pedidos sin pagar
-        query = query.eq('is_paid', false);
+        // Normal table: show unpaid orders for this table
+        const result = await supabase
+          .from('orders')
+          .select(`*, order_items (*), restaurants(name, logo_url)`)
+          .eq('table_id', table.id)
+          .eq('is_paid', false)
+          .neq('status', 'cancelled')
+          .order('created_at', { ascending: false });
+        data = result.data || [];
+        error = result.error;
       }
 
-      const { data, error } = await query;
-        
       if (error) throw error;
 
       if (table.type !== 'takeaway' && isRefresh && billOrders.length > 0 && (!data || data.length === 0)) {
-        // Tenía pedidos sin pagar, y ahora no tiene. Significa que pagaron la cuenta (solo en mesas normales).
         setSessionEnded(true);
         sessionStorage.setItem(`session_ended_${table.id}`, 'true');
       }
@@ -1124,7 +1168,57 @@ export default function PublicMenuClient({
               <span className="text-2xl font-bold text-gray-900">Bs {cartTotal.toLocaleString('es-BO')}</span>
             </div>
             
-            {showTakeawayPaymentQR ? (
+            {/* Takeaway checkout: Step 1 = Customer Data, Step 2 = Payment QR */}
+            {table.type === 'takeaway' && showCustomerDataStep ? (
+              <div className="space-y-4">
+                <p className="text-sm font-semibold text-gray-700">¿Cómo te llamamos cuando esté listo?</p>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Tu nombre <span className="text-orange-500">*</span></label>
+                  <input
+                    type="text"
+                    value={customerName}
+                    onChange={e => setCustomerName(e.target.value)}
+                    placeholder="Ej. Juan Pérez"
+                    className="w-full mt-1.5 px-4 py-3 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2"
+                    style={{ '--tw-ring-color': brandColor } as React.CSSProperties}
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">NIT (opcional, para factura)</label>
+                  <input
+                    type="text"
+                    value={customerNit}
+                    onChange={e => setCustomerNit(e.target.value)}
+                    placeholder="Ej. 1234567"
+                    className="w-full mt-1.5 px-4 py-3 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2"
+                    style={{ '--tw-ring-color': brandColor } as React.CSSProperties}
+                  />
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={() => setShowCustomerDataStep(false)}
+                    className="flex-1 py-3 rounded-xl font-bold text-gray-600 bg-gray-100"
+                  >
+                    Atrás
+                  </button>
+                  <button
+                    onClick={() => {
+                      // Save to localStorage so it persists across restaurants
+                      if (customerName.trim()) localStorage.setItem('customer_name', customerName.trim());
+                      if (customerNit.trim()) localStorage.setItem('customer_nit', customerNit.trim());
+                      setShowCustomerDataStep(false);
+                      setShowTakeawayPaymentQR(true);
+                    }}
+                    disabled={!customerName.trim()}
+                    className="flex-1 py-3 rounded-xl font-bold text-white disabled:opacity-40 transition-transform active:scale-95"
+                    style={{ backgroundColor: brandColor }}
+                  >
+                    Continuar →
+                  </button>
+                </div>
+              </div>
+            ) : showTakeawayPaymentQR ? (
               <div className="flex flex-col items-center">
                 <p className="text-sm text-gray-600 mb-4 text-center">Escanea el QR para pagar, o presiona el botón para simular el pago.</p>
                 <div className="p-4 bg-white border border-gray-200 rounded-2xl shadow-sm mb-4">
@@ -1144,7 +1238,7 @@ export default function PublicMenuClient({
               <button 
                 onClick={() => {
                   if (table.type === 'takeaway') {
-                    setShowTakeawayPaymentQR(true);
+                    setShowCustomerDataStep(true);
                   } else {
                     handleSubmitOrder(false);
                   }
@@ -1163,6 +1257,7 @@ export default function PublicMenuClient({
           </div>
         </div>
       )}
+
       {/* Bill Modal */}
       {showBill && (
         <div className="fixed inset-0 z-50 flex flex-col bg-white animate-in slide-in-from-right duration-300">
@@ -1187,41 +1282,107 @@ export default function PublicMenuClient({
             ) : billOrders.length === 0 ? (
               <div className="text-center text-gray-500 py-10">
                 <FileText className="mx-auto mb-4 opacity-50" size={48} />
-                Aún no tienes pedidos registrados en esta mesa.
+                Aún no tienes pedidos registrados.
               </div>
-            ) : (
-              <div className="space-y-6">
-                {billOrders.map(order => (
-                  <div key={order.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-                    <div className="flex justify-between items-center mb-3">
-                      <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-                        {new Date(order.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                      </span>
-                      <span className={`text-xs font-bold px-2 py-1 rounded-md ${
-                        order.status === 'delivered' ? 'bg-gray-100 text-gray-600' :
-                        order.status === 'ready' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
-                      }`}>
-                        {order.status === 'delivered' ? 'Entregado' : 
-                         order.status === 'ready' ? 'Listo para servir' : 'En preparación'}
-                      </span>
+            ) : (() => {
+              // Get first order to show customer identity
+              const firstOrder = billOrders[0];
+              const orderCode = firstOrder.id?.slice(-6).toUpperCase();
+              const displayName = firstOrder.customer_name || customerName;
+              const displayNit = firstOrder.customer_nit || customerNit;
+
+              // Group orders by restaurant_id
+              const grouped: Record<string, { restaurantName: string; logoUrl: string | null; orders: any[] }> = {};
+              for (const order of billOrders) {
+                const rid = order.restaurant_id;
+                if (!grouped[rid]) {
+                  grouped[rid] = {
+                    restaurantName: order.restaurants?.name || restaurant.name,
+                    logoUrl: order.restaurants?.logo_url || restaurant.logo_url,
+                    orders: []
+                  };
+                }
+                grouped[rid].orders.push(order);
+              }
+              const restaurantGroups = Object.entries(grouped);
+              const isMultiRestaurant = restaurantGroups.length > 1;
+
+              return (
+                <div className="space-y-4">
+                  {/* Customer Identity Card */}
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Código de orden</span>
+                      <span className="text-lg font-black text-gray-900 tracking-widest font-mono">#{orderCode}</span>
                     </div>
-                    {order.order_items?.map((item: any) => (
-                      <div key={item.id} className="flex justify-between items-center mb-2">
-                        <div className="text-gray-900 text-sm">
-                          <span className="font-bold mr-2 text-gray-500">{item.quantity}x</span>
-                          {item.product_name}
-                        </div>
-                        <div className="font-medium text-gray-900 text-sm">Bs {item.total_price.toLocaleString('es-BO')}</div>
+                    {displayName && (
+                      <div className="flex items-center gap-2 text-gray-700">
+                        <span className="text-sm">👤</span>
+                        <span className="font-semibold text-sm">{displayName}</span>
                       </div>
-                    ))}
-                    <div className="border-t mt-3 pt-3 flex justify-between items-center font-bold text-gray-900">
-                      <span>Total parcial</span>
-                      <span>Bs {order.total.toLocaleString('es-BO')}</span>
-                    </div>
+                    )}
+                    {displayNit && (
+                      <div className="flex items-center gap-2 text-gray-500 mt-1">
+                        <span className="text-sm">📋</span>
+                        <span className="text-sm">NIT: {displayNit}</span>
+                      </div>
+                    )}
+                    {(!displayName && !displayNit) && (
+                      <p className="text-xs text-gray-400 mt-1">Muestra este código en la barra al recoger tu pedido.</p>
+                    )}
                   </div>
-                ))}
-              </div>
-            )}
+
+                  {/* Orders grouped by restaurant */}
+                  {restaurantGroups.map(([rid, group]) => (
+                    <div key={rid} className="space-y-3">
+                      {isMultiRestaurant && (
+                        <div className="flex items-center gap-2 px-1">
+                          {group.logoUrl && (
+                            <img src={group.logoUrl} alt="" className="w-6 h-6 rounded-full object-cover" />
+                          )}
+                          <span className="font-bold text-gray-800 text-sm">{group.restaurantName}</span>
+                        </div>
+                      )}
+                      {group.orders.map(order => (
+                        <div key={order.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+                          <div className="flex justify-between items-center mb-3">
+                            <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                              {new Date(order.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                            </span>
+                            <span className={`text-xs font-bold px-2 py-1 rounded-md ${
+                              order.status === 'delivered' ? 'bg-gray-100 text-gray-600' :
+                              order.status === 'ready' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
+                            }`}>
+                              {order.status === 'delivered' ? 'Entregado' : 
+                               order.status === 'ready' ? '¡Listo! Pasa a recoger' : 'En preparación'}
+                            </span>
+                          </div>
+                          {order.order_items?.map((item: any) => (
+                            <div key={item.id} className="flex justify-between items-center mb-2">
+                              <div className="text-gray-900 text-sm">
+                                <span className="font-bold mr-2 text-gray-500">{item.quantity}x</span>
+                                {item.product_name}
+                              </div>
+                              <div className="font-medium text-gray-900 text-sm">Bs {item.total_price.toLocaleString('es-BO')}</div>
+                            </div>
+                          ))}
+                          <div className="border-t mt-3 pt-3 flex justify-between items-center font-bold text-gray-900">
+                            <span>Subtotal</span>
+                            <span>Bs {order.total.toLocaleString('es-BO')}</span>
+                          </div>
+                        </div>
+                      ))}
+                      {isMultiRestaurant && (
+                        <div className="flex justify-between items-center px-2 font-semibold text-gray-600 text-sm">
+                          <span>Total {group.restaurantName}</span>
+                          <span>Bs {group.orders.reduce((a, o) => a + o.total, 0).toLocaleString('es-BO')}</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
           
           <div className="p-6 pb-[100px] bg-white border-t border-gray-200">
