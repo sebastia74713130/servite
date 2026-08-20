@@ -33,6 +33,7 @@ export async function POST(req: Request) {
       codigoPuntoVenta: parseInt(siatSettings.siat_codigo_punto_venta) || 0,
       codigoSucursal: parseInt(siatSettings.siat_codigo_sucursal) || 0,
       cuis: siatSettings.siat_cuis,
+      nit: parseInt(siatSettings.siat_nit, 10),
     });
 
     const codigoCufd = response?.RespuestaCufd?.codigo;

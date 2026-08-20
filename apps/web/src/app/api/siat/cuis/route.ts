@@ -28,6 +28,7 @@ export async function POST(req: Request) {
       codigoModalidad: 1, // Electrónica en Línea
       codigoPuntoVenta: parseInt(siatSettings.siat_codigo_punto_venta) || 0,
       codigoSucursal: parseInt(siatSettings.siat_codigo_sucursal) || 0,
+      nit: parseInt(siatSettings.siat_nit, 10),
     });
 
     const codigoCuis = response?.RespuestaCuis?.codigo;
