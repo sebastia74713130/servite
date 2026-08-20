@@ -1162,7 +1162,7 @@ export default function PublicMenuClient({
             )}
           </div>
 
-          <div className="p-6 bg-white border-t border-gray-100 pb-[100px] shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
+          <div className="p-6 bg-white border-t border-gray-100 pb-[70px] shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
             <div className="flex justify-between items-center mb-6">
               <span className="text-gray-500 font-medium">Total a pagar</span>
               <span className="text-2xl font-bold text-gray-900">Bs {cartTotal.toLocaleString('es-BO')}</span>
@@ -1385,7 +1385,7 @@ export default function PublicMenuClient({
             })()}
           </div>
           
-          <div className="p-6 pb-[100px] bg-white border-t border-gray-200">
+          <div className="p-6 pb-[70px] bg-white border-t border-gray-200">
             <div className="flex justify-between items-center mb-6">
               <span className="text-xl font-bold text-gray-900">Total a pagar</span>
               <span className="text-2xl font-bold" style={{ color: brandColor }}>
