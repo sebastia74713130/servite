@@ -155,10 +155,14 @@ export default function TestSiatPage() {
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ restaurantId, overridePuntoVenta: 1 })
                 });
-                if (res.ok) setCuisPv1Status('Completado (100%)');
-                else setCuisPv1Status('Error en la solicitud');
-              } catch (e) {
-                setCuisPv1Status('Error');
+                if (res.ok) {
+                  setCuisPv1Status('Completado (100%)');
+                } else {
+                  const errorData = await res.json();
+                  setCuisPv1Status(`Error: ${errorData.error}`);
+                }
+              } catch (e: any) {
+                setCuisPv1Status(`Error: ${e.message}`);
               }
               setRequestingCuis(false);
             }}
