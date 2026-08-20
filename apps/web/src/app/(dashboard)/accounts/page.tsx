@@ -232,8 +232,9 @@ export default function AccountsPage() {
             
             alert('✅ Factura SIAT emitida exitosamente.\nCUF: ' + generatedCuf.substring(0, 15) + '...');
           } else {
-            console.error("SIAT Error:", result.error);
-            alert("⚠️ Atención: Hubo un problema al emitir la factura SIAT: " + result.error);
+            console.error("SIAT Error:", result.error, result.detalles);
+            const detailMsg = result.detalles ? JSON.stringify(result.detalles, null, 2) : "";
+            alert("⚠️ Atención: Hubo un problema al emitir la factura SIAT:\n" + result.error + "\n" + detailMsg);
           }
         } catch (e) {
           console.error("Excepción en emisión SIAT:", e);

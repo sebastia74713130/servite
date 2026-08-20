@@ -62,6 +62,30 @@ export async function POST(req: Request) {
       codigoControlCufd: siatSettings.siat_cufd.slice(-16) // TODO: Módulo de control real del CUFD
     };
     
+    // Formatear fecha para SIAT (UTC-4)
+    const d = new Date(facturaParams.cabecera.fechaEmision);
+    d.setHours(d.getHours() - 4); 
+    const siatDate = d.toISOString().replace('Z', '');
+    
+    // Inyectar datos faltantes a la cabecera
+    facturaParams.cabecera.fechaEmision = siatDate;
+    facturaParams.cabecera.nitEmisor = siatSettings.siat_nit;
+    facturaParams.cabecera.razonSocialEmisor = "Tendai S.R.L.";
+    facturaParams.cabecera.municipio = "La Paz";
+    facturaParams.cabecera.telefono = "60000000";
+    facturaParams.cabecera.codigoSucursal = parseInt(siatSettings.siat_codigo_sucursal);
+    facturaParams.cabecera.direccion = "Av. Principal 123";
+    facturaParams.cabecera.codigoPuntoVenta = parseInt(siatSettings.siat_codigo_punto_venta);
+    facturaParams.cabecera.codigoTipoDocumentoIdentidad = 1; // 1 = CI, 5 = NIT
+    facturaParams.cabecera.codigoCliente = facturaParams.cabecera.numeroDocumento;
+    facturaParams.cabecera.codigoMetodoPago = 1; // Efectivo
+    facturaParams.cabecera.codigoMoneda = 1; // Boliviano
+    facturaParams.cabecera.tipoCambio = 1;
+    facturaParams.cabecera.montoTotalMoneda = facturaParams.cabecera.montoTotal;
+    facturaParams.cabecera.leyenda = "Ley N 453: Tienes derecho a recibir un trato equitativo y justo.";
+    facturaParams.cabecera.usuario = "cajero";
+    facturaParams.cabecera.codigoDocumentoSector = 1;
+
     // El cuf de facturaParams será sobreescrito por el generado para asegurar integridad
     const cuf = generarCUF(cufParams);
     facturaParams.cabecera.cuf = cuf;
