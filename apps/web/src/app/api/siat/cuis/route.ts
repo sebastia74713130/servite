@@ -5,7 +5,7 @@ import { solicitarCUIS } from "@/lib/siat/services/solicitarCUIS";
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { restaurantId } = body;
+    const { restaurantId, overridePuntoVenta } = body;
 
     if (!restaurantId) {
       return NextResponse.json({ error: "Falta el ID del restaurante" }, { status: 400 });
@@ -22,11 +22,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "El restaurante no tiene configurado el SIAT" }, { status: 404 });
     }
 
+    const pv = overridePuntoVenta !== undefined ? overridePuntoVenta : parseInt(siatSettings.siat_codigo_punto_venta) || 0;
+
     // 2. Solicitar CUIS
     const response = await solicitarCUIS({
       codigoAmbiente: 2, // Piloto
       codigoModalidad: 1, // Electrónica en Línea
-      codigoPuntoVenta: parseInt(siatSettings.siat_codigo_punto_venta) || 0,
+      codigoPuntoVenta: pv,
       codigoSucursal: parseInt(siatSettings.siat_codigo_sucursal) || 0,
       nit: parseInt(siatSettings.siat_nit, 10),
     });
@@ -36,11 +38,13 @@ export async function POST(req: Request) {
        throw new Error(JSON.stringify(response));
     }
 
-    // 3. Guardar en Supabase
-    await supabaseAdmin
-      .from('restaurant_siat_settings')
-      .update({ siat_cuis: codigoCuis })
-      .eq('restaurant_id', restaurantId);
+    // 3. Guardar en Supabase (Solo si no es una prueba con override)
+    if (overridePuntoVenta === undefined) {
+      await supabaseAdmin
+        .from('restaurant_siat_settings')
+        .update({ siat_cuis: codigoCuis })
+        .eq('restaurant_id', restaurantId);
+    }
 
     return NextResponse.json({
       success: true,

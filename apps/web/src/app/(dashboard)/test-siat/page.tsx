@@ -15,6 +15,9 @@ export default function TestSiatPage() {
   const [emitting, setEmitting] = useState(false);
   const [emitTarget, setEmitTarget] = useState(250);
 
+  const [cuisPv1Status, setCuisPv1Status] = useState<string>('');
+  const [requestingCuis, setRequestingCuis] = useState(false);
+
   const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
   const runSyncTests = async () => {
@@ -135,6 +138,38 @@ export default function TestSiatPage() {
     <div className="max-w-4xl mx-auto p-10 space-y-8">
       <h1 className="text-3xl font-bold text-gray-900">Automatización Pruebas Piloto SIAT</h1>
       <p className="text-gray-600">Esta página interna permite ejecutar las miles de transacciones requeridas por Impuestos Nacionales para alcanzar el 100% en las Etapas de prueba.</p>
+
+      {/* Etapa I - Obtención de CUIS para P.V. 1 */}
+      <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+        <h2 className="text-xl font-semibold mb-2">0. Etapa I - Obtención de CUIS (Punto de Venta 1)</h2>
+        <p className="text-sm text-gray-500 mb-4">El SIAT requiere solicitar al menos una vez un CUIS para el Punto de Venta 1.</p>
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={async () => {
+              if (!restaurantId) return;
+              setRequestingCuis(true);
+              setCuisPv1Status('Solicitando...');
+              try {
+                const res = await fetch('/api/siat/cuis', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ restaurantId, overridePuntoVenta: 1 })
+                });
+                if (res.ok) setCuisPv1Status('Completado (100%)');
+                else setCuisPv1Status('Error en la solicitud');
+              } catch (e) {
+                setCuisPv1Status('Error');
+              }
+              setRequestingCuis(false);
+            }}
+            disabled={requestingCuis}
+            className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg font-medium disabled:opacity-50"
+          >
+            {requestingCuis ? 'Solicitando...' : 'Solicitar CUIS para P.V. 1'}
+          </button>
+          <span className="text-sm font-medium text-gray-700">{cuisPv1Status}</span>
+        </div>
+      </div>
 
       {/* Sincronización */}
       <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
