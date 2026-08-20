@@ -1559,40 +1559,40 @@ export default function PublicMenuClient({
 
       {/* ── Bottom Navigation Bar ── */}
       <nav className={`${isPreviewMode ? 'absolute' : 'fixed'} bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-t border-gray-200/60 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]`} style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-        <div className="flex items-end justify-around h-16 max-w-lg mx-auto relative px-6">
+        <div className="flex items-end justify-around h-[52px] max-w-lg mx-auto relative px-6 pb-1">
           {/* Cuenta (Left) */}
           <button 
             onClick={() => { if (!isPreviewMode) handleFetchBill(); }}
-            className="flex flex-col items-center justify-center gap-0.5 pt-2 transition-colors w-16"
+            className="flex flex-col items-center justify-center gap-0.5 pt-1 transition-colors w-16"
             style={{ color: showBill ? (isLightBrand ? '#1F2933' : brandColor) : '#9CA3AF' }}
           >
-            <FileText size={22} />
-            <span className="text-[11px] font-semibold">Cuenta</span>
+            <FileText size={20} />
+            <span className="text-[10px] font-semibold">Cuenta</span>
           </button>
 
           {/* Menú (Center - Elevated FAB) */}
-          <div className="flex flex-col items-center -mt-5 relative">
+          <div className="flex flex-col items-center -mt-6 relative">
             <button 
               onClick={() => { setShowCart(false); setShowBill(false); setSelectedCatId(null); onCategoryChange?.(null); setSearchQuery(''); }}
-              className={`w-14 h-14 rounded-full flex items-center justify-center shadow-[0_4px_20px_rgba(0,0,0,0.15)] border-4 ${isLightBrand ? 'border-gray-100' : 'border-white'} active:scale-90 transition-transform`}
+              className={`w-12 h-12 rounded-full flex items-center justify-center shadow-[0_4px_20px_rgba(0,0,0,0.15)] border-[3px] ${isLightBrand ? 'border-gray-100' : 'border-white'} active:scale-90 transition-transform`}
               style={{ backgroundColor: brandColor }}
             >
-              <LayoutGrid size={24} style={{ color: isLightBrand ? '#1F2933' : '#FFF' }} />
+              <LayoutGrid size={22} style={{ color: isLightBrand ? '#1F2933' : '#FFF' }} />
             </button>
-            <span className="text-[11px] font-semibold mt-0.5" style={{ color: (!showCart && !showBill) ? brandColor : '#9CA3AF' }}>Menú</span>
+            <span className="text-[10px] font-semibold mt-0.5" style={{ color: (!showCart && !showBill) ? brandColor : '#9CA3AF' }}>Menú</span>
           </div>
 
           {/* Pedido (Right) */}
           <button 
             onClick={() => { if (!isPreviewMode) { setShowCart(true); setShowBill(false); } }}
-            className="flex flex-col items-center justify-center gap-0.5 pt-2 relative transition-colors w-16"
+            className="flex flex-col items-center justify-center gap-0.5 pt-1 relative transition-colors w-16"
             style={{ color: showCart ? (isLightBrand ? '#1F2933' : brandColor) : '#9CA3AF' }}
           >
-            <ShoppingCart size={22} />
-            <span className="text-[11px] font-semibold">Pedido</span>
+            <ShoppingCart size={20} />
+            <span className="text-[10px] font-semibold">Pedido</span>
             {cartCount > 0 && (
               <span 
-                className="absolute top-0.5 right-0 min-w-[18px] h-[18px] rounded-full text-white text-[10px] font-bold flex items-center justify-center px-1"
+                className="absolute top-0 right-1 min-w-[16px] h-[16px] rounded-full text-white text-[9px] font-bold flex items-center justify-center px-1"
                 style={{ backgroundColor: brandColor }}
               >
                 {cartCount}
