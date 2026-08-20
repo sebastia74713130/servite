@@ -1559,7 +1559,7 @@ export default function PublicMenuClient({
 
       {/* ── Bottom Navigation Bar ── */}
       <nav className={`${isPreviewMode ? 'absolute' : 'fixed'} bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-t border-gray-200/60 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]`} style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-        <div className="flex items-end justify-around h-[52px] max-w-lg mx-auto relative px-6 pb-1">
+        <div className="flex items-end justify-around h-[48px] max-w-lg mx-auto relative px-6">
           {/* Cuenta (Left) */}
           <button 
             onClick={() => { if (!isPreviewMode) handleFetchBill(); }}
@@ -1571,7 +1571,7 @@ export default function PublicMenuClient({
           </button>
 
           {/* Menú (Center - Elevated FAB) */}
-          <div className="flex flex-col items-center -mt-6 relative">
+          <div className="flex flex-col items-center -mt-4 relative">
             <button 
               onClick={() => { setShowCart(false); setShowBill(false); setSelectedCatId(null); onCategoryChange?.(null); setSearchQuery(''); }}
               className={`w-12 h-12 rounded-full flex items-center justify-center shadow-[0_4px_20px_rgba(0,0,0,0.15)] border-[3px] ${isLightBrand ? 'border-gray-100' : 'border-white'} active:scale-90 transition-transform`}
