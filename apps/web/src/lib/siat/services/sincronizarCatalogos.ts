@@ -51,7 +51,7 @@ export async function sincronizarCatalogosSIAT(params: {
     }
 
     if (!codigoProducto) {
-      throw new Error("No se pudo obtener la lista de productos del SIAT.");
+      throw new Error("No se pudo obtener la lista de productos del SIAT. " + JSON.stringify(productosResult));
     }
 
     return {
