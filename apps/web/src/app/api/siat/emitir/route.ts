@@ -86,6 +86,14 @@ export async function POST(req: Request) {
     facturaParams.cabecera.usuario = "cajero";
     facturaParams.cabecera.codigoDocumentoSector = 1;
 
+    // Inyectar datos faltantes al detalle
+    facturaParams.detalle = facturaParams.detalle.map((d: any) => ({
+      ...d,
+      actividadEconomica: d.actividadEconomica || "561000", // Restaurantes
+      codigoProductoSin: d.codigoProductoSin || 89920, // Servicios de expendio de comidas
+      unidadMedida: d.unidadMedida || 58 // Unidad (Bienes/Servicios)
+    }));
+
     // El cuf de facturaParams será sobreescrito por el generado para asegurar integridad
     const cuf = generarCUF(cufParams);
     facturaParams.cabecera.cuf = cuf;
