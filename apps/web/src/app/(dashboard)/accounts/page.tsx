@@ -103,6 +103,14 @@ export default function AccountsPage() {
   const [activeRegister, setActiveRegister] = useState<any>(null);
 
   useEffect(() => {
+    if (selectedTable?.requested_payment_method) {
+      setPaymentMethod(selectedTable.requested_payment_method);
+    } else {
+      setPaymentMethod('Efectivo');
+    }
+  }, [selectedTable]);
+
+  useEffect(() => {
     if (restaurant?.id) {
       fetchActiveRegister();
     }
@@ -495,7 +503,11 @@ export default function AccountsPage() {
               </div>
               
               <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Método de pago:</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {selectedTable.requested_payment_method 
+                    ? `Método de pago: ${selectedTable.requested_payment_method}` 
+                    : 'Método de pago:'}
+                </label>
                 <select 
                   value={paymentMethod}
                   onChange={e => setPaymentMethod(e.target.value)}

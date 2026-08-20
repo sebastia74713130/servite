@@ -46,6 +46,7 @@ export interface RestaurantTable {
   siat_customer_nit?: string | null;
   siat_customer_name?: string | null;
   siat_customer_email?: string | null;
+  requested_payment_method?: string | null;
   is_active: boolean;
   created_at?: string;
   updated_at?: string;

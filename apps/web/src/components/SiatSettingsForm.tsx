@@ -20,7 +20,10 @@ interface SiatSettingsFormProps {
 export function SiatSettingsForm({ restaurantId }: SiatSettingsFormProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [syncingCuis, setSyncingCuis] = useState(false);
+  const [syncingCufd, setSyncingCufd] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('Configuración SIAT guardada correctamente');
   const [error, setError] = useState<string | null>(null);
 
   // Form State
@@ -105,6 +108,7 @@ export function SiatSettingsForm({ restaurantId }: SiatSettingsFormProps) {
 
       if (dbError) throw dbError;
 
+      setSuccessMessage('Configuración SIAT guardada correctamente');
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 3000);
       setCertFile(null); // Reset file input
@@ -113,6 +117,55 @@ export function SiatSettingsForm({ restaurantId }: SiatSettingsFormProps) {
       setError(err.message || 'Error guardando configuración SIAT');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleObtenerCuis = async () => {
+    if (!restaurantId) return;
+    setSyncingCuis(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/siat/cuis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ restaurantId })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error obteniendo CUIS');
+      
+      setCuis(data.cuis);
+      setSuccessMessage('CUIS obtenido correctamente');
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 3000);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setSyncingCuis(false);
+    }
+  };
+
+  const handleObtenerCufd = async () => {
+    if (!restaurantId) return;
+    setSyncingCufd(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/siat/cufd', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ restaurantId })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error obteniendo CUFD');
+      
+      setCufd(data.cufd);
+      setCufdFecha(data.fechaVigencia);
+      setSuccessMessage('CUFD generado correctamente');
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 3000);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setSyncingCufd(false);
     }
   };
 
@@ -135,7 +188,7 @@ export function SiatSettingsForm({ restaurantId }: SiatSettingsFormProps) {
       {showSuccess && (
         <div className="flex items-center gap-3 bg-green-50 border border-green-200 text-green-700 rounded-xl p-4 animate-in fade-in">
           <CheckCircle size={20} />
-          <span className="font-medium">Configuración SIAT guardada correctamente</span>
+          <span className="font-medium">{successMessage}</span>
         </div>
       )}
 
@@ -264,6 +317,25 @@ export function SiatSettingsForm({ restaurantId }: SiatSettingsFormProps) {
                 <span>{new Date(cufdFecha).toLocaleString()}</span>
               </div>
             )}
+          </div>
+          
+          <div className="flex gap-3 pt-3 mt-3 border-t border-[#E5E7EB]">
+            <button
+              type="button"
+              onClick={handleObtenerCuis}
+              disabled={syncingCuis || !nit || saving}
+              className="flex-1 py-2 bg-white border border-[#E5E7EB] hover:bg-gray-50 text-[#4B5563] font-medium rounded-lg transition-colors disabled:opacity-50 text-sm flex items-center justify-center gap-2"
+            >
+              {syncingCuis ? 'Conectando...' : '1. Solicitar CUIS'}
+            </button>
+            <button
+              type="button"
+              onClick={handleObtenerCufd}
+              disabled={syncingCufd || !cuis || saving}
+              className="flex-1 py-2 bg-[#E76F51]/10 text-[#E76F51] hover:bg-[#E76F51]/20 font-medium rounded-lg transition-colors disabled:opacity-50 text-sm flex items-center justify-center gap-2"
+            >
+              {syncingCufd ? 'Generando...' : '2. Generar CUFD Diario'}
+            </button>
           </div>
         </div>
 

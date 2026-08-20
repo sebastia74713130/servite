@@ -25,7 +25,7 @@ export function useDashboardStats(restaurantId: string | undefined) {
 
       const { data: orders } = await supabase
         .from("orders")
-        .select("status, total, created_at, is_paid, table_id")
+        .select("status, total, created_at, is_paid, table_id, customer_session_id")
         .eq("restaurant_id", restaurantId)
         .gte("created_at", today.toISOString());
 
@@ -36,11 +36,15 @@ export function useDashboardStats(restaurantId: string | undefined) {
         let ventas = 0;
 
         orders.forEach((o: any) => {
-          if (!o.is_paid) {
-            if (o.status === "sent") nuevos.add(o.table_id);
-            if (o.status === "preparing") preparacion.add(o.table_id);
-            if (o.status === "ready") listos.add(o.table_id);
-          }
+          // El contador de "Nuevos" en el sidebar debe reflejar lo que ve la cocina (OrdersPage)
+          // La cocina agrupa por customer_session_id (takeaway) o table_id (dine-in)
+          // Y no debe ignorar los pedidos pagados (is_paid = true), porque los de takeaway suelen llegar ya pagados
+          const key = o.customer_session_id ? `session_${o.customer_session_id}` : `table_${o.table_id}`;
+
+          if (o.status === "sent" || o.status === "received") nuevos.add(key);
+          if (o.status === "preparing") preparacion.add(key);
+          if (o.status === "ready") listos.add(key);
+
           // Sum all orders for total sales
           ventas += Number(o.total || 0);
         });

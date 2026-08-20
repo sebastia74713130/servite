@@ -229,9 +229,10 @@ export default function PublicMenuClient({
   const [notes, setNotes] = useState('');
   const [showTakeawayPaymentQR, setShowTakeawayPaymentQR] = useState(false);
 
-  // Bill Request SIAT Data
+  // Bill Request SIAT Data & Payment Method
   const [showBillRequestModal, setShowBillRequestModal] = useState(false);
   const [customerEmail, setCustomerEmail] = useState('');
+  const [requestedPaymentMethod, setRequestedPaymentMethod] = useState('Efectivo');
 
   // Fullscreen state
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -640,6 +641,7 @@ export default function PublicMenuClient({
           siat_customer_nit: omit ? '0' : customerNit,
           siat_customer_name: omit ? 'S/N' : customerName,
           siat_customer_email: omit ? null : customerEmail,
+          requested_payment_method: requestedPaymentMethod,
           updated_at: new Date().toISOString()
         })
         .eq('id', table.id);
@@ -1160,7 +1162,7 @@ export default function PublicMenuClient({
             )}
           </div>
 
-          <div className="p-6 bg-white border-t border-gray-100 pb-[100px] shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
+          <div className="p-6 bg-white border-t border-gray-100 pb-[70px] shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
             <div className="flex justify-between items-center mb-6">
               <span className="text-gray-500 font-medium">Total a pagar</span>
               <span className="text-2xl font-bold text-gray-900">Bs {cartTotal.toLocaleString('es-BO')}</span>
@@ -1383,7 +1385,7 @@ export default function PublicMenuClient({
             })()}
           </div>
           
-          <div className="p-6 pb-[100px] bg-white border-t border-gray-200">
+          <div className="p-6 pb-[70px] bg-white border-t border-gray-200">
             <div className="flex justify-between items-center mb-6">
               <span className="text-xl font-bold text-gray-900">Total a pagar</span>
               <span className="text-2xl font-bold" style={{ color: brandColor }}>
@@ -1471,6 +1473,20 @@ export default function PublicMenuClient({
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2"
                   />
                 </div>
+                
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Método de Pago</label>
+                  <select 
+                    value={requestedPaymentMethod}
+                    onChange={(e) => setRequestedPaymentMethod(e.target.value)}
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2"
+                    style={{ '--tw-ring-color': brandColor } as React.CSSProperties}
+                  >
+                    <option value="Efectivo">Efectivo</option>
+                    <option value="Tarjeta">Tarjeta</option>
+                    <option value="QR / Transferencia">QR / Transferencia</option>
+                  </select>
+                </div>
               </div>
             </div>
             
@@ -1543,40 +1559,40 @@ export default function PublicMenuClient({
 
       {/* ── Bottom Navigation Bar ── */}
       <nav className={`${isPreviewMode ? 'absolute' : 'fixed'} bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-t border-gray-200/60 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]`} style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-        <div className="flex items-end justify-around h-16 max-w-lg mx-auto relative px-6">
+        <div className="flex items-end justify-around h-[48px] max-w-lg mx-auto relative px-6">
           {/* Cuenta (Left) */}
           <button 
             onClick={() => { if (!isPreviewMode) handleFetchBill(); }}
-            className="flex flex-col items-center justify-center gap-0.5 pt-2 transition-colors w-16"
+            className="flex flex-col items-center justify-center gap-0.5 pt-1 transition-colors w-16"
             style={{ color: showBill ? (isLightBrand ? '#1F2933' : brandColor) : '#9CA3AF' }}
           >
-            <FileText size={22} />
-            <span className="text-[11px] font-semibold">Cuenta</span>
+            <FileText size={20} />
+            <span className="text-[10px] font-semibold">Cuenta</span>
           </button>
 
           {/* Menú (Center - Elevated FAB) */}
-          <div className="flex flex-col items-center -mt-5 relative">
+          <div className="flex flex-col items-center -mt-4 relative">
             <button 
               onClick={() => { setShowCart(false); setShowBill(false); setSelectedCatId(null); onCategoryChange?.(null); setSearchQuery(''); }}
-              className={`w-14 h-14 rounded-full flex items-center justify-center shadow-[0_4px_20px_rgba(0,0,0,0.15)] border-4 ${isLightBrand ? 'border-gray-100' : 'border-white'} active:scale-90 transition-transform`}
+              className={`w-12 h-12 rounded-full flex items-center justify-center shadow-[0_4px_20px_rgba(0,0,0,0.15)] border-[3px] ${isLightBrand ? 'border-gray-100' : 'border-white'} active:scale-90 transition-transform`}
               style={{ backgroundColor: brandColor }}
             >
-              <LayoutGrid size={24} style={{ color: isLightBrand ? '#1F2933' : '#FFF' }} />
+              <LayoutGrid size={22} style={{ color: isLightBrand ? '#1F2933' : '#FFF' }} />
             </button>
-            <span className="text-[11px] font-semibold mt-0.5" style={{ color: (!showCart && !showBill) ? brandColor : '#9CA3AF' }}>Menú</span>
+            <span className="text-[10px] font-semibold mt-0.5" style={{ color: (!showCart && !showBill) ? brandColor : '#9CA3AF' }}>Menú</span>
           </div>
 
           {/* Pedido (Right) */}
           <button 
             onClick={() => { if (!isPreviewMode) { setShowCart(true); setShowBill(false); } }}
-            className="flex flex-col items-center justify-center gap-0.5 pt-2 relative transition-colors w-16"
+            className="flex flex-col items-center justify-center gap-0.5 pt-1 relative transition-colors w-16"
             style={{ color: showCart ? (isLightBrand ? '#1F2933' : brandColor) : '#9CA3AF' }}
           >
-            <ShoppingCart size={22} />
-            <span className="text-[11px] font-semibold">Pedido</span>
+            <ShoppingCart size={20} />
+            <span className="text-[10px] font-semibold">Pedido</span>
             {cartCount > 0 && (
               <span 
-                className="absolute top-0.5 right-0 min-w-[18px] h-[18px] rounded-full text-white text-[10px] font-bold flex items-center justify-center px-1"
+                className="absolute top-0 right-1 min-w-[16px] h-[16px] rounded-full text-white text-[9px] font-bold flex items-center justify-center px-1"
                 style={{ backgroundColor: brandColor }}
               >
                 {cartCount}
