@@ -85,15 +85,13 @@ export default function TestSiatPage() {
     for (let i = 0; i < emitTarget; i++) {
       try {
         // Generar una orden falsa al vuelo
-        const isException = i < (emitTarget / 2); // La mitad con excepción, la mitad normales
-        
         const facturaParams = {
           cabecera: {
             numeroFactura: Math.floor(Math.random() * 1000000) + 1,
-            fechaEmision: new Date().toISOString(), // Será reemplazado por la API
-            codigoTipoDocumentoIdentidad: isException ? 5 : 1, // 5 = NIT, 1 = CI
-            numeroDocumento: isException ? "99002" : "1234567", // 99002 es un NIT inválido para forzar la excepción
-            codigoExcepcion: isException ? 1 : 0,
+            fechaEmision: new Date().toISOString(),
+            codigoTipoDocumentoIdentidad: 1, // 1 = CI
+            numeroDocumento: "1234567",
+            codigoExcepcion: 0,
             montoTotal: 100,
             montoTotalSujetoIva: 100,
             montoTotalMoneda: 100,
