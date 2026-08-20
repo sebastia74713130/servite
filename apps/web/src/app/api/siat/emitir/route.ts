@@ -64,7 +64,7 @@ export async function POST(req: Request) {
     
     // Formatear fecha para SIAT (UTC-4)
     const d = new Date(facturaParams.cabecera.fechaEmision);
-    d.setHours(d.getHours() - 4); 
+    d.setUTCHours(d.getUTCHours() - 4); 
     const siatDate = d.toISOString().replace('Z', '');
     
     // Inyectar datos faltantes a la cabecera

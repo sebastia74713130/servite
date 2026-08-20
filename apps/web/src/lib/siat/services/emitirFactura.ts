@@ -19,8 +19,10 @@ export async function emitirFacturaSIAT(xmlFirmado: string, siatSettings: any) {
     // 3. Convertir el GZIP a Base64 para enviarlo en el payload SOAP
     const archivoBase64 = gzipBuffer.toString("base64");
 
-    // Formato de fecha esperado por SIAT (YYYY-MM-DDTHH:mm:ss.SSS)
-    const fechaEnvio = new Date().toISOString().replace('Z', '');
+    // Formato de fecha esperado por SIAT (UTC-4 Bolivia YYYY-MM-DDTHH:mm:ss.SSS)
+    const d = new Date();
+    d.setUTCHours(d.getUTCHours() - 4);
+    const fechaEnvio = d.toISOString().replace('Z', '');
 
     // 4. Construir el Payload
     const args = {
