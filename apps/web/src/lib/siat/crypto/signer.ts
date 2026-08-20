@@ -55,8 +55,9 @@ export function signXml(xmlString: string, privateKeyPem: string, certPem: strin
       "http://www.w3.org/2000/09/xmldsig#enveloped-signature", 
       "http://www.w3.org/2001/10/xml-exc-c14n#"
     ],
-    digestAlgorithm: "http://www.w3.org/2001/04/xmlenc#sha256"
-  });
+    digestAlgorithm: "http://www.w3.org/2001/04/xmlenc#sha256",
+    isEmptyUri: true
+  } as any);
 
   // Configuramos la llave privada
   sig.privateKey = privateKeyPem;
