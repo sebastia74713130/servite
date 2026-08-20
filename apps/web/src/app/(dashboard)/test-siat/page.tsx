@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { useRestaurantSession } from '@/hooks/useRestaurantSession';
 
 export default function TestSiatPage() {
-  const [restaurantId, setRestaurantId] = useState<string | null>(null);
+  const { restaurant, loading } = useRestaurantSession();
+  const restaurantId = restaurant?.id;
   
   const [syncCount, setSyncCount] = useState(0);
   const [syncing, setSyncing] = useState(false);
@@ -13,23 +14,6 @@ export default function TestSiatPage() {
   const [emitCount, setEmitCount] = useState(0);
   const [emitting, setEmitting] = useState(false);
   const [emitTarget, setEmitTarget] = useState(250);
-
-  useEffect(() => {
-    // Get the first restaurant of the user to run tests
-    async function loadRestaurant() {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-      const { data } = await supabase
-        .from('restaurant_users')
-        .select('restaurant_id')
-        .eq('user_id', session.user.id)
-        .limit(1)
-        .single();
-      
-      if (data) setRestaurantId(data.restaurant_id);
-    }
-    loadRestaurant();
-  }, []);
 
   const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
@@ -110,7 +94,7 @@ export default function TestSiatPage() {
     setEmitting(false);
   };
 
-  if (!restaurantId) return <div className="p-10">Cargando restaurante...</div>;
+  if (loading || !restaurantId) return <div className="p-10">Cargando restaurante...</div>;
 
   return (
     <div className="max-w-4xl mx-auto p-10 space-y-8">
