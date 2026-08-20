@@ -41,21 +41,28 @@ export async function sincronizarCatalogosSIAT(params: {
 
     // 2. Sincronizar Productos
     const [productosResult] = await client.sincronizarListaProductosServiciosAsync(args);
-    const listaProductos = productosResult.RespuestaListaProductos?.listaProductos;
+    const listaCodigos = productosResult.RespuestaListaProductos?.listaCodigos;
 
     let codigoProducto = null;
-    if (Array.isArray(listaProductos) && listaProductos.length > 0) {
-      codigoProducto = listaProductos[0].codigoProducto;
-    } else if (listaProductos?.codigoProducto) {
-      codigoProducto = listaProductos.codigoProducto;
+    let actividadAsociada = null;
+
+    if (Array.isArray(listaCodigos) && listaCodigos.length > 0) {
+      codigoProducto = listaCodigos[0].codigoProducto;
+      actividadAsociada = listaCodigos[0].codigoActividad; // Extraemos la actividad directamente del producto para garantizar asociación
+    } else if (listaCodigos?.codigoProducto) {
+      codigoProducto = listaCodigos.codigoProducto;
+      actividadAsociada = listaCodigos.codigoActividad;
     }
 
     if (!codigoProducto) {
       throw new Error("No se pudo obtener la lista de productos del SIAT. " + JSON.stringify(productosResult));
     }
 
+    // Usar la actividad asociada al producto para evitar Error 1017
+    const actividadFinal = actividadAsociada || codigoActividad;
+
     return {
-      actividad: codigoActividad,
+      actividad: actividadFinal,
       producto: codigoProducto
     };
 
