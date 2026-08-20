@@ -108,20 +108,25 @@ export async function POST(req: Request) {
     // 6. Enviar al SIAT (WSDL)
     const respuestaSiat = await emitirFacturaSIAT(xmlFirmado, siatSettings);
 
+    // Interpretar respuesta del SIAT
+    const resp = respuestaSiat.RespuestaServicioFacturacion;
+    const isSuccess = resp && (resp.codigoEstado === 904 || resp.codigoEstado === 908);
+    const estado = isSuccess ? 'VALIDADA' : 'RECHAZADA';
+    const detallesError = !isSuccess ? JSON.stringify(resp?.mensajesList || resp) : null;
+
     // Guardar en base de datos la confirmación
-    /*
     await supabaseAdmin.from('invoices').insert({
       order_id: orderId,
       restaurant_id: restaurantId,
       cuf: cuf,
+      numero_factura: facturaParams.cabecera.numeroFactura,
       xml_signed: xmlFirmado,
-      siat_reception_code: respuestaSiat.RespuestaServicioFacturacion?.codigoRecepcion || null
+      siat_estado: estado,
+      codigo_recepcion: resp?.codigoRecepcion || null,
+      detalles_error: detallesError
     });
-    */
 
-    // Interpretar respuesta del SIAT
-    const resp = respuestaSiat.RespuestaServicioFacturacion;
-    if (resp && (resp.codigoEstado === 904 || resp.codigoEstado === 908)) {
+    if (isSuccess) {
       // 904 = Validada Exitosamente, 908 = Observada (pero recibida)
       return NextResponse.json({
         success: true,
