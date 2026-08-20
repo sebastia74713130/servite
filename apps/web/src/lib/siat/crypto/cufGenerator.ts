@@ -2,7 +2,7 @@ import { calcularModulo11 } from "./modulo11";
 
 export interface CufParams {
   nit: string;
-  fechaEmision: Date;
+  fechaEmision: string; // Formato YYYY-MM-DDThh:mm:ss.SSS (Exactamente el que va al XML)
   sucursal: number;
   modalidad: number; // 1: Electrónica en Línea, 2: Computarizada en Línea
   tipoEmision: number; // 1: Online, 2: Offline
@@ -19,17 +19,11 @@ export interface CufParams {
 const padZeros = (num: number | string, places: number) => String(num).padStart(places, '0');
 
 /**
- * Convierte una fecha a la cadena de formato requerida por SIAT: YYYYMMDDHHmmssSSS
+ * Convierte una fecha SIAT a la cadena numérica requerida: YYYYMMDDHHmmssSSS
  */
-const formatDateForCuf = (date: Date): string => {
-  const yyyy = date.getFullYear();
-  const MM = padZeros(date.getMonth() + 1, 2);
-  const dd = padZeros(date.getDate(), 2);
-  const hh = padZeros(date.getHours(), 2);
-  const mm = padZeros(date.getMinutes(), 2);
-  const ss = padZeros(date.getSeconds(), 2);
-  const SSS = padZeros(date.getMilliseconds(), 3);
-  return `${yyyy}${MM}${dd}${hh}${mm}${ss}${SSS}`;
+const formatDateForCuf = (dateStr: string): string => {
+  // Ej: 2026-08-20T13:07:00.000 -> 20260820130700000
+  return dateStr.replace(/[-T:\.]/g, "");
 };
 
 /**

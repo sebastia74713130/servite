@@ -48,10 +48,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Contraseña del certificado incorrecta o archivo inválido" }, { status: 400 });
     }
 
-    // 4. Generar el CUF de la factura
+    // Formatear fecha para SIAT (UTC-4) para asegurar que el XML y el CUF tengan exactamente la misma fecha
+    const d = new Date(facturaParams.cabecera.fechaEmision);
+    d.setUTCHours(d.getUTCHours() - 4); 
+    const siatDate = d.toISOString().replace('Z', '');
+    
+    // 4. Generar el CUF de la factura con la fecha exacta del XML
     const cufParams = {
       nit: siatSettings.siat_nit,
-      fechaEmision: new Date(facturaParams.cabecera.fechaEmision),
+      fechaEmision: siatDate,
       sucursal: siatSettings.siat_codigo_sucursal,
       modalidad: 1, // Electrónica en Línea
       tipoEmision: 1, // Online
@@ -61,11 +66,6 @@ export async function POST(req: Request) {
       puntoVenta: siatSettings.siat_codigo_punto_venta,
       codigoControlCufd: siatSettings.siat_codigo_control_cufd || siatSettings.siat_cufd.slice(-16) // Fallback solo si no hay control
     };
-    
-    // Formatear fecha para SIAT (UTC-4)
-    const d = new Date(facturaParams.cabecera.fechaEmision);
-    d.setUTCHours(d.getUTCHours() - 4); 
-    const siatDate = d.toISOString().replace('Z', '');
     
     // Inyectar datos faltantes a la cabecera
     facturaParams.cabecera.fechaEmision = siatDate;
