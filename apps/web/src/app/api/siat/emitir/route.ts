@@ -86,13 +86,15 @@ export async function POST(req: Request) {
     facturaParams.cabecera.usuario = "cajero";
     facturaParams.cabecera.codigoDocumentoSector = 1;
 
-    // Inyectar datos faltantes al detalle
-    facturaParams.detalle = facturaParams.detalle.map((d: any) => ({
-      ...d,
-      actividadEconomica: d.actividadEconomica || "561000", // Restaurantes
-      codigoProductoSin: d.codigoProductoSin || 89920, // Servicios de expendio de comidas
-      unidadMedida: d.unidadMedida || 58 // Unidad (Bienes/Servicios)
-    }));
+    // Inyectar datos faltantes a los detalles
+    if (facturaParams.detalle && Array.isArray(facturaParams.detalle)) {
+      facturaParams.detalle = facturaParams.detalle.map((d: any) => ({
+        ...d,
+        actividadEconomica: d.actividadEconomica || "561000",
+        codigoProductoSin: d.codigoProductoSin || 99100,
+        unidadMedida: d.unidadMedida || 58,
+      }));
+    }
 
     // El cuf de facturaParams será sobreescrito por el generado para asegurar integridad
     const cuf = generarCUF(cufParams);
