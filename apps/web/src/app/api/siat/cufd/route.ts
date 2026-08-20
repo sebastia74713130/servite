@@ -1,34 +1,65 @@
 import { NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 import { solicitarCUFD } from "@/lib/siat/services/solicitarCUFD";
 
-export async function GET(request: Request) {
+export async function POST(req: Request) {
   try {
-    const { searchParams } = new URL(request.url);
-    const codigoPuntoVenta = searchParams.get("codigoPuntoVenta") 
-      ? parseInt(searchParams.get("codigoPuntoVenta") as string, 10) 
-      : 0;
-      
-    // En producción, el CUIS debería leerse de la base de datos (Supabase)
-    const cuis = searchParams.get("cuis") || process.env.SIAT_CUIS;
+    const body = await req.json();
+    const { restaurantId } = body;
 
-    if (!cuis) {
-      return NextResponse.json({ success: false, message: "Falta el CUIS" }, { status: 400 });
+    if (!restaurantId) {
+      return NextResponse.json({ error: "Falta el ID del restaurante" }, { status: 400 });
     }
 
+    // 1. Obtener la configuración del SIAT del restaurante
+    const { data: siatSettings, error: dbError } = await supabaseAdmin
+      .from('restaurant_siat_settings')
+      .select('*')
+      .eq('restaurant_id', restaurantId)
+      .single();
+
+    if (dbError || !siatSettings) {
+      return NextResponse.json({ error: "El restaurante no tiene configurado el SIAT" }, { status: 404 });
+    }
+
+    if (!siatSettings.siat_cuis) {
+      return NextResponse.json({ error: "Falta el CUIS. Solicite el CUIS primero." }, { status: 400 });
+    }
+
+    // 2. Solicitar CUFD
     const response = await solicitarCUFD({
       codigoAmbiente: 2, 
       codigoModalidad: 1, 
-      codigoPuntoVenta,
-      codigoSucursal: 0,
-      cuis,
+      codigoPuntoVenta: parseInt(siatSettings.siat_codigo_punto_venta) || 0,
+      codigoSucursal: parseInt(siatSettings.siat_codigo_sucursal) || 0,
+      cuis: siatSettings.siat_cuis,
     });
-    
+
+    const codigoCufd = response?.RespuestaCufd?.codigo;
+    const fechaVigencia = response?.RespuestaCufd?.fechaVigencia;
+
+    if (!codigoCufd) {
+       throw new Error(JSON.stringify(response));
+    }
+
+    // 3. Guardar en Supabase
+    await supabaseAdmin
+      .from('restaurant_siat_settings')
+      .update({ 
+        siat_cufd: codigoCufd,
+        cufd_fecha_vigencia: fechaVigencia
+      })
+      .eq('restaurant_id', restaurantId);
+
     return NextResponse.json({
       success: true,
       message: "CUFD obtenido exitosamente.",
+      cufd: codigoCufd,
+      fechaVigencia: fechaVigencia,
       data: response,
     });
   } catch (error: any) {
+    console.error("Error en solicitar CUFD:", error);
     return NextResponse.json(
       {
         success: false,
