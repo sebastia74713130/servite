@@ -22,24 +22,55 @@ export default function TestSiatPage() {
     setSyncing(true);
     let successCount = 0;
 
-    for (let i = 0; i < syncTarget; i++) {
-      if (!syncing && i > 0) break; // Allow manual stop but state is tricky in loop, we check a ref normally, but for simplicity we just let it run or rely on simple bool if we implemented a stop button.
-      try {
-        const res = await fetch('/api/siat/sincronizar', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ restaurantId })
-        });
-        if (res.ok) {
-          successCount++;
-          setSyncCount(successCount);
-        }
-      } catch (e) {
-        console.error(e);
+    try {
+      // 1. Obtener lista de métodos disponibles en el WSDL
+      const methodsRes = await fetch('/api/siat/robot/methods');
+      const methodsData = await methodsRes.json();
+      
+      if (!methodsData.success) {
+        console.error("Error obteniendo métodos", methodsData.error);
+        setSyncing(false);
+        return;
       }
-      // Wait 100ms between requests to avoid DDoS protection
-      await delay(100);
+      
+      const methods: string[] = methodsData.methods;
+      
+      // Actualizamos el target basándonos en los métodos (cada uno necesita 50 llamadas)
+      // Si el SIAT requiere 1800 y tenemos ~36 métodos, 50 c/u
+      const requiredPerMethod = 50;
+      const totalTests = methods.length * requiredPerMethod;
+      setSyncTarget(totalTests);
+
+      // 2. Ejecutar cada método 50 veces
+      for (const methodName of methods) {
+        for (let i = 0; i < requiredPerMethod; i++) {
+          if (!syncing && successCount > 0) break; // Allow manual stop logic
+          
+          try {
+            const res = await fetch('/api/siat/robot/execute', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ restaurantId, methodName })
+            });
+            
+            if (res.ok) {
+              successCount++;
+              setSyncCount(successCount);
+            } else {
+               const errData = await res.json();
+               console.error(`Error en ${methodName}:`, errData);
+            }
+          } catch (e) {
+            console.error(e);
+          }
+          // Pequeño delay para no saturar SIAT
+          await delay(50);
+        }
+      }
+    } catch (error) {
+      console.error(error);
     }
+    
     setSyncing(false);
   };
 
@@ -51,11 +82,15 @@ export default function TestSiatPage() {
     for (let i = 0; i < emitTarget; i++) {
       try {
         // Generar una orden falsa al vuelo
+        const isException = i < (emitTarget / 2); // La mitad con excepción, la mitad normales
+        
         const facturaParams = {
           cabecera: {
             numeroFactura: Math.floor(Math.random() * 1000000) + 1,
             fechaEmision: new Date().toISOString(), // Será reemplazado por la API
-            numeroDocumento: "1234567",
+            codigoTipoDocumentoIdentidad: isException ? 5 : 1, // 5 = NIT, 1 = CI
+            numeroDocumento: isException ? "99002" : "1234567", // 99002 es un NIT inválido para forzar la excepción
+            codigoExcepcion: isException ? 1 : 0,
             montoTotal: 100,
             montoTotalSujetoIva: 100,
             montoTotalMoneda: 100,

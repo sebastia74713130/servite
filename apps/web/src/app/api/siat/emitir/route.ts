@@ -76,9 +76,9 @@ export async function POST(req: Request) {
     facturaParams.cabecera.codigoSucursal = parseInt(siatSettings.siat_codigo_sucursal);
     facturaParams.cabecera.direccion = "Av. Principal 123";
     facturaParams.cabecera.codigoPuntoVenta = parseInt(siatSettings.siat_codigo_punto_venta);
-    facturaParams.cabecera.codigoTipoDocumentoIdentidad = 1; // 1 = CI, 5 = NIT
+    facturaParams.cabecera.codigoTipoDocumentoIdentidad = facturaParams.cabecera.codigoTipoDocumentoIdentidad || 1; // 1 = CI, 5 = NIT
     facturaParams.cabecera.codigoCliente = facturaParams.cabecera.numeroDocumento;
-    facturaParams.cabecera.codigoMetodoPago = 1; // Efectivo
+    facturaParams.cabecera.codigoMetodoPago = facturaParams.cabecera.codigoMetodoPago || 1; // Efectivo
     facturaParams.cabecera.codigoMoneda = 1; // Boliviano
     facturaParams.cabecera.tipoCambio = 1;
     facturaParams.cabecera.montoTotalMoneda = facturaParams.cabecera.montoTotal;
