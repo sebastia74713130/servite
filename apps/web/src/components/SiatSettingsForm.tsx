@@ -22,6 +22,7 @@ export function SiatSettingsForm({ restaurantId }: SiatSettingsFormProps) {
   const [saving, setSaving] = useState(false);
   const [syncingCuis, setSyncingCuis] = useState(false);
   const [syncingCufd, setSyncingCufd] = useState(false);
+  const [syncingCatalogos, setSyncingCatalogos] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState('Configuración SIAT guardada correctamente');
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +38,8 @@ export function SiatSettingsForm({ restaurantId }: SiatSettingsFormProps) {
   const [cuis, setCuis] = useState<string | null>(null);
   const [cufd, setCufd] = useState<string | null>(null);
   const [cufdFecha, setCufdFecha] = useState<string | null>(null);
+  const [actividad, setActividad] = useState<string | null>(null);
+  const [producto, setProducto] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadSettings() {
@@ -61,6 +64,8 @@ export function SiatSettingsForm({ restaurantId }: SiatSettingsFormProps) {
           setCuis(data.siat_cuis);
           setCufd(data.siat_cufd);
           setCufdFecha(data.cufd_fecha_vigencia);
+          setActividad(data.siat_actividad_economica);
+          setProducto(data.siat_codigo_producto_sin?.toString());
         }
       } catch (err) {
         console.error("Exception loading settings:", err);
@@ -166,6 +171,31 @@ export function SiatSettingsForm({ restaurantId }: SiatSettingsFormProps) {
       setError(err.message);
     } finally {
       setSyncingCufd(false);
+    }
+  };
+
+  const handleSincronizar = async () => {
+    if (!restaurantId) return;
+    setSyncingCatalogos(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/siat/sincronizar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ restaurantId })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error sincronizando catálogos');
+      
+      setActividad(data.actividad);
+      setProducto(data.producto);
+      setSuccessMessage('Catálogos sincronizados correctamente');
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 3000);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setSyncingCatalogos(false);
     }
   };
 
@@ -317,14 +347,22 @@ export function SiatSettingsForm({ restaurantId }: SiatSettingsFormProps) {
                 <span>{new Date(cufdFecha).toLocaleString()}</span>
               </div>
             )}
+            <div className="flex justify-between">
+              <span>Actividad Principal:</span>
+              <span className="font-mono text-[#E76F51]">{actividad ? actividad : 'No asignado'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Producto Principal:</span>
+              <span className="font-mono text-[#E76F51]">{producto ? producto : 'No asignado'}</span>
+            </div>
           </div>
           
-          <div className="flex gap-3 pt-3 mt-3 border-t border-[#E5E7EB]">
+          <div className="flex flex-col md:flex-row gap-3 pt-3 mt-3 border-t border-[#E5E7EB]">
             <button
               type="button"
               onClick={handleObtenerCuis}
               disabled={syncingCuis || !nit || saving}
-              className="flex-1 py-2 bg-white border border-[#E5E7EB] hover:bg-gray-50 text-[#4B5563] font-medium rounded-lg transition-colors disabled:opacity-50 text-sm flex items-center justify-center gap-2"
+              className="flex-1 py-2 bg-white border border-[#E5E7EB] hover:bg-gray-50 text-[#4B5563] font-medium rounded-lg transition-colors disabled:opacity-50 text-xs flex items-center justify-center gap-1"
             >
               {syncingCuis ? 'Conectando...' : '1. Solicitar CUIS'}
             </button>
@@ -332,9 +370,17 @@ export function SiatSettingsForm({ restaurantId }: SiatSettingsFormProps) {
               type="button"
               onClick={handleObtenerCufd}
               disabled={syncingCufd || !cuis || saving}
-              className="flex-1 py-2 bg-[#E76F51]/10 text-[#E76F51] hover:bg-[#E76F51]/20 font-medium rounded-lg transition-colors disabled:opacity-50 text-sm flex items-center justify-center gap-2"
+              className="flex-1 py-2 bg-white border border-[#E5E7EB] hover:bg-gray-50 text-[#4B5563] font-medium rounded-lg transition-colors disabled:opacity-50 text-xs flex items-center justify-center gap-1"
             >
-              {syncingCufd ? 'Generando...' : '2. Generar CUFD Diario'}
+              {syncingCufd ? 'Generando...' : '2. Generar CUFD'}
+            </button>
+            <button
+              type="button"
+              onClick={handleSincronizar}
+              disabled={syncingCatalogos || !cuis || saving}
+              className="flex-1 py-2 bg-[#E76F51]/10 text-[#E76F51] hover:bg-[#E76F51]/20 font-medium rounded-lg transition-colors disabled:opacity-50 text-xs flex items-center justify-center gap-1"
+            >
+              {syncingCatalogos ? 'Sincronizando...' : '3. Sincronizar'}
             </button>
           </div>
         </div>

@@ -59,7 +59,7 @@ export async function POST(req: Request) {
       tipoDocumentoSector: facturaParams.cabecera.codigoDocumentoSector || 1,
       numeroFactura: facturaParams.cabecera.numeroFactura,
       puntoVenta: siatSettings.siat_codigo_punto_venta,
-      codigoControlCufd: siatSettings.siat_cufd.slice(-16) // TODO: Módulo de control real del CUFD
+      codigoControlCufd: siatSettings.siat_codigo_control_cufd || siatSettings.siat_cufd.slice(-16) // Fallback solo si no hay control
     };
     
     // Formatear fecha para SIAT (UTC-4)
@@ -90,8 +90,8 @@ export async function POST(req: Request) {
     if (facturaParams.detalle && Array.isArray(facturaParams.detalle)) {
       facturaParams.detalle = facturaParams.detalle.map((d: any) => ({
         ...d,
-        actividadEconomica: d.actividadEconomica || "561000",
-        codigoProductoSin: d.codigoProductoSin || 99100,
+        actividadEconomica: d.actividadEconomica || siatSettings.siat_actividad_economica || "561000",
+        codigoProductoSin: d.codigoProductoSin || siatSettings.siat_codigo_producto_sin || 99100,
         unidadMedida: d.unidadMedida || 58,
       }));
     }

@@ -38,6 +38,7 @@ export async function POST(req: Request) {
 
     const codigoCufd = response?.RespuestaCufd?.codigo;
     const fechaVigencia = response?.RespuestaCufd?.fechaVigencia;
+    const codigoControl = response?.RespuestaCufd?.codigoControl;
 
     if (!codigoCufd) {
        throw new Error(JSON.stringify(response));
@@ -48,7 +49,8 @@ export async function POST(req: Request) {
       .from('restaurant_siat_settings')
       .update({ 
         siat_cufd: codigoCufd,
-        cufd_fecha_vigencia: fechaVigencia
+        cufd_fecha_vigencia: fechaVigencia,
+        siat_codigo_control_cufd: codigoControl
       })
       .eq('restaurant_id', restaurantId);
 

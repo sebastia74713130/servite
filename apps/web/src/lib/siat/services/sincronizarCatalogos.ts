@@ -1,52 +1,66 @@
-import { createSiatClient } from "../soapClient";
+import * as soap from "soap";
 import { siatConfig } from "../config";
 
-export interface SyncRequestParams {
-  codigoAmbiente?: number; 
-  codigoPuntoVenta?: number; 
-  codigoSucursal?: number; 
-  cuis?: string;
-}
-
-/**
- * Servicio para sincronizar catálogos (ej. Actividades Económicas).
- */
-export async function sincronizarActividades(params: SyncRequestParams = {}) {
-  const {
-    codigoAmbiente = 2,
-    codigoPuntoVenta = 0,
-    codigoSucursal = 0,
-    cuis = process.env.SIAT_CUIS || "",
-  } = params;
-
-  if (!cuis) {
-    throw new Error("El CUIS es obligatorio para sincronizar catálogos");
-  }
-
+export async function sincronizarCatalogosSIAT(params: {
+  codigoAmbiente: number;
+  codigoPuntoVenta: number;
+  codigoSistema: string;
+  codigoSucursal: number;
+  cuis: string;
+  nit: number;
+}) {
   try {
-    const client = await createSiatClient(siatConfig.wsdlSincronizacionPiloto);
-    
-    const solicitudSincronizacion = {
+    const client = await soap.createClientAsync(siatConfig.wsdlSincronizacionPiloto);
+    client.addHttpHeader("apikey", `TokenApi ${siatConfig.tokenDelegado}`);
+
+    const args = {
       SolicitudSincronizacion: {
-        codigoAmbiente,
-        codigoPuntoVenta,
-        codigoSistema: siatConfig.codigoSistema,
-        codigoSucursal,
-        cuis,
-        nit: parseInt(siatConfig.nit, 10)
+        codigoAmbiente: params.codigoAmbiente,
+        codigoPuntoVenta: params.codigoPuntoVenta,
+        codigoSistema: params.codigoSistema,
+        codigoSucursal: params.codigoSucursal,
+        cuis: params.cuis,
+        nit: params.nit
       }
     };
 
-    console.log("Enviando SolicitudSincronizacion...");
+    // 1. Sincronizar Actividades
+    const [actividadesResult] = await client.sincronizarActividadesAsync(args);
+    const listaActividades = actividadesResult.RespuestaListaActividades?.listaActividades;
     
-    const [result] = await client.sincronizarActividadesAsync(solicitudSincronizacion);
-    
-    return result;
-  } catch (error: any) {
-    console.error("Error en sincronizarActividades:", error);
-    if (error.root && error.root.Envelope) {
-        throw new Error(JSON.stringify(error.root.Envelope.Body.Fault));
+    let codigoActividad = null;
+    if (Array.isArray(listaActividades) && listaActividades.length > 0) {
+      codigoActividad = listaActividades[0].codigoCaeb;
+    } else if (listaActividades?.codigoCaeb) {
+      codigoActividad = listaActividades.codigoCaeb;
     }
-    throw error;
+
+    if (!codigoActividad) {
+      throw new Error("No se pudo obtener el código de actividad del SIAT. " + JSON.stringify(actividadesResult));
+    }
+
+    // 2. Sincronizar Productos
+    const [productosResult] = await client.sincronizarListaProductosServiciosAsync(args);
+    const listaProductos = productosResult.RespuestaListaProductos?.listaProductos;
+
+    let codigoProducto = null;
+    if (Array.isArray(listaProductos) && listaProductos.length > 0) {
+      codigoProducto = listaProductos[0].codigoProducto;
+    } else if (listaProductos?.codigoProducto) {
+      codigoProducto = listaProductos.codigoProducto;
+    }
+
+    if (!codigoProducto) {
+      throw new Error("No se pudo obtener la lista de productos del SIAT.");
+    }
+
+    return {
+      actividad: codigoActividad,
+      producto: codigoProducto
+    };
+
+  } catch (error: any) {
+    console.error("Error en sincronizarCatalogosSIAT:", error);
+    throw new Error(error.message || "Fallo en la comunicación con SIAT (Sincronización)");
   }
 }
