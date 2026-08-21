@@ -10,6 +10,7 @@ export default function TestSiatPage() {
   const [syncCount, setSyncCount] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const [syncTarget, setSyncTarget] = useState(1800);
+  const [currentSyncMethod, setCurrentSyncMethod] = useState('');
 
   const [emitCount, setEmitCount] = useState(0);
   const [emitting, setEmitting] = useState(false);
@@ -49,6 +50,8 @@ export default function TestSiatPage() {
         for (let i = 0; i < requiredPerMethod; i++) {
           if (!syncing && successCount > 0) break; // Allow manual stop logic
           
+          setCurrentSyncMethod(`${methodName} (${i + 1}/${requiredPerMethod})`);
+          
           try {
             const res = await fetch('/api/siat/robot/execute', {
               method: 'POST',
@@ -66,8 +69,8 @@ export default function TestSiatPage() {
           } catch (e) {
             console.error(e);
           }
-          // Pequeño delay para no saturar SIAT
-          await delay(50);
+          // Aumentado a 1000ms (1 segundo) para evitar cualquier tipo de bloqueo o rechazo por saturación del SIAT
+          await delay(1000);
         }
       }
     } catch (error) {
@@ -75,6 +78,7 @@ export default function TestSiatPage() {
     }
     
     setSyncing(false);
+    setCurrentSyncMethod('');
   };
 
   const runEmitTests = async () => {
@@ -83,6 +87,8 @@ export default function TestSiatPage() {
     let successCount = 0;
 
     for (let i = 0; i < emitTarget; i++) {
+      if (!emitting && successCount > 0) break;
+      
       try {
         // Generar una orden falsa al vuelo
         const facturaParams = {
@@ -124,8 +130,9 @@ export default function TestSiatPage() {
       } catch (e) {
         console.error(e);
       }
-      // Wait 200ms between emission requests
-      await delay(200);
+      
+      // Wait 1000ms between emission batches
+      await delay(1000);
     }
     setEmitting(false);
   };
@@ -198,6 +205,9 @@ export default function TestSiatPage() {
           ></div>
         </div>
         <p className="text-sm text-gray-500 mt-2">Completados: {syncCount} / {syncTarget}</p>
+        {currentSyncMethod && (
+          <p className="text-sm text-blue-600 font-medium mt-1 animate-pulse">Ejecutando: {currentSyncMethod}</p>
+        )}
       </div>
 
       {/* Emisión */}
