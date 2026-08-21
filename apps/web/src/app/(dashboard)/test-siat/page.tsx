@@ -11,6 +11,18 @@ export default function TestSiatPage() {
   const [syncing, setSyncing] = useState(false);
   const [syncTarget, setSyncTarget] = useState(1800);
   const [currentSyncMethod, setCurrentSyncMethod] = useState('');
+  const [selectedMethod, setSelectedMethod] = useState('all');
+  const [availableMethods, setAvailableMethods] = useState<string[]>([]);
+
+  useEffect(() => {
+    fetch('/api/siat/robot/methods')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setAvailableMethods(data.methods);
+        }
+      });
+  }, []);
 
   const [emitCount, setEmitCount] = useState(0);
   const [emitting, setEmitting] = useState(false);
@@ -37,13 +49,11 @@ export default function TestSiatPage() {
         return;
       }
       
-      const methods: string[] = methodsData.methods;
+      const methods: string[] = selectedMethod === 'all' 
+        ? methodsData.methods 
+        : [selectedMethod];
       
-      // Actualizamos el target basándonos en los métodos (cada uno necesita 50 llamadas)
-      // Si el SIAT requiere 1800 y tenemos ~36 métodos, 50 c/u
-      const requiredPerMethod = 50;
-      const totalTests = methods.length * requiredPerMethod;
-      setSyncTarget(totalTests);
+      const requiredPerMethod = syncTarget / methods.length;
 
       // 2. Ejecutar cada método 50 veces
       for (const methodName of methods) {
@@ -182,13 +192,26 @@ export default function TestSiatPage() {
 
       {/* Sincronización */}
       <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-        <h2 className="text-xl font-semibold mb-2">1. Etapa II - Sincronización de Catálogos (1800 requeridos)</h2>
-        <div className="flex items-center gap-4 mb-4">
+        <h2 className="text-xl font-semibold mb-2">1. Etapa II - Sincronización de Catálogos</h2>
+        <div className="flex items-center gap-4 mb-4 flex-wrap">
+          <select
+            value={selectedMethod}
+            onChange={e => {
+              setSelectedMethod(e.target.value);
+              setSyncTarget(e.target.value === 'all' ? availableMethods.length * 50 : 50);
+            }}
+            className="border border-gray-300 rounded-lg px-3 py-2 w-64 bg-white"
+          >
+            <option value="all">TODOS LOS CATÁLOGOS (1800)</option>
+            {availableMethods.map(m => (
+              <option key={m} value={m}>{m} (50)</option>
+            ))}
+          </select>
           <input 
             type="number" 
             value={syncTarget} 
             onChange={e => setSyncTarget(Number(e.target.value))}
-            className="border border-gray-300 rounded-lg px-3 py-2 w-32"
+            className="border border-gray-300 rounded-lg px-3 py-2 w-24"
           />
           <button 
             onClick={runSyncTests}
