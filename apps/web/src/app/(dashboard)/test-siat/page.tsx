@@ -44,30 +44,47 @@ export default function TestSiatPage() {
       const totalTests = methods.length * requiredPerMethod;
       setSyncTarget(totalTests);
 
-      // 2. Ejecutar cada método 50 veces
+      // 2. Ejecutar cada método en lotes (chunks) para mayor velocidad
+      const CHUNK_SIZE = 10; // 10 peticiones concurrentes
+
       for (const methodName of methods) {
-        for (let i = 0; i < requiredPerMethod; i++) {
+        for (let i = 0; i < requiredPerMethod; i += CHUNK_SIZE) {
           if (!syncing && successCount > 0) break; // Allow manual stop logic
           
-          try {
-            const res = await fetch('/api/siat/robot/execute', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ restaurantId, methodName })
-            });
-            
-            if (res.ok) {
-              successCount++;
-              setSyncCount(successCount);
-            } else {
-               const errData = await res.json();
-               console.error(`Error en ${methodName}:`, errData);
+          const currentChunkSize = Math.min(CHUNK_SIZE, requiredPerMethod - i);
+          
+          // Crear un array de promesas
+          const promises = Array.from({ length: currentChunkSize }).map(async () => {
+            try {
+              const res = await fetch('/api/siat/robot/execute', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ restaurantId, methodName })
+              });
+              
+              if (res.ok) {
+                return true;
+              } else {
+                 const errData = await res.json();
+                 console.error(`Error en ${methodName}:`, errData);
+                 return false;
+              }
+            } catch (e) {
+              console.error(e);
+              return false;
             }
-          } catch (e) {
-            console.error(e);
-          }
-          // Pequeño delay para no saturar SIAT
-          await delay(50);
+          });
+
+          // Ejecutar lote en paralelo
+          const results = await Promise.all(promises);
+          
+          // Contar éxitos y actualizar estado
+          const successes = results.filter(r => r).length;
+          successCount += successes;
+          setSyncCount(successCount);
+          
+          // Pequeño delay entre lotes para no saturar SIAT
+          await delay(100);
         }
       }
     } catch (error) {
@@ -82,49 +99,62 @@ export default function TestSiatPage() {
     setEmitting(true);
     let successCount = 0;
 
-    for (let i = 0; i < emitTarget; i++) {
-      try {
-        // Generar una orden falsa al vuelo
-        const facturaParams = {
-          cabecera: {
-            numeroFactura: Math.floor(Math.random() * 1000000) + 1,
-            fechaEmision: new Date().toISOString(),
-            codigoTipoDocumentoIdentidad: 1, // 1 = CI
-            numeroDocumento: "1234567",
-            codigoExcepcion: 0,
-            montoTotal: 100,
-            montoTotalSujetoIva: 100,
-            montoTotalMoneda: 100,
-          },
-          detalle: [
-            {
-              descripcion: "Producto de Prueba",
-              cantidad: 1,
-              precioUnitario: 100,
-              subTotal: 100,
-              montoDescuento: 0
-            }
-          ]
-        };
+    const EMIT_CHUNK = 5;
 
-        const res = await fetch('/api/siat/emitir', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            restaurantId, 
-            orderId: null, 
-            facturaParams 
-          })
-        });
-        
-        if (res.ok) {
-          successCount++;
-          setEmitCount(successCount);
+    for (let i = 0; i < emitTarget; i += EMIT_CHUNK) {
+      if (!emitting && successCount > 0) break;
+      
+      const currentChunkSize = Math.min(EMIT_CHUNK, emitTarget - i);
+      
+      const promises = Array.from({ length: currentChunkSize }).map(async () => {
+        try {
+          // Generar una orden falsa al vuelo
+          const facturaParams = {
+            cabecera: {
+              numeroFactura: Math.floor(Math.random() * 1000000) + 1,
+              fechaEmision: new Date().toISOString(),
+              codigoTipoDocumentoIdentidad: 1, // 1 = CI
+              numeroDocumento: "1234567",
+              codigoExcepcion: 0,
+              montoTotal: 100,
+              montoTotalSujetoIva: 100,
+              montoTotalMoneda: 100,
+            },
+            detalle: [
+              {
+                descripcion: "Producto de Prueba",
+                cantidad: 1,
+                precioUnitario: 100,
+                subTotal: 100,
+                montoDescuento: 0
+              }
+            ]
+          };
+
+          const res = await fetch('/api/siat/emitir', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              restaurantId, 
+              orderId: null, 
+              facturaParams 
+            })
+          });
+          
+          if (res.ok) return true;
+          return false;
+        } catch (e) {
+          console.error(e);
+          return false;
         }
-      } catch (e) {
-        console.error(e);
-      }
-      // Wait 200ms between emission requests
+      });
+      
+      const results = await Promise.all(promises);
+      const successes = results.filter(r => r).length;
+      successCount += successes;
+      setEmitCount(successCount);
+      
+      // Wait 200ms between emission batches
       await delay(200);
     }
     setEmitting(false);
