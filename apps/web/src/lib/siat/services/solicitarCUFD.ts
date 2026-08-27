@@ -7,13 +7,14 @@ export interface CufdRequestParams {
   codigoPuntoVenta?: number; 
   codigoSucursal?: number; 
   cuis?: string;
+  nit: number;
 }
 
 /**
  * Servicio para solicitar el CUFD (Código Único de Facturación Diario).
  * Este código caduca cada 24 horas y es obligatorio para emitir facturas.
  */
-export async function solicitarCUFD(params: CufdRequestParams = {}) {
+export async function solicitarCUFD(params: CufdRequestParams) {
   const {
     codigoAmbiente = 2,
     codigoModalidad = 1,
@@ -37,7 +38,7 @@ export async function solicitarCUFD(params: CufdRequestParams = {}) {
         codigoSistema: siatConfig.codigoSistema,
         codigoSucursal,
         cuis,
-        nit: parseInt(siatConfig.nit, 10)
+        nit: params.nit
       }
     };
 

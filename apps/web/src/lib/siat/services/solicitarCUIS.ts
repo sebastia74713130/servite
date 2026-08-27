@@ -6,13 +6,14 @@ export interface CuisRequestParams {
   codigoModalidad?: number; // 1 = Electrónica en Línea, 2 = Computarizada en Línea
   codigoPuntoVenta?: number; // 0 = Casa Matriz
   codigoSucursal?: number; // 0 = Principal
+  nit: number; // NIT del contribuyente
 }
 
 /**
  * Servicio para solicitar el CUIS (Código Único de Inicio de Sistema).
  * Obligatorio para realizar cualquier otra operación en el SIAT.
  */
-export async function solicitarCUIS(params: CuisRequestParams = {}) {
+export async function solicitarCUIS(params: CuisRequestParams) {
   const {
     codigoAmbiente = 2, // Por defecto Piloto
     codigoModalidad = 1, // Por defecto Electrónica en Línea
@@ -30,7 +31,7 @@ export async function solicitarCUIS(params: CuisRequestParams = {}) {
         codigoPuntoVenta,
         codigoSistema: siatConfig.codigoSistema,
         codigoSucursal,
-        nit: parseInt(siatConfig.nit, 10)
+        nit: params.nit
       }
     };
 
