@@ -43,6 +43,10 @@ export default function PublicMenuClient({
   const [customerName, setCustomerName] = useState('');
   const [customerNit, setCustomerNit] = useState('');
   const [showCustomerDataStep, setShowCustomerDataStep] = useState(false);
+  
+  // SIP / QR states
+  const [sipQrBase64, setSipQrBase64] = useState<string | null>(null);
+  const [activePaymentIntentId, setActivePaymentIntentId] = useState<string | null>(null);
 
   useEffect(() => {
     if (externalSelectedCatId !== undefined) {
@@ -155,6 +159,33 @@ export default function PublicMenuClient({
       }
     }
   }, [billOrders, table.id, table.type]);
+
+  useEffect(() => {
+    if (activePaymentIntentId) {
+      const channel = supabase
+        .channel(`public:orders:payment:${activePaymentIntentId}`)
+        .on('postgres_changes', {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'orders',
+          filter: `payment_intent_id=eq.${activePaymentIntentId}`
+        }, (payload) => {
+          if (payload.new.is_paid && !payload.old.is_paid) {
+            // ¡Pago exitoso!
+            setSipQrBase64(null);
+            setActivePaymentIntentId(null);
+            setShowTakeawayPaymentQR(false);
+            setCartItems([]);
+            setShowCart(false);
+            sessionStorage.setItem(`has_ordered_${table.id}`, 'true');
+            handleFetchBill();
+            setServiceMessage("¡Pago QR exitoso! Tu pedido ha sido enviado a cocina.");
+          }
+        })
+        .subscribe();
+      return () => { supabase.removeChannel(channel); };
+    }
+  }, [activePaymentIntentId, table.id]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -381,17 +412,14 @@ export default function PublicMenuClient({
     setCartItems(cartItems.filter(item => item.id !== id));
   };
 
-  const handleSubmitOrder = async (isPaid: boolean = false) => {
+  const handleSubmitOrder = async (isPaid: boolean = false, generateQR: boolean = false) => {
     if (cartItems.length === 0) return;
     
-    // INICIAR AUDIO SILENCIOSO DE FORMA SÍNCRONA
-    // Esto es vital para iOS, si se hace después de un 'await', iOS lo bloquea
-    if (isPaid) {
+    if (isPaid || generateQR) {
       if (keepAwakeAudioRef.current) {
         keepAwakeAudioRef.current.play().catch(() => {});
       }
       if (alarmAudioRef.current) {
-        // Pre-cargar la alarma para que esté lista
         alarmAudioRef.current.load();
       }
     }
@@ -399,7 +427,6 @@ export default function PublicMenuClient({
     setIsSubmitting(true);
     
     try {
-      // Group cart items by station
       const itemsByStation = cartItems.reduce((acc, item) => {
         const stationId = item.product.station_id || 'unassigned';
         if (!acc[stationId]) acc[stationId] = [];
@@ -410,7 +437,6 @@ export default function PublicMenuClient({
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      // Fetch all 'sent' orders for this table today to see if we can merge
       const { data: existingOrders, error: fetchError } = await supabase
         .from('orders')
         .select('id, subtotal, total, order_items(station_id)')
@@ -419,24 +445,21 @@ export default function PublicMenuClient({
         .eq('is_paid', isPaid)
         .gte('created_at', today.toISOString());
 
-      // We need to process each station group separately
+      // Generar un intent único si estamos pidiendo QR
+      const currentPaymentIntentId = generateQR ? `intent-${Date.now()}-${Math.random().toString(36).substring(7)}` : null;
+
       for (const [stationId, items] of Object.entries(itemsByStation)) {
         const groupTotal = items.reduce((acc, item) => acc + (item.product.price * item.quantity), 0);
         const actualStationId = stationId === 'unassigned' ? null : stationId;
         
-        // Find if there is an existing 'sent' order for this specific station
         let targetOrderId = null;
-        if (existingOrders) {
+        if (existingOrders && !generateQR) { // Si generamos QR no deberíamos fusionar con una orden anterior no pagada
           const matchingOrder = existingOrders.find(o => {
-            // Check if this order has items that match our station
-            // Handle null (unassigned) and actual UUIDs
             return o.order_items?.some(oi => oi.station_id === actualStationId);
           });
           
           if (matchingOrder) {
             targetOrderId = matchingOrder.id;
-            
-            // Update the total of the existing order
             await supabase
               .from('orders')
               .update({
@@ -446,14 +469,12 @@ export default function PublicMenuClient({
               })
               .eq('id', targetOrderId);
               
-            // Update local reference so if we merge again it's accurate
             matchingOrder.subtotal += groupTotal;
             matchingOrder.total += groupTotal;
           }
         }
 
         if (!targetOrderId) {
-          // Create new order for this station
           const orderPayload: any = {
             restaurant_id: restaurant.id,
             branch_id: table.branch_id,
@@ -465,10 +486,12 @@ export default function PublicMenuClient({
             is_paid: isPaid,
             customer_session_id: 'web-session-' + Math.random().toString(36).substring(7),
           };
+          if (currentPaymentIntentId) {
+            orderPayload.payment_intent_id = currentPaymentIntentId;
+          }
           if (table.type === 'takeaway' && deviceSessionId) {
             orderPayload.customer_session_id = deviceSessionId;
           }
-          // Add customer data and food court session for takeaway orders
           if (table.type === 'takeaway') {
             if (customerName.trim()) orderPayload.customer_name = customerName.trim();
             if (customerNit.trim()) orderPayload.customer_nit = customerNit.trim();
@@ -485,7 +508,6 @@ export default function PublicMenuClient({
           targetOrderId = newOrder.id;
         }
 
-        // Create order items for this group
         const itemsToInsert = items.map(item => ({
           order_id: targetOrderId,
           product_id: item.product.id,
@@ -503,21 +525,36 @@ export default function PublicMenuClient({
 
         if (itemsError) throw itemsError;
         
-        // Trigger a realtime update by modifying the order AFTER items are inserted
-        // This ensures the Kitchen and Orders dashboard fetch the order with its items
         await supabase
           .from('orders')
           .update({ updated_at: new Date().toISOString() })
           .eq('id', targetOrderId);
       }
 
-      // Success
+      if (generateQR && currentPaymentIntentId) {
+        // Pedir QR al API
+        const res = await fetch('/api/sip/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ paymentIntentId: currentPaymentIntentId })
+        });
+        const data = await res.json();
+        
+        if (!res.ok) throw new Error(data.error || 'Error al generar QR');
+        
+        setSipQrBase64(data.qrBase64);
+        setActivePaymentIntentId(currentPaymentIntentId);
+        // No limpiamos el carrito todavía, esperamos a que paguen
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Success normal
       sessionStorage.setItem(`has_ordered_${table.id}`, 'true');
       setCartItems([]);
       setShowCart(false);
       setShowTakeawayPaymentQR(false);
       
-      // Si el pedido se pagó exitosamente, redirigir a la pestaña de Mi Cuenta y actualizar los datos
       if (isPaid) {
         handleFetchBill();
       }
@@ -1204,34 +1241,41 @@ export default function PublicMenuClient({
                   </button>
                   <button
                     onClick={() => {
-                      // Save to localStorage so it persists across restaurants
                       if (customerName.trim()) localStorage.setItem('customer_name', customerName.trim());
                       if (customerNit.trim()) localStorage.setItem('customer_nit', customerNit.trim());
                       setShowCustomerDataStep(false);
                       setShowTakeawayPaymentQR(true);
+                      handleSubmitOrder(false, true); // Inicia proceso para generar QR real
                     }}
-                    disabled={!customerName.trim()}
+                    disabled={!customerName.trim() || isSubmitting}
                     className="flex-1 py-3 rounded-xl font-bold text-white disabled:opacity-40 transition-transform active:scale-95"
                     style={{ backgroundColor: brandColor }}
                   >
-                    Continuar →
+                    {isSubmitting ? 'Generando...' : 'Continuar →'}
                   </button>
                 </div>
               </div>
             ) : showTakeawayPaymentQR ? (
               <div className="flex flex-col items-center">
-                <p className="text-sm text-gray-600 mb-4 text-center">Escanea el QR para pagar, o presiona el botón para simular el pago.</p>
-                <div className="p-4 bg-white border border-gray-200 rounded-2xl shadow-sm mb-4">
-                  <QRCodeSVG value={`payment-sim-${Date.now()}`} size={150} />
+                <p className="text-sm text-gray-600 mb-4 text-center">Escanea el QR para pagar desde tu aplicación bancaria.</p>
+                <div className="p-4 bg-white border border-gray-200 rounded-2xl shadow-sm mb-4 min-h-[232px] flex items-center justify-center">
+                  {sipQrBase64 ? (
+                    <img src={`data:image/png;base64,${sipQrBase64}`} alt="QR de Pago" className="w-[200px] h-[200px] object-contain" />
+                  ) : (
+                    <div className="flex flex-col items-center text-gray-400">
+                      <div className="w-8 h-8 border-4 border-gray-200 border-t-gray-500 rounded-full animate-spin mb-3" style={{ borderTopColor: brandColor }}></div>
+                      <span className="text-sm font-medium">Generando QR...</span>
+                    </div>
+                  )}
                 </div>
                 <button
-                  disabled={isSubmitting}
-                  onClick={() => handleSubmitOrder(true)}
-                  className="w-full py-3 rounded-xl font-bold text-white flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-50"
-                  style={{ backgroundColor: brandColor }}
+                  onClick={() => {
+                    setShowTakeawayPaymentQR(false);
+                    // Opcional: cancelar el intento de pago
+                  }}
+                  className="w-full py-3 rounded-xl font-bold text-gray-500 flex items-center justify-center gap-2 active:scale-95 transition-transform"
                 >
-                  <CheckCircle size={20} />
-                  {isSubmitting ? 'Procesando pago...' : 'Simular Pago Exitoso'}
+                  Cancelar
                 </button>
               </div>
             ) : (
