@@ -15,14 +15,14 @@ export interface CuisRequestParams {
  */
 export async function solicitarCUIS(params: CuisRequestParams) {
   const {
-    codigoAmbiente = 2, // Por defecto Piloto
+    codigoAmbiente = siatConfig.ambiente,
     codigoModalidad = 1, // Por defecto Electrónica en Línea
     codigoPuntoVenta = 0,
     codigoSucursal = 0,
   } = params;
 
   try {
-    const client = await createSiatClient(siatConfig.wsdlCodigosPiloto);
+    const client = await createSiatClient(siatConfig.wsdlCodigos);
     
     const solicitudCuis = {
       SolicitudCuis: {

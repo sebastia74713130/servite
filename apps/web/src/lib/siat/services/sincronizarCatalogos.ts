@@ -10,7 +10,7 @@ export async function sincronizarCatalogosSIAT(params: {
   nit: number;
 }) {
   try {
-    const client = await soap.createClientAsync(siatConfig.wsdlSincronizacionPiloto);
+    const client = await soap.createClientAsync(siatConfig.wsdlSincronizacion);
     client.addHttpHeader("apikey", `TokenApi ${siatConfig.tokenDelegado}`);
 
     const args = {

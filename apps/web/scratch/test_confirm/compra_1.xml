@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<confirmacionCompra>
+    <nro>1</nro>
+    <nitEmisor>698777025</nitEmisor>
+    <codigoAutorizacion>2FCFF08D2A846D94D7AC076C4084CF8A1A2BC62D4427F4CE134C1BF74</codigoAutorizacion>
+    <numeroFactura>590082</numeroFactura>
+    <tipoCompra>1</tipoCompra>
+</confirmacionCompra>

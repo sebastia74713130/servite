@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { solicitarCUFD } from "@/lib/siat/services/solicitarCUFD";
+import { siatConfig } from "@/lib/siat/config";
 
 export async function POST(req: Request) {
   try {
@@ -28,7 +29,7 @@ export async function POST(req: Request) {
 
     // 2. Solicitar CUFD
     const response = await solicitarCUFD({
-      codigoAmbiente: 2, 
+      codigoAmbiente: siatConfig.ambiente, 
       codigoModalidad: 1, 
       codigoPuntoVenta: parseInt(siatSettings.siat_codigo_punto_venta) || 0,
       codigoSucursal: parseInt(siatSettings.siat_codigo_sucursal) || 0,

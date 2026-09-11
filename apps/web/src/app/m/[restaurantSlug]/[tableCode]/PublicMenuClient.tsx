@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { ShoppingCart, X, Plus, Minus, FileText, LayoutGrid, ChevronLeft, Search, Maximize, Minimize, CheckCircle, AlertCircle, ChevronRight } from 'lucide-react';
+import { ShoppingCart, X, Plus, Minus, FileText, LayoutGrid, ChevronLeft, Search, CheckCircle, AlertCircle, ChevronRight } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -234,77 +234,6 @@ export default function PublicMenuClient({
   const [customerEmail, setCustomerEmail] = useState('');
   const [requestedPaymentMethod, setRequestedPaymentMethod] = useState('Efectivo');
 
-  // Fullscreen state
-  const [isFullscreen, setIsFullscreen] = useState(false);
-
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      const doc = document as any;
-      const isFull = !!(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement);
-      setIsFullscreen(isFull);
-    };
-    
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
-    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
-    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
-    
-    return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
-      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
-      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
-    };
-  }, []);
-
-  const toggleFullscreen = () => {
-    const docEl = document.documentElement as any;
-    const doc = document as any;
-    
-    const reqFS = docEl.requestFullscreen || docEl.webkitRequestFullscreen || docEl.mozRequestFullScreen || docEl.msRequestFullscreen;
-    const exitFS = doc.exitFullscreen || doc.webkitExitFullscreen || doc.mozCancelFullScreen || doc.msExitFullscreen;
-    
-    const isFull = !!(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement);
-
-    if (!isFull) {
-      if (reqFS) {
-        try {
-          const promise = reqFS.call(docEl);
-          if (promise) {
-            promise.catch((err: any) => {}); // Silently ignore errors
-          }
-        } catch (e) {
-        }
-      }
-    } else {
-      if (exitFS) {
-        exitFS.call(doc);
-      }
-    }
-  };
-
-  const [hasAttemptedAutoFS, setHasAttemptedAutoFS] = useState(false);
-  
-  const handleFirstInteraction = () => {
-    if (hasAttemptedAutoFS) return;
-    setHasAttemptedAutoFS(true);
-    
-    const docEl = document.documentElement as any;
-    const doc = document as any;
-    const isFull = !!(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement);
-    
-    if (!isFull) {
-      const reqFS = docEl.requestFullscreen || docEl.webkitRequestFullscreen || docEl.mozRequestFullScreen || docEl.msRequestFullscreen;
-      if (reqFS) {
-        try {
-          const promise = reqFS.call(docEl);
-          if (promise) {
-            promise.catch(() => {});
-          }
-        } catch (e) {}
-      }
-    }
-  };
 
   // Cart state
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -679,7 +608,6 @@ export default function PublicMenuClient({
     <div 
       className="min-h-screen relative flex flex-col" 
       style={{ backgroundColor: bgColor }}
-      onClick={handleFirstInteraction}
     >
       {/* Background Image Layer */}
       {bgImageUrl && (
@@ -771,13 +699,6 @@ export default function PublicMenuClient({
               )}
             </div>
           )}
-          <button 
-            onClick={toggleFullscreen}
-            className={`w-9 h-9 rounded-full ${isLightPageBg ? 'bg-gray-100/80 text-gray-700' : 'bg-white/10 text-white'} flex items-center justify-center active:scale-90 transition-transform flex-shrink-0`}
-            aria-label="Toggle Fullscreen"
-          >
-            {isFullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
-          </button>
         </div>
 
         {/* Categories Bar */}
@@ -1036,10 +957,10 @@ export default function PublicMenuClient({
       {selectedProduct && (
         <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/60 p-0 sm:p-6 animate-in fade-in duration-200">
           <div 
-            className="bg-white w-full sm:w-[480px] sm:rounded-3xl rounded-t-3xl overflow-hidden flex flex-col max-h-[85dvh]"
+            className="bg-white w-full sm:w-[480px] sm:rounded-3xl rounded-t-3xl overflow-hidden flex flex-col max-h-[90dvh]"
             onClick={e => e.stopPropagation()}
           >
-            <div className="relative h-48 sm:h-64 bg-gray-100 flex-shrink-0">
+            <div className="relative h-48 sm:h-64 max-h-[30dvh] bg-gray-100 flex-shrink-0 transition-all duration-300">
               {selectedProduct.image_url ? (
                 <img src={selectedProduct.image_url} alt={selectedProduct.name} className="w-full h-full object-cover" />
               ) : (
@@ -1068,6 +989,11 @@ export default function PublicMenuClient({
                   <textarea 
                     value={notes}
                     onChange={e => setNotes(e.target.value)}
+                    onFocus={(e) => {
+                      setTimeout(() => {
+                        e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      }, 300);
+                    }}
                     placeholder="Ej. Sin cebolla, extra picante..."
                     className="w-full bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm resize-none h-24 focus:ring-2 focus:outline-none"
                     style={{ '--tw-ring-color': brandColor } as React.CSSProperties}
@@ -1162,7 +1088,7 @@ export default function PublicMenuClient({
             )}
           </div>
 
-          <div className="p-6 bg-white border-t border-gray-100 pb-[70px] shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
+          <div className="p-6 bg-white border-t border-gray-100 pb-[70px] shadow-[0_-10px_40px_rgba(0,0,0,0.05)] overflow-y-auto flex-shrink">
             <div className="flex justify-between items-center mb-6">
               <span className="text-gray-500 font-medium">Total a pagar</span>
               <span className="text-2xl font-bold text-gray-900">Bs {cartTotal.toLocaleString('es-BO')}</span>
@@ -1178,6 +1104,11 @@ export default function PublicMenuClient({
                     type="text"
                     value={customerName}
                     onChange={e => setCustomerName(e.target.value)}
+                    onFocus={(e) => {
+                      setTimeout(() => {
+                        e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      }, 300);
+                    }}
                     placeholder="Ej. Juan Pérez"
                     className="w-full mt-1.5 px-4 py-3 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2"
                     style={{ '--tw-ring-color': brandColor } as React.CSSProperties}
@@ -1190,6 +1121,11 @@ export default function PublicMenuClient({
                     type="text"
                     value={customerNit}
                     onChange={e => setCustomerNit(e.target.value)}
+                    onFocus={(e) => {
+                      setTimeout(() => {
+                        e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      }, 300);
+                    }}
                     placeholder="Ej. 1234567"
                     className="w-full mt-1.5 px-4 py-3 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2"
                     style={{ '--tw-ring-color': brandColor } as React.CSSProperties}
@@ -1449,6 +1385,11 @@ export default function PublicMenuClient({
                     type="text" 
                     value={customerNit}
                     onChange={(e) => setCustomerNit(e.target.value)}
+                    onFocus={(e) => {
+                      setTimeout(() => {
+                        e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      }, 300);
+                    }}
                     placeholder="Ej. 1234567"
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2"
                   />
@@ -1459,6 +1400,11 @@ export default function PublicMenuClient({
                     type="text" 
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
+                    onFocus={(e) => {
+                      setTimeout(() => {
+                        e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      }, 300);
+                    }}
                     placeholder="Ej. Juan Perez"
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2"
                   />
@@ -1469,6 +1415,11 @@ export default function PublicMenuClient({
                     type="email" 
                     value={customerEmail}
                     onChange={(e) => setCustomerEmail(e.target.value)}
+                    onFocus={(e) => {
+                      setTimeout(() => {
+                        e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      }, 300);
+                    }}
                     placeholder="correo@ejemplo.com"
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2"
                   />

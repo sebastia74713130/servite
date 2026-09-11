@@ -27,7 +27,7 @@ export async function POST(req: Request) {
     }
 
     const catalogos = await sincronizarCatalogosSIAT({
-      codigoAmbiente: 2,
+      codigoAmbiente: siatConfig.ambiente,
       codigoPuntoVenta: parseInt(siatSettings.siat_codigo_punto_venta) || 0,
       codigoSistema: siatConfig.codigoSistema,
       codigoSucursal: parseInt(siatSettings.siat_codigo_sucursal) || 0,

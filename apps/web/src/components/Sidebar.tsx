@@ -17,7 +17,8 @@ import {
   Receipt,
   LogOut,
   Wallet,
-  Package
+  Package,
+  CalendarClock
 } from "lucide-react";
 
 let globalUtterance: SpeechSynthesisUtterance | null = null;
@@ -28,6 +29,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: { isOpen?: boolean, setIsO
   const { restaurant } = useRestaurantSession();
   const { stats } = useDashboardStats(restaurant?.id);
   const [callingTablesCount, setCallingTablesCount] = useState(0);
+  const [pendingReservationsCount, setPendingReservationsCount] = useState(0);
   const [hasInteracted, setHasInteracted] = useState(false);
 
   const prevNuevosRef = useRef(0);
@@ -48,7 +50,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: { isOpen?: boolean, setIsO
     };
   }, []);
 
-  const playSound = (type: 'order' | 'call' | 'ready') => {
+  const playSound = (type: 'order' | 'call' | 'ready' | 'reservation') => {
     try {
       if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
         let msg = 'Revisa tu panel de Servido.';
@@ -56,6 +58,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: { isOpen?: boolean, setIsO
         if (type === 'order') title = '🍔 ¡Nuevo Pedido!';
         else if (type === 'call') title = '🛎️ ¡Llamado de Mesa!';
         else if (type === 'ready') title = '✅ ¡Pedido Listo!';
+        else if (type === 'reservation') title = '📅 ¡Nueva Reserva!';
         
         new Notification(title, { body: msg });
       }
@@ -70,6 +73,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: { isOpen?: boolean, setIsO
         if (type === 'order') speechText = 'Nuevo pedido';
         else if (type === 'call') speechText = 'Llamada en mesa';
         else if (type === 'ready') speechText = 'Pedido listo';
+        else if (type === 'reservation') speechText = 'Nueva reserva';
 
         globalUtterance = new SpeechSynthesisUtterance(speechText);
         globalUtterance.rate = 1.1;
@@ -150,9 +154,40 @@ export function Sidebar({ isOpen = true, setIsOpen }: { isOpen?: boolean, setIsO
       )
       .subscribe();
 
+    // Fetch pending reservations count
+    const fetchPendingReservations = async () => {
+      const today = new Date().toISOString().split('T')[0];
+      const { data } = await supabase
+        .from('reservations')
+        .select('id')
+        .eq('restaurant_id', restaurant.id)
+        .eq('status', 'pending')
+        .gte('reservation_date', today);
+      
+      setPendingReservationsCount(data?.length || 0);
+    };
+
+    fetchPendingReservations();
+
+    const channelReservations = supabase
+      .channel(`public:reservations_sidebar_${Math.random()}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'reservations' },
+        async (payload: any) => {
+          fetchPendingReservations();
+          
+          if (payload.eventType === 'INSERT' && payload.new && payload.new.restaurant_id === restaurant.id) {
+            playSound('reservation');
+          }
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(channelTables);
       supabase.removeChannel(channelOrders);
+      supabase.removeChannel(channelReservations);
     };
   }, [restaurant?.id]);
 
@@ -170,6 +205,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: { isOpen?: boolean, setIsO
     { name: "Inventario", href: "/inventory", icon: Package },
     { name: "Menú", href: "/menu", icon: UtensilsCrossed },
     { name: "Mesas", href: "/tables", icon: LayoutGrid },
+    { name: "Reservas", href: "/reservations", icon: CalendarClock },
     { name: "Configuración", href: "/settings", icon: Settings },
   ];
 
@@ -206,6 +242,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: { isOpen?: boolean, setIsO
           let badgeCount = 0;
           if (link.name === "Pedidos") badgeCount = stats?.nuevos || 0;
           if (link.name === "Cuentas") badgeCount = callingTablesCount;
+          if (link.name === "Reservas") badgeCount = pendingReservationsCount;
 
           return (
             <Link

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { solicitarCUIS } from "@/lib/siat/services/solicitarCUIS";
+import { siatConfig } from "@/lib/siat/config";
 
 export async function POST(req: Request) {
   try {
@@ -26,7 +27,7 @@ export async function POST(req: Request) {
 
     // 2. Solicitar CUIS
     const response = await solicitarCUIS({
-      codigoAmbiente: 2, // Piloto
+      codigoAmbiente: siatConfig.ambiente,
       codigoModalidad: 1, // Electrónica en Línea
       codigoPuntoVenta: pv,
       codigoSucursal: parseInt(siatSettings.siat_codigo_sucursal) || 0,

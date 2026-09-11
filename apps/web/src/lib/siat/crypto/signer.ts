@@ -41,7 +41,7 @@ export function extractKeysFromP12(p12Buffer: Buffer, password: string) {
 /**
  * Firma un documento XML en formato string usando XMLDSig (RSA-SHA256).
  */
-export function signXml(xmlString: string, privateKeyPem: string, certPem: string): string {
+export function signXml(xmlString: string, privateKeyPem: string, certPem: string, nodeName: string = "facturaElectronicaCompraVenta"): string {
   const sig = new SignedXml();
   
   // SIAT requiere los algoritmos estándar de XMLDSig
@@ -50,7 +50,7 @@ export function signXml(xmlString: string, privateKeyPem: string, certPem: strin
 
   // Añadir la referencia (apunta al documento completo usando enveloped signature)
   sig.addReference({
-    xpath: "//*[local-name(.)='facturaElectronicaCompraVenta']",
+    xpath: `//*[local-name(.)='${nodeName}']`,
     transforms: [
       "http://www.w3.org/2000/09/xmldsig#enveloped-signature", 
       "http://www.w3.org/2001/10/xml-exc-c14n#"

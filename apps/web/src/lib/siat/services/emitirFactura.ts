@@ -27,7 +27,7 @@ export async function emitirFacturaSIAT(xmlFirmado: string, siatSettings: any) {
     // 4. Construir el Payload
     const args = {
       SolicitudServicioRecepcionFactura: {
-        codigoAmbiente: 2, // 2 = Piloto
+        codigoAmbiente: siatConfig.ambiente,
         codigoDocumentoSector: 1, // 1 = Compra Venta
         codigoEmision: 1, // 1 = Online, 2 = Offline
         codigoModalidad: 1, // 1 = Electrónica en Línea, 2 = Computarizada
@@ -45,7 +45,7 @@ export async function emitirFacturaSIAT(xmlFirmado: string, siatSettings: any) {
     };
 
     // 5. Crear cliente SOAP
-    const client = await soap.createClientAsync(siatConfig.wsdlCompraVentaPiloto);
+    const client = await soap.createClientAsync(siatConfig.wsdlCompraVenta);
     
     // Configurar Token de API
     client.addHttpHeader("apikey", `TokenApi ${siatConfig.tokenDelegado}`);

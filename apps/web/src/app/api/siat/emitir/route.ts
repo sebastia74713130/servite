@@ -7,7 +7,7 @@ import { emitirFacturaSIAT } from "@/lib/siat/services/emitirFactura";
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { restaurantId, orderId, facturaParams } = body;
+    const { restaurantId, orderId, facturaParams, simulateOffline } = body;
 
     if (!restaurantId || !facturaParams) {
       return NextResponse.json({ error: "Faltan parámetros requeridos" }, { status: 400 });
@@ -105,41 +105,76 @@ export async function POST(req: Request) {
     const xmlBase = buildFacturaXml(facturaParams);
     const xmlFirmado = signXml(xmlBase, keys.privateKeyPem, keys.certPem);
 
-    // 6. Enviar al SIAT (WSDL)
-    const respuestaSiat = await emitirFacturaSIAT(xmlFirmado, siatSettings);
+    let isSuccess = false;
+    let isOffline = false;
+    let resp: any = null;
+    let xmlFinal = xmlFirmado;
+    let cufFinal = cuf;
 
-    // Interpretar respuesta del SIAT
-    const resp = respuestaSiat.RespuestaServicioFacturacion;
-    const isSuccess = resp && (resp.codigoEstado === 904 || resp.codigoEstado === 908);
-    const estado = isSuccess ? 'VALIDADA' : 'RECHAZADA';
-    const detallesError = !isSuccess ? JSON.stringify(resp?.mensajesList || resp) : null;
+    try {
+      if (simulateOffline) {
+        throw new Error("Simulación de corte de internet (Inspección SIAT)");
+      }
+      // 6. Enviar al SIAT (WSDL)
+      const respuestaSiat = await emitirFacturaSIAT(xmlFirmado, siatSettings);
+      resp = respuestaSiat.RespuestaServicioFacturacion;
+      isSuccess = resp && (resp.codigoEstado === 904 || resp.codigoEstado === 908);
+    } catch (networkError: any) {
+      // Si emitirFacturaSIAT lanza un error (falla de red, SIAT caído, timeout), caemos a Offline
+      isOffline = true;
+      
+      // Regeneramos CUF con tipoEmision: 2 (Offline)
+      cufParams.tipoEmision = 2;
+      cufFinal = generarCUF(cufParams);
+      facturaParams.cabecera.cuf = cufFinal;
+      
+      // Añadimos el código CAFC si existe para contingencia
+      if (siatSettings.siat_cafc) {
+        facturaParams.cabecera.cafc = siatSettings.siat_cafc;
+      }
+      
+      // Re-firmamos el XML
+      const xmlBaseOffline = buildFacturaXml(facturaParams);
+      xmlFinal = signXml(xmlBaseOffline, keys.privateKeyPem, keys.certPem);
+    }
 
-    // Guardar en base de datos la confirmación
+    // Interpretar estado
+    const estado = isOffline ? 'PENDIENTE_OFFLINE' : (isSuccess ? 'VALIDADA' : 'RECHAZADA');
+    const detallesError = isOffline 
+      ? 'Caída de conexión - Guardada para empaquetado offline' 
+      : (!isSuccess ? JSON.stringify(resp?.mensajesList || resp) : null);
+
+    // Guardar en base de datos la confirmación o estado offline
     await supabaseAdmin.from('invoices').insert({
       order_id: orderId,
       restaurant_id: restaurantId,
-      cuf: cuf,
+      cuf: cufFinal,
       numero_factura: facturaParams.cabecera.numeroFactura,
-      xml_signed: xmlFirmado,
+      xml_signed: xmlFinal,
       siat_estado: estado,
       codigo_recepcion: resp?.codigoRecepcion || null,
       detalles_error: detallesError
     });
 
-    if (isSuccess) {
-      // 904 = Validada Exitosamente, 908 = Observada (pero recibida)
+    if (isOffline) {
+      return NextResponse.json({
+        success: true,
+        message: "Factura emitida en modo contingencia (Offline).",
+        cuf: cufFinal,
+        offline: true
+      });
+    } else if (isSuccess) {
       return NextResponse.json({
         success: true,
         message: "Factura validada y recepcionada por el SIAT.",
-        cuf: cuf,
+        cuf: cufFinal,
         codigoRecepcion: resp.codigoRecepcion
       });
     } else {
-      // Rechazada u otro error
       return NextResponse.json({
         success: false,
         error: "Factura rechazada por el SIAT",
-        cuf: cuf,
+        cuf: cufFinal,
         detalles: resp?.mensajesList || resp
       }, { status: 400 });
     }

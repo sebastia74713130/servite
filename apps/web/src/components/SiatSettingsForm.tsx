@@ -32,6 +32,7 @@ export function SiatSettingsForm({ restaurantId }: SiatSettingsFormProps) {
   const [sucursal, setSucursal] = useState('0');
   const [puntoVenta, setPuntoVenta] = useState('0');
   const [certPassword, setCertPassword] = useState('');
+  const [cafc, setCafc] = useState('');
   const [certFile, setCertFile] = useState<File | null>(null);
 
   // Status state
@@ -61,6 +62,7 @@ export function SiatSettingsForm({ restaurantId }: SiatSettingsFormProps) {
           setSucursal(data.siat_codigo_sucursal?.toString() || '0');
           setPuntoVenta(data.siat_codigo_punto_venta?.toString() || '0');
           setCertPassword(data.siat_cert_password || '');
+          setCafc(data.siat_cafc || '');
           setCuis(data.siat_cuis);
           setCufd(data.siat_cufd);
           setCufdFecha(data.cufd_fecha_vigencia);
@@ -77,19 +79,15 @@ export function SiatSettingsForm({ restaurantId }: SiatSettingsFormProps) {
     loadSettings();
   }, [restaurantId]);
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!restaurantId) return;
-
+  const saveSettings = async () => {
+    if (!restaurantId) return false;
     setSaving(true);
     setError(null);
     setShowSuccess(false);
 
     try {
-      // 1. Upload .p12 if provided
       if (certFile) {
         const filePath = `${restaurantId}/cert.p12`;
-        
         const { error: uploadError } = await supabase.storage
           .from('siat_certificates')
           .upload(filePath, certFile, { upsert: true });
@@ -99,7 +97,6 @@ export function SiatSettingsForm({ restaurantId }: SiatSettingsFormProps) {
         }
       }
 
-      // 2. Save Settings in DB
       const { error: dbError } = await supabase
         .from('restaurant_siat_settings')
         .upsert({
@@ -108,25 +105,37 @@ export function SiatSettingsForm({ restaurantId }: SiatSettingsFormProps) {
           siat_codigo_sucursal: parseInt(sucursal) || 0,
           siat_codigo_punto_venta: parseInt(puntoVenta) || 0,
           siat_cert_password: certPassword,
-          // CUIS and CUFD are preserved, they are fetched separately
+          siat_cafc: cafc,
         }, { onConflict: 'restaurant_id' });
 
       if (dbError) throw dbError;
-
-      setSuccessMessage('Configuración SIAT guardada correctamente');
-      setShowSuccess(true);
-      setTimeout(() => setShowSuccess(false), 3000);
+      
       setCertFile(null); // Reset file input
+      return true;
     } catch (err: any) {
       console.error(err);
       setError(err.message || 'Error guardando configuración SIAT');
+      return false;
     } finally {
       setSaving(false);
     }
   };
 
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const success = await saveSettings();
+    if (success) {
+      setSuccessMessage('Configuración SIAT guardada correctamente');
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 3000);
+    }
+  };
+
   const handleObtenerCuis = async () => {
     if (!restaurantId) return;
+    const saved = await saveSettings();
+    if (!saved) return;
+
     setSyncingCuis(true);
     setError(null);
     try {
@@ -151,6 +160,9 @@ export function SiatSettingsForm({ restaurantId }: SiatSettingsFormProps) {
 
   const handleObtenerCufd = async () => {
     if (!restaurantId) return;
+    const saved = await saveSettings();
+    if (!saved) return;
+
     setSyncingCufd(true);
     setError(null);
     try {
@@ -176,6 +188,9 @@ export function SiatSettingsForm({ restaurantId }: SiatSettingsFormProps) {
 
   const handleSincronizar = async () => {
     if (!restaurantId) return;
+    const saved = await saveSettings();
+    if (!saved) return;
+
     setSyncingCatalogos(true);
     setError(null);
     try {
@@ -279,6 +294,21 @@ export function SiatSettingsForm({ restaurantId }: SiatSettingsFormProps) {
             />
           </div>
 
+          {/* CAFC */}
+          <div>
+            <label className="text-sm font-medium text-[#1F2933] mb-1.5 flex items-center gap-2">
+              <ShieldCheck size={14} className="text-[#6B7280]" />
+              Código CAFC (Contingencia)
+            </label>
+            <input
+              type="text"
+              value={cafc}
+              onChange={e => setCafc(e.target.value)}
+              className="w-full border border-[#E5E7EB] rounded-xl px-4 py-3 text-[#1F2933] focus:outline-none focus:ring-2 focus:ring-[#E76F51]/30 focus:border-[#E76F51] transition-colors"
+              placeholder="Opcional. Ej: 101C155D9178E"
+            />
+          </div>
+
           {/* Password */}
           <div>
             <label className="text-sm font-medium text-[#1F2933] mb-1.5 flex items-center gap-2">
@@ -354,6 +384,10 @@ export function SiatSettingsForm({ restaurantId }: SiatSettingsFormProps) {
             <div className="flex justify-between">
               <span>Producto Principal:</span>
               <span className="font-mono text-[#E76F51]">{producto ? producto : 'No asignado'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>CAFC Activo:</span>
+              <span className="font-mono text-[#E76F51]">{cafc ? 'Configurado' : 'Ninguno'}</span>
             </div>
           </div>
           

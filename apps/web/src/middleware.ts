@@ -1,0 +1,77 @@
+import { NextRequest, NextResponse } from 'next/server';
+
+/**
+ * Middleware para detectar subdominios de restaurantes y reescribir la URL
+ * internamente a la ruta /m/[restaurantSlug]/[...path].
+ * 
+ * Ejemplo:
+ *   Petición: https://mi-restaurante.servido.app/MESA-1
+ *   Reescribe a: /m/mi-restaurante/MESA-1
+ * 
+ * Requiere que NEXT_PUBLIC_ROOT_DOMAIN esté configurado (ej: "servido.app").
+ * Si no está configurado, el middleware no hace nada.
+ */
+export function middleware(request: NextRequest) {
+  const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN;
+
+  // Si no hay dominio raíz configurado, no hacer nada
+  if (!rootDomain) {
+    return NextResponse.next();
+  }
+
+  const hostname = request.headers.get('host') || '';
+  
+  // Remover el puerto si existe (para desarrollo local)
+  const hostnameWithoutPort = hostname.split(':')[0];
+
+  // Si es el dominio raíz o www, dejar pasar normalmente (dashboard)
+  if (
+    hostnameWithoutPort === rootDomain ||
+    hostnameWithoutPort === `www.${rootDomain}` ||
+    hostnameWithoutPort === 'localhost'
+  ) {
+    return NextResponse.next();
+  }
+
+  // Extraer el subdominio
+  // Ej: "mi-restaurante.servido.app" → "mi-restaurante"
+  const subdomain = hostnameWithoutPort.replace(`.${rootDomain}`, '');
+
+  // Si no hay subdominio o es el mismo hostname (no se extrajo nada), dejar pasar
+  if (!subdomain || subdomain === hostnameWithoutPort) {
+    return NextResponse.next();
+  }
+
+  const pathname = request.nextUrl.pathname;
+
+  // No reescribir rutas del sistema
+  if (
+    pathname.startsWith('/_next') ||
+    pathname.startsWith('/api') ||
+    pathname.startsWith('/auth') ||
+    pathname.startsWith('/m/') ||
+    pathname === '/favicon.ico' ||
+    pathname.startsWith('/login') ||
+    pathname.startsWith('/register')
+  ) {
+    return NextResponse.next();
+  }
+
+  // Reescribir: /MESA-1 → /m/mi-restaurante/MESA-1
+  const rewrittenUrl = request.nextUrl.clone();
+  rewrittenUrl.pathname = `/m/${subdomain}${pathname}`;
+  
+  return NextResponse.rewrite(rewrittenUrl);
+}
+
+export const config = {
+  matcher: [
+    /*
+     * Match all request paths except:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (browser icon)
+     */
+    '/((?!_next/static|_next/image|favicon.ico).*)',
+  ],
+};

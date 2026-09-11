@@ -1,0 +1,193 @@
+import * as soap from 'soap';
+import * as fs from 'fs';
+import * as path from 'path';
+import { execSync } from 'child_process';
+import * as crypto from 'crypto';
+import { extractKeysFromP12, signXml } from './src/lib/siat/crypto/signer';
+import { buildFacturaXml } from './src/lib/siat/xml/invoiceBuilder';
+import { generarCUF } from './src/lib/siat/crypto/cufGenerator';
+
+const envPath = path.resolve(process.cwd(), '.env.local');
+const envContent = fs.readFileSync(envPath, 'utf8');
+const envVars: Record<string, string> = {};
+envContent.split('\n').forEach(line => {
+  const [key, ...val] = line.split('=');
+  if (key && val.length > 0) {
+    let cleanVal = val.join('=').trim();
+    if (cleanVal.startsWith('"') && cleanVal.endsWith('"')) { cleanVal = cleanVal.slice(1, -1); }
+    envVars[key.trim()] = cleanVal;
+  }
+});
+
+const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
+
+function getBoliviaTimeForXML(offsetMs = 0) {
+    const d = new Date(Date.now() + offsetMs);
+    const boliviaTime = new Date(d.getTime() - (4 * 60 * 60 * 1000));
+    return boliviaTime.toISOString().replace('Z', ''); // YYYY-MM-DDTHH:mm:ss.SSS
+}
+
+async function createClientWithRetry(url: string, retries = 5) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await soap.createClientAsync(url);
+    } catch (e) {
+      console.log(`Error al conectar con WSDL ${url}. Reintentando...`);
+      await delay(2000);
+    }
+  }
+  throw new Error(`Fallo fatal al conectar con WSDL ${url}`);
+}
+
+async function run() {
+  console.log("=== INICIANDO ETAPA IX: EMISIÓN MASIVA DE PAQUETES ===");
+  
+  console.log("Cargando y extrayendo archivo .p12...");
+  const p12Path = path.resolve(process.cwd(), envVars.SIAT_CERT_PATH);
+  const p12Buffer = fs.readFileSync(p12Path);
+  const { privateKeyPem, certPem } = extractKeysFromP12(p12Buffer, envVars.SIAT_CERT_PASSWORD);
+
+  const codigosClient = await createClientWithRetry('https://pilotosiatservicios.impuestos.gob.bo/v2/FacturacionCodigos?wsdl');
+  codigosClient.addHttpHeader("apikey", `TokenApi ${envVars.SIAT_TOKEN_DELEGADO}`);
+  
+  const compraVentaClient = await createClientWithRetry('https://pilotosiatservicios.impuestos.gob.bo/v2/ServicioFacturacionCompraVenta?wsdl');
+  compraVentaClient.addHttpHeader("apikey", `TokenApi ${envVars.SIAT_TOKEN_DELEGADO}`);
+
+  let numFacturaGlobal = 80000;
+
+  for (const pv of [1, 0]) {
+    console.log(`\n==============================================`);
+    console.log(`=== INICIANDO PRUEBAS PARA PUNTO DE VENTA ${pv} ===`);
+    console.log(`==============================================\n`);
+
+    for (let i = 1; i <= 10; i++) {
+      const cantidadFacturas = (i <= 5) ? 1000 : 500;
+      console.log(`\n--- Prueba ${i}/10 (Cantidad: ${cantidadFacturas}) para PV ${pv} ---`);
+      
+      let cuis = '';
+      let cufd = '';
+      let cufdControl = '';
+
+      // === A. Obtener CUIS y CUFD ===
+      while(true) {
+          try {
+              const [cuisResult] = await codigosClient.cuisAsync({ SolicitudCuis: { codigoAmbiente: 2, codigoModalidad: 1, codigoPuntoVenta: pv, codigoSistema: envVars.SIAT_CODIGO_SISTEMA, codigoSucursal: 0, nit: parseInt(envVars.SIAT_NIT, 10) }});
+              cuis = cuisResult.RespuestaCuis?.codigo;
+              if (cuis) break;
+          } catch(e) {}
+          await delay(1000);
+      }
+      
+      while(true) {
+          try {
+              const [cufdResult] = await codigosClient.cufdAsync({ SolicitudCufd: { codigoAmbiente: 2, codigoModalidad: 1, codigoPuntoVenta: pv, codigoSistema: envVars.SIAT_CODIGO_SISTEMA, codigoSucursal: 0, cuis: cuis, nit: parseInt(envVars.SIAT_NIT, 10) }});
+              if (cufdResult.RespuestaCufd?.transaccion) {
+                  cufd = cufdResult.RespuestaCufd.codigo;
+                  cufdControl = cufdResult.RespuestaCufd.codigoControl;
+                  break;
+              }
+          } catch(e) {}
+          await delay(1000);
+      }
+      console.log(`   CUFD obtenido.`);
+
+      // === B. Generar XMLs ===
+      console.log(`   -> Generando y firmando ${cantidadFacturas} XMLs...`);
+      const tempDir = path.join(process.cwd(), 'scratch', `masiva_pv${pv}`);
+      if (fs.existsSync(tempDir)) fs.rmSync(tempDir, { recursive: true, force: true });
+      fs.mkdirSync(tempDir, { recursive: true });
+
+      for (let f = 0; f < cantidadFacturas; f++) {
+          numFacturaGlobal++;
+          const fechaXML = getBoliviaTimeForXML();
+          const cuf = generarCUF({
+              nit: envVars.SIAT_NIT, fechaEmision: fechaXML, sucursal: 0, modalidad: 1, tipoEmision: 3, // 3 = MASIVA
+              tipoFactura: 1, tipoDocumentoSector: 1, numeroFactura: numFacturaGlobal, puntoVenta: pv, codigoControlCufd: cufdControl
+          });
+
+          const xmlStr = buildFacturaXml({
+              cabecera: {
+                  nitEmisor: envVars.SIAT_NIT, razonSocialEmisor: "Tendai S.R.L.", municipio: "La Paz", telefono: "77777777",
+                  numeroFactura: numFacturaGlobal, cuf, cufd, codigoSucursal: 0, direccion: "Av Central", codigoPuntoVenta: pv,
+                  fechaEmision: fechaXML, nombreRazonSocial: "SN", codigoTipoDocumentoIdentidad: 1, numeroDocumento: "1234567",
+                  codigoCliente: "1234567", codigoMetodoPago: 1, montoTotal: 100, montoTotalSujetoIva: 100, codigoMoneda: 1,
+                  tipoCambio: 1, montoTotalMoneda: 100, descuentoAdicional: 0, leyenda: "Ley N 453: Tienes derecho a recibir un trato equitativo y justo.", usuario: "test", codigoDocumentoSector: 1
+              },
+              detalle: [{ actividadEconomica: "6201000", codigoProductoSin: 1003913, codigoProducto: "P001", descripcion: "Producto Test", cantidad: 1, unidadMedida: 58, precioUnitario: 100, montoDescuento: 0, subTotal: 100 }]
+          });
+
+          const signedXml = signXml(xmlStr, privateKeyPem, certPem);
+          fs.writeFileSync(path.join(tempDir, `factura_${f}.xml`), signedXml);
+      }
+
+      // === C. Comprimir y Hash ===
+      const tarName = `masiva_pv${pv}_p${i}.tar.gz`;
+      const tarPath = path.join(process.cwd(), 'scratch', tarName);
+      execSync(`cd ${tempDir} && tar -czf ${tarPath} *`);
+
+      const gzipBuffer = fs.readFileSync(tarPath);
+      const hashArchivo = crypto.createHash("sha256").update(gzipBuffer).digest("hex");
+      const archivoBase64 = gzipBuffer.toString("base64");
+
+      // === D. Enviar Paquete Masivo ===
+      let codigoRecepcionMasiva = '';
+      while(true) {
+          try {
+              const [recepResult] = await compraVentaClient.recepcionMasivaFacturaAsync({
+                  SolicitudServicioRecepcionMasiva: {
+                      codigoAmbiente: 2, codigoDocumentoSector: 1, codigoEmision: 3, codigoModalidad: 1, codigoPuntoVenta: pv, // EMISION 3
+                      codigoSistema: envVars.SIAT_CODIGO_SISTEMA, codigoSucursal: 0, cufd: cufd, cuis: cuis, nit: parseInt(envVars.SIAT_NIT, 10),
+                      tipoFacturaDocumento: 1, archivo: archivoBase64, fechaEnvio: getBoliviaTimeForXML(), hashArchivo: hashArchivo,
+                      cantidadFacturas: cantidadFacturas
+                  }
+              });
+              if (recepResult.RespuestaServicioFacturacion?.transaccion) {
+                  codigoRecepcionMasiva = recepResult.RespuestaServicioFacturacion.codigoRecepcion;
+                  break;
+              } else {
+                  console.error("      Error recepción:", JSON.stringify(recepResult.RespuestaServicioFacturacion?.mensajesList));
+                  if (JSON.stringify(recepResult).includes("984") || JSON.stringify(recepResult).includes("966")) {
+                      await delay(2000);
+                  } else {
+                      break; 
+                  }
+              }
+          } catch(e) { console.error("      SOAP ERR"); }
+          await delay(1000);
+      }
+
+      if (!codigoRecepcionMasiva) continue;
+      process.stdout.write(`      [ENVIADO MASIVO ${codigoRecepcionMasiva}] `);
+
+      // === E. Validar Paquete Masivo ===
+      let iter = 0;
+      while(iter < 30) {
+          await delay(3000); 
+          iter++;
+          try {
+              const [valResult] = await compraVentaClient.validacionRecepcionMasivaFacturaAsync({
+                  SolicitudServicioValidacionRecepcionMasiva: {
+                      codigoAmbiente: 2, codigoDocumentoSector: 1, codigoEmision: 3, codigoModalidad: 1, codigoPuntoVenta: pv,
+                      codigoSistema: envVars.SIAT_CODIGO_SISTEMA, codigoSucursal: 0, cufd: cufd, cuis: cuis, nit: parseInt(envVars.SIAT_NIT, 10),
+                      tipoFacturaDocumento: 1, codigoRecepcion: codigoRecepcionMasiva
+                  }
+              });
+              const codDesc = valResult.RespuestaServicioFacturacion?.codigoDescripcion;
+              if (codDesc === 'VALIDADA') {
+                  process.stdout.write(` [VALIDADA OK]\n`);
+                  break;
+              } else if (codDesc === 'RECHAZADA') {
+                  process.stdout.write(` [RECHAZADA] `);
+                  console.log(JSON.stringify(valResult.RespuestaServicioFacturacion?.mensajesList));
+                  break;
+              } else {
+                  process.stdout.write(` [${codDesc}] `);
+              }
+          } catch(e) { process.stdout.write(` [ERR] `); }
+      }
+    }
+  }
+  console.log("\n=== ETAPA IX COMPLETADA ===");
+}
+
+run();

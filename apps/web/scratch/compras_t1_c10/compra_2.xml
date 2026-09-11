@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<confirmacionCompra xsi:noNamespaceSchemaLocation="confirmacionCompra.xsd" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <nro>2</nro>
+    <nitEmisor>154422029</nitEmisor>
+    <codigoAutorizacion>1</codigoAutorizacion>
+    <numeroFactura>12117</numeroFactura>
+    <tipoCompra>1</tipoCompra>
+</confirmacionCompra>

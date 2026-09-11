@@ -98,7 +98,7 @@ export default function TablesPage() {
               {/* mini QR preview */}
               <div className="flex justify-center mb-4 p-3 bg-[#F9FAFB] rounded-xl border border-[#E5E7EB]">
                 <QRCodeSVG
-                  value={typeof window !== 'undefined' && restaurant ? `${window.location.origin}/m/${restaurant.slug}/${table.table_code}` : ''}
+                  value={typeof window !== 'undefined' && restaurant ? (process.env.NEXT_PUBLIC_ROOT_DOMAIN ? `https://${restaurant.slug}.${process.env.NEXT_PUBLIC_ROOT_DOMAIN}/${table.table_code}` : `${window.location.origin}/m/${restaurant.slug}/${table.table_code}`) : ''}
                   size={100}
                   level="H"
                 />
@@ -171,7 +171,10 @@ function QrModal({ table, restaurantSlug, onClose }: { table: RestaurantTable; r
   
   // Usamos el origen actual (ej. https://servite.com) + /m/ + slug + codigo de mesa
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-  const qrValue = `${baseUrl}/m/${restaurantSlug}/${table.table_code}`;
+  const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN;
+  const qrValue = rootDomain 
+    ? `https://${restaurantSlug}.${rootDomain}/${table.table_code}`
+    : `${baseUrl}/m/${restaurantSlug}/${table.table_code}`;
 
   const handleDownload = () => {
     const svg = qrRef.current?.querySelector('svg');

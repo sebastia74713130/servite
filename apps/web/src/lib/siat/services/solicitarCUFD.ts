@@ -16,7 +16,7 @@ export interface CufdRequestParams {
  */
 export async function solicitarCUFD(params: CufdRequestParams) {
   const {
-    codigoAmbiente = 2,
+    codigoAmbiente = siatConfig.ambiente,
     codigoModalidad = 1,
     codigoPuntoVenta = 0,
     codigoSucursal = 0,
@@ -28,7 +28,7 @@ export async function solicitarCUFD(params: CufdRequestParams) {
   }
 
   try {
-    const client = await createSiatClient(siatConfig.wsdlCodigosPiloto);
+    const client = await createSiatClient(siatConfig.wsdlCodigos);
     
     const solicitudCufd = {
       SolicitudCufd: {

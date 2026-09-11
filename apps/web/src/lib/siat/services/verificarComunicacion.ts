@@ -7,7 +7,7 @@ import { siatConfig } from "../config";
  */
 export async function verificarComunicacion() {
   try {
-    const client = await createSiatClient(siatConfig.wsdlSincronizacionPiloto);
+    const client = await createSiatClient(siatConfig.wsdlSincronizacion);
     
     // Ejecutamos el método asíncrono que provee el cliente SOAP.
     // El método suele retornar un array, donde el primer elemento es el resultado.
