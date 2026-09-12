@@ -5,11 +5,11 @@
   "crons": [
     {
       "path": "/api/siat/sincronizar-offline",
-      "schedule": "0 * * * *"
+      "schedule": "0 0 * * *"
     },
     {
       "path": "/api/siat/validar-paquetes",
-      "schedule": "5 * * * *"
+      "schedule": "5 0 * * *"
     }
   ]
 }
