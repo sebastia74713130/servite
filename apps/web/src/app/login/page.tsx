@@ -18,8 +18,13 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
 
+    let loginEmail = email.trim();
+    if (!loginEmail.includes("@")) {
+      loginEmail = `${loginEmail}@users.servido.app`;
+    }
+
     const { error: authError } = await supabase.auth.signInWithPassword({
-      email,
+      email: loginEmail,
       password,
     });
 
@@ -56,14 +61,14 @@ export default function LoginPage() {
         <form onSubmit={handleLogin} className="space-y-6">
           <div>
             <label className="block text-sm font-semibold text-[#1F2933] mb-2">
-              Correo electrónico
+              Usuario o Correo
             </label>
             <input
-              type="email"
+              type="text"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full px-4 py-3 rounded-xl border border-[#E5E7EB] focus:outline-none focus:ring-2 focus:ring-[#E76F51] focus:border-transparent transition-all"
-              placeholder="demo@servido.app"
+              placeholder="juan_perez o demo@servido.app"
               required
             />
           </div>

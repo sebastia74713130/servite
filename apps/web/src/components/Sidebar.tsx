@@ -18,7 +18,8 @@ import {
   LogOut,
   Wallet,
   Package,
-  CalendarClock
+  CalendarClock,
+  Store
 } from "lucide-react";
 
 let globalUtterance: SpeechSynthesisUtterance | null = null;
@@ -206,6 +207,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: { isOpen?: boolean, setIsO
     { name: "Menú", href: "/menu", icon: UtensilsCrossed },
     { name: "Mesas", href: "/tables", icon: LayoutGrid },
     { name: "Reservas", href: "/reservations", icon: CalendarClock },
+    { name: "Sucursales", href: "/branches", icon: Store },
     { name: "Configuración", href: "/settings", icon: Settings },
   ];
 
