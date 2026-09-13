@@ -5,7 +5,7 @@ import { useRestaurantSession } from "@/hooks/useRestaurantSession";
 import { LoadingState } from "@/components/LoadingState";
 import { supabase } from "@/lib/supabase";
 import { Store, UserPlus, Users, X, Plus } from "lucide-react";
-import { createBranch, createBranchUser, deleteBranchUser } from "./actions";
+import { createBranch, createBranchUser, deleteBranchUser, getBranchUsers } from "./actions";
 
 export default function BranchesPage() {
   const { restaurant, loading: sessionLoading } = useRestaurantSession();
@@ -38,14 +38,14 @@ export default function BranchesPage() {
     
     if (bData) setBranches(bData);
 
-    // Fetch Users
-    const { data: uData } = await supabase
-      .from('restaurant_users')
-      .select('*, branch:branches(name)')
-      .eq('restaurant_id', restaurant.id)
-      .order('created_at', { ascending: false });
-
-    if (uData) setUsers(uData);
+    // Fetch Users via server action to bypass RLS
+    const res = await getBranchUsers(restaurant.id);
+    if (res.users) {
+      setUsers(res.users);
+    } else {
+      console.error("Failed to fetch users:", res.error);
+    }
+    
     setLoadingData(false);
   };
 

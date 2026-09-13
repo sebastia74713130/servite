@@ -2,6 +2,20 @@
 
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
+export async function getBranchUsers(restaurantId: string) {
+  const { data, error } = await supabaseAdmin
+    .from('restaurant_users')
+    .select('*, branch:branches(name)')
+    .eq('restaurant_id', restaurantId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error("Error fetching branch users:", error);
+    return { error: error.message };
+  }
+  return { users: data };
+}
+
 export async function createBranch(restaurantId: string, name: string, address: string) {
   const { data, error } = await supabaseAdmin
     .from('branches')
