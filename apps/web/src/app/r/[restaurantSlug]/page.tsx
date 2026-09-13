@@ -2,11 +2,13 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { notFound } from "next/navigation";
 import ReservationFlow from "./ReservationFlow";
 
-export default async function PublicReservationPage({ params }: { params: { restaurantSlug: string } }) {
+export default async function PublicReservationPage({ params }: { params: Promise<{ restaurantSlug: string }> }) {
+  const { restaurantSlug } = await params;
+
   const { data: restaurant } = await supabaseAdmin
     .from('restaurants')
     .select('id, name, slug, reservation_settings')
-    .eq('slug', params.restaurantSlug)
+    .eq('slug', restaurantSlug)
     .single();
 
   if (!restaurant) {
