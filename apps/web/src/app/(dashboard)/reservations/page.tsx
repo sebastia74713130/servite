@@ -523,12 +523,14 @@ export default function ReservationsPage() {
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [detailModalRes, setDetailModalRes] = useState<Reservation | null>(null);
+  const [showCopiedToast, setShowCopiedToast] = useState(false);
 
   const handleShareLink = () => {
     if (!restaurant?.slug) return;
     const url = `${window.location.origin}/r/${restaurant.slug}`;
     navigator.clipboard.writeText(url);
-    alert('Enlace público de reservas copiado al portapapeles:\n' + url);
+    setShowCopiedToast(true);
+    setTimeout(() => setShowCopiedToast(false), 3000);
   };
 
   const { reservations, loading: reservationsLoading, refetch } = useReservations(restaurant?.id, selectedDate);
@@ -684,6 +686,14 @@ export default function ReservationsPage() {
             window.location.reload();
           }}
         />
+      )}
+      
+      {/* Toast Notification */}
+      {showCopiedToast && (
+        <div className="fixed bottom-6 right-6 bg-[#1F2933] text-white px-6 py-3 rounded-xl shadow-lg flex items-center gap-3 animate-in slide-in-from-bottom-5 duration-300 z-50">
+          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+          <span className="font-medium">Enlace de reservas copiado al portapapeles</span>
+        </div>
       )}
     </div>
   );
