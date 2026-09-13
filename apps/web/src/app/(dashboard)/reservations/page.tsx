@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useRestaurantSession } from "@/hooks/useRestaurantSession";
 import { useReservations, Reservation } from "@/hooks/useReservations";
 import { useTables } from "@/hooks/useTables";
@@ -10,6 +10,7 @@ import { supabase } from "@/lib/supabase";
 import {
   CalendarPlus,
   CalendarClock,
+  Calendar as CalendarIcon,
   Phone,
   Clock,
   Users,
@@ -175,8 +176,20 @@ function NewReservationModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError('');
+
+    const phoneTrimmed = formData.customer_phone.trim();
+    const digits = phoneTrimmed.replace(/\D/g, '');
+    if (!/^[\d\s+\-()]+$/.test(phoneTrimmed) || digits.length < 8) {
+      setError(`Por favor ingresa un número de teléfono válido con al menos 8 dígitos (ingresaste ${digits.length}).`);
+      return;
+    }
+    if (digits.length > 15) {
+      setError(`El número de teléfono excede el límite permitido de 15 dígitos (ingresaste ${digits.length}).`);
+      return;
+    }
+
+    setLoading(true);
     
     try {
       const { error: insertError } = await supabase.from('reservations').insert({
@@ -263,7 +276,8 @@ function NewReservationModal({
                 min={new Date().toISOString().split('T')[0]}
                 value={formData.reservation_date}
                 onChange={e => setFormData({ ...formData, reservation_date: e.target.value })}
-                className="w-full border border-[#E5E7EB] rounded-xl px-4 py-3 text-[#1F2933] focus:outline-none focus:ring-2 focus:ring-[#E76F51]/30 focus:border-[#E76F51] transition-colors"
+                onClick={e => e.currentTarget.showPicker?.()}
+                className="w-full border border-[#E5E7EB] rounded-xl px-4 py-3 text-[#1F2933] focus:outline-none focus:ring-2 focus:ring-[#E76F51]/30 focus:border-[#E76F51] transition-colors cursor-pointer"
               />
             </div>
             <div>
@@ -519,6 +533,7 @@ export default function ReservationsPage() {
   const { restaurant, branch, loading: sessionLoading } = useRestaurantSession();
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [statusFilter, setStatusFilter] = useState<string>('Todas');
+  const dateInputRef = useRef<HTMLInputElement>(null);
   
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
@@ -604,12 +619,39 @@ export default function ReservationsPage() {
         <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center bg-white border border-[#E5E7EB] rounded-2xl p-4 shadow-sm">
           <div className="flex items-center gap-3">
             <label className="text-sm font-medium text-[#1F2933]">Fecha:</label>
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={e => setSelectedDate(e.target.value)}
-              className="border border-[#E5E7EB] rounded-xl px-4 py-2 text-[#1F2933] focus:outline-none focus:ring-2 focus:ring-[#E76F51]/30 focus:border-[#E76F51] transition-colors"
-            />
+            <div
+              onClick={() => {
+                try {
+                  dateInputRef.current?.showPicker?.();
+                } catch {
+                  dateInputRef.current?.focus();
+                }
+              }}
+              className="relative flex items-center justify-between gap-3 border border-[#E5E7EB] hover:border-[#E76F51] bg-white rounded-xl px-4 py-2 cursor-pointer transition-all shadow-sm group select-none min-w-[150px]"
+            >
+              <span className="text-[#1F2933] font-medium text-sm">
+                {(() => {
+                  if (!selectedDate) return 'Seleccionar fecha';
+                  const [y, m, d] = selectedDate.split('-');
+                  return `${d}/${m}/${y}`;
+                })()}
+              </span>
+              <CalendarIcon className="w-4 h-4 text-[#6B7280] group-hover:text-[#E76F51] transition-colors pointer-events-none" />
+              <input
+                ref={dateInputRef}
+                type="date"
+                value={selectedDate}
+                onChange={e => setSelectedDate(e.target.value)}
+                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                tabIndex={-1}
+                aria-label="Seleccionar fecha"
+                onClick={(e) => {
+                  try {
+                    (e.target as HTMLInputElement).showPicker?.();
+                  } catch {}
+                }}
+              />
+            </div>
           </div>
           
           <div className="flex flex-wrap gap-2">

@@ -6,10 +6,54 @@ import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterv
 import { es } from "date-fns/locale";
 import { ChevronLeft, ChevronRight, CheckCircle2 } from "lucide-react";
 
+function validatePhoneNumber(phone: string): { isValid: boolean; error?: string } {
+  const trimmed = phone.trim();
+  if (!trimmed) {
+    return { isValid: false, error: "El número de celular es obligatorio." };
+  }
+
+  // Allow only digits, +, -, (, ), and spaces
+  if (!/^[\d\s+\-()]+$/.test(trimmed)) {
+    return { isValid: false, error: "El teléfono solo puede contener números, espacios y los símbolos +, -, ()." };
+  }
+
+  const digits = trimmed.replace(/\D/g, "");
+
+  if (digits.length < 8) {
+    return { 
+      isValid: false, 
+      error: `El número debe tener al menos 8 dígitos (ingresaste ${digits.length}).` 
+    };
+  }
+
+  if (digits.length > 15) {
+    return { 
+      isValid: false, 
+      error: `El número excede el límite permitido de 15 dígitos (ingresaste ${digits.length}).` 
+    };
+  }
+
+  // Prevent obvious dummy patterns like 00000000, 11111111
+  if (/^(\d)\1+$/.test(digits)) {
+    return { isValid: false, error: "Por favor ingresa un número de teléfono válido." };
+  }
+
+  // If starts with Bolivian country code 591
+  if (digits.startsWith("591") && digits.length !== 11) {
+    return { 
+      isValid: false, 
+      error: `Con código de país +591, debe tener 8 dígitos adicionales (actualmente tiene ${digits.length - 3}).` 
+    };
+  }
+
+  return { isValid: true };
+}
+
 export default function ReservationFlow({ restaurant, branchId }: { restaurant: any; branchId: string }) {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [phoneError, setPhoneError] = useState("");
 
   // Settings
   const settings = restaurant.reservation_settings || {
@@ -48,13 +92,27 @@ export default function ReservationFlow({ restaurant, branchId }: { restaurant: 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError("");
+    setPhoneError("");
+
     if (!branchId) {
       setError("Este restaurante no tiene sucursales activas para reservar.");
       return;
     }
 
+    const phoneValidation = validatePhoneNumber(form.phone);
+    if (!phoneValidation.isValid) {
+      setPhoneError(phoneValidation.error || "Número de celular no válido.");
+      setError(phoneValidation.error || "Por favor verifica el número de celular.");
+      return;
+    }
+
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      setError("Por favor ingresa un correo electrónico válido.");
+      return;
+    }
+
     setLoading(true);
-    setError("");
 
     try {
       const { error: insertError } = await supabase.from('reservations').insert({
@@ -296,14 +354,32 @@ export default function ReservationFlow({ restaurant, branchId }: { restaurant: 
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-[#888]">Celular *</label>
+            <div className="flex justify-between items-baseline">
+              <label className="text-sm font-medium text-[#888]">Celular *</label>
+              <span className="text-xs text-[#666]">Mínimo 8 dígitos</span>
+            </div>
             <input 
               required
               type="tel"
+              placeholder="Ej: 71234567 o +591 71234567"
               value={form.phone}
-              onChange={e => setForm({...form, phone: e.target.value})}
-              className="w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#E76F51] transition-colors"
+              onChange={e => {
+                setForm({...form, phone: e.target.value});
+                if (phoneError) setPhoneError("");
+              }}
+              onBlur={() => {
+                if (form.phone.trim()) {
+                  const check = validatePhoneNumber(form.phone);
+                  if (!check.isValid) setPhoneError(check.error || "");
+                }
+              }}
+              className={`w-full bg-[#1A1A1A] border rounded-xl px-4 py-3 text-white focus:outline-none transition-colors ${
+                phoneError ? 'border-red-500/80 focus:border-red-500' : 'border-[#2A2A2A] focus:border-[#E76F51]'
+              }`}
             />
+            {phoneError && (
+              <p className="text-xs text-red-400 mt-1">{phoneError}</p>
+            )}
           </div>
 
           <div className="space-y-2">
