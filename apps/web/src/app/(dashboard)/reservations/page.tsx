@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRestaurantSession } from "@/hooks/useRestaurantSession";
 import { useReservations, Reservation } from "@/hooks/useReservations";
 import { useTables } from "@/hooks/useTables";
@@ -22,6 +22,7 @@ import {
   Settings
 } from "lucide-react";
 import { ReservationSettingsModal } from "@/components/ReservationSettingsModal";
+import { ReservationDatePicker } from "@/components/ReservationDatePicker";
 
 // --- Components ---
 
@@ -533,12 +534,33 @@ export default function ReservationsPage() {
   const { restaurant, branch, loading: sessionLoading } = useRestaurantSession();
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [statusFilter, setStatusFilter] = useState<string>('Todas');
-  const dateInputRef = useRef<HTMLInputElement>(null);
+  const [datesWithReservations, setDatesWithReservations] = useState<string[]>([]);
   
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [detailModalRes, setDetailModalRes] = useState<Reservation | null>(null);
   const [showCopiedToast, setShowCopiedToast] = useState(false);
+
+  const fetchDatesWithReservations = useCallback(async () => {
+    if (!restaurant?.id) return;
+    try {
+      const { data } = await supabase
+        .from('reservations')
+        .select('reservation_date')
+        .eq('restaurant_id', restaurant.id)
+        .neq('status', 'cancelled');
+      if (data) {
+        const unique = Array.from(new Set(data.map((r: any) => r.reservation_date)));
+        setDatesWithReservations(unique as string[]);
+      }
+    } catch (e) {
+      console.error('Error fetching reservation dates:', e);
+    }
+  }, [restaurant?.id]);
+
+  useEffect(() => {
+    fetchDatesWithReservations();
+  }, [fetchDatesWithReservations]);
 
   const handleShareLink = () => {
     if (!restaurant?.slug) return;
@@ -559,6 +581,7 @@ export default function ReservationsPage() {
     try {
       await supabase.from('reservations').update({ status }).eq('id', id);
       refetch();
+      fetchDatesWithReservations();
     } catch (error) {
       console.error('Error updating status:', error);
     }
@@ -619,39 +642,11 @@ export default function ReservationsPage() {
         <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center bg-white border border-[#E5E7EB] rounded-2xl p-4 shadow-sm">
           <div className="flex items-center gap-3">
             <label className="text-sm font-medium text-[#1F2933]">Fecha:</label>
-            <div
-              onClick={() => {
-                try {
-                  dateInputRef.current?.showPicker?.();
-                } catch {
-                  dateInputRef.current?.focus();
-                }
-              }}
-              className="relative flex items-center justify-between gap-3 border border-[#E5E7EB] hover:border-[#E76F51] bg-white rounded-xl px-4 py-2 cursor-pointer transition-all shadow-sm group select-none min-w-[150px]"
-            >
-              <span className="text-[#1F2933] font-medium text-sm">
-                {(() => {
-                  if (!selectedDate) return 'Seleccionar fecha';
-                  const [y, m, d] = selectedDate.split('-');
-                  return `${d}/${m}/${y}`;
-                })()}
-              </span>
-              <CalendarIcon className="w-4 h-4 text-[#6B7280] group-hover:text-[#E76F51] transition-colors pointer-events-none" />
-              <input
-                ref={dateInputRef}
-                type="date"
-                value={selectedDate}
-                onChange={e => setSelectedDate(e.target.value)}
-                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-                tabIndex={-1}
-                aria-label="Seleccionar fecha"
-                onClick={(e) => {
-                  try {
-                    (e.target as HTMLInputElement).showPicker?.();
-                  } catch {}
-                }}
-              />
-            </div>
+            <ReservationDatePicker
+              selectedDate={selectedDate}
+              onSelectDate={setSelectedDate}
+              datesWithReservations={datesWithReservations}
+            />
           </div>
           
           <div className="flex flex-wrap gap-2">
@@ -703,6 +698,7 @@ export default function ReservationsPage() {
           onSaved={() => {
             setIsNewModalOpen(false);
             refetch();
+            fetchDatesWithReservations();
           }}
         />
       )}
@@ -715,6 +711,7 @@ export default function ReservationsPage() {
           onUpdated={() => {
             setDetailModalRes(null);
             refetch();
+            fetchDatesWithReservations();
           }}
         />
       )}
