@@ -16,8 +16,11 @@ import {
   LayoutGrid,
   Mail,
   X,
-  FileText
+  FileText,
+  Share2,
+  Settings
 } from "lucide-react";
+import { ReservationSettingsModal } from "@/components/ReservationSettingsModal";
 
 // --- Components ---
 
@@ -518,7 +521,15 @@ export default function ReservationsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('Todas');
   
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [detailModalRes, setDetailModalRes] = useState<Reservation | null>(null);
+
+  const handleShareLink = () => {
+    if (!restaurant?.slug) return;
+    const url = `${window.location.origin}/r/${restaurant.slug}`;
+    navigator.clipboard.writeText(url);
+    alert('Enlace público de reservas copiado al portapapeles:\n' + url);
+  };
 
   const { reservations, loading: reservationsLoading, refetch } = useReservations(restaurant?.id, selectedDate);
   const { tables } = useTables(restaurant?.id, branch?.id);
@@ -562,13 +573,29 @@ export default function ReservationsPage() {
               {filteredReservations.length} {filteredReservations.length === 1 ? 'reserva' : 'reservas'} para esta fecha
             </p>
           </div>
-          <button
-            onClick={() => setIsNewModalOpen(true)}
-            className="bg-[#E76F51] text-white hover:bg-[#D4604A] rounded-xl font-medium px-4 py-2.5 transition-colors flex items-center gap-2"
-          >
-            <CalendarPlus className="w-5 h-5" />
-            Nueva reserva
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={handleShareLink}
+              className="bg-white border border-[#E5E7EB] text-[#1F2933] hover:bg-[#F9FAFB] rounded-xl font-medium px-4 py-2.5 transition-colors flex items-center gap-2"
+            >
+              <Share2 className="w-5 h-5" />
+              Compartir
+            </button>
+            <button
+              onClick={() => setIsSettingsModalOpen(true)}
+              className="bg-white border border-[#E5E7EB] text-[#1F2933] hover:bg-[#F9FAFB] rounded-xl font-medium px-4 py-2.5 transition-colors flex items-center gap-2"
+            >
+              <Settings className="w-5 h-5" />
+              Configurar
+            </button>
+            <button
+              onClick={() => setIsNewModalOpen(true)}
+              className="bg-[#E76F51] text-white hover:bg-[#D4604A] rounded-xl font-medium px-4 py-2.5 transition-colors flex items-center gap-2"
+            >
+              <CalendarPlus className="w-5 h-5" />
+              Nueva reserva
+            </button>
+          </div>
         </div>
 
         {/* Filters */}
@@ -644,6 +671,17 @@ export default function ReservationsPage() {
           onUpdated={() => {
             setDetailModalRes(null);
             refetch();
+          }}
+        />
+      )}
+      
+      {isSettingsModalOpen && restaurant && (
+        <ReservationSettingsModal
+          restaurant={restaurant}
+          onClose={() => setIsSettingsModalOpen(false)}
+          onSaved={() => {
+            setIsSettingsModalOpen(false);
+            window.location.reload();
           }}
         />
       )}
