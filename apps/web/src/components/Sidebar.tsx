@@ -27,7 +27,7 @@ let globalUtterance: SpeechSynthesisUtterance | null = null;
 export function Sidebar({ isOpen = true, setIsOpen }: { isOpen?: boolean, setIsOpen?: (v: boolean) => void }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { restaurant } = useRestaurantSession();
+  const { restaurant, role } = useRestaurantSession();
   const { stats } = useDashboardStats(restaurant?.id);
   const [callingTablesCount, setCallingTablesCount] = useState(0);
   const [pendingReservationsCount, setPendingReservationsCount] = useState(0);
@@ -197,19 +197,25 @@ export function Sidebar({ isOpen = true, setIsOpen }: { isOpen?: boolean, setIsO
     router.push("/login");
   };
 
-  const links = [
+  const allLinks = [
     { name: "Dashboard", href: "/", icon: Home },
-    { name: "Pedidos", href: "/orders", icon: ClipboardList },
-    { name: "Cocina", href: "/kitchen", icon: ChefHat },
+    { name: "Pedidos", href: "/orders", icon: ClipboardList, allowedRoles: ['kitchen', 'waitstaff'] },
+    { name: "Cocina", href: "/kitchen", icon: ChefHat, allowedRoles: ['kitchen'] },
     { name: "Cuentas", href: "/accounts", icon: Receipt },
     { name: "Finanzas", href: "/finances", icon: Wallet },
     { name: "Inventario", href: "/inventory", icon: Package },
-    { name: "Menú", href: "/menu", icon: UtensilsCrossed },
-    { name: "Mesas", href: "/tables", icon: LayoutGrid },
+    { name: "Menú", href: "/menu", icon: UtensilsCrossed, allowedRoles: ['kitchen', 'waitstaff'] },
+    { name: "Mesas", href: "/tables", icon: LayoutGrid, allowedRoles: ['waitstaff'] },
     { name: "Reservas", href: "/reservations", icon: CalendarClock },
     { name: "Sucursales", href: "/branches", icon: Store },
     { name: "Configuración", href: "/settings", icon: Settings },
   ];
+
+  const links = allLinks.filter(link => {
+    if (role === 'owner' || role === 'admin') return true;
+    if (link.allowedRoles?.includes(role as string)) return true;
+    return false;
+  });
 
   return (
     <>

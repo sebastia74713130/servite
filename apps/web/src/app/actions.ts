@@ -7,7 +7,7 @@ export async function getUserRestaurant(userId: string) {
   
   const { data: restUsers } = await supabaseAdmin
     .from('restaurant_users')
-    .select('restaurant_id')
+    .select('*')
     .eq('user_id', userId)
     .order('created_at', { ascending: true })
     .limit(1);
@@ -15,6 +15,9 @@ export async function getUserRestaurant(userId: string) {
   if (!restUsers || restUsers.length === 0) {
     return null; // El usuario no tiene restaurante
   }
+  
+  const userRole = restUsers[0].role;
+  const userBranchId = restUsers[0].branch_id;
 
   const { data: restaurant } = await supabaseAdmin
     .from('restaurants')
@@ -24,14 +27,18 @@ export async function getUserRestaurant(userId: string) {
 
   if (!restaurant) return null;
 
-  const { data: branch } = await supabaseAdmin
+  let branchQuery = supabaseAdmin
     .from('branches')
     .select('*')
-    .eq('restaurant_id', restaurant.id)
-    .limit(1)
-    .single();
+    .eq('restaurant_id', restaurant.id);
+    
+  if (userBranchId) {
+    branchQuery = branchQuery.eq('id', userBranchId);
+  }
+  
+  const { data: branch } = await branchQuery.limit(1).single();
 
-  return { restaurant, branch };
+  return { restaurant, branch, role: userRole };
 }
 
 export async function createExpense(data: any) {

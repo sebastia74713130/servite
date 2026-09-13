@@ -18,7 +18,8 @@ export function ReservationSettingsModal({
     open_time: '12:00',
     close_time: '22:00',
     interval_minutes: 30,
-    days_available: [0, 1, 2, 3, 4, 5, 6]
+    days_available: [0, 1, 2, 3, 4, 5, 6],
+    available_tables: 5
   };
 
   const [settings, setSettings] = useState(defaultSettings);
@@ -89,10 +90,15 @@ export function ReservationSettingsModal({
           <div>
             <label className="text-sm font-medium text-[#1F2933] mb-1.5 block">Intervalo (minutos)</label>
             <select value={settings.interval_minutes} onChange={e => setSettings({...settings, interval_minutes: parseInt(e.target.value)})} className="w-full border border-[#E5E7EB] rounded-xl px-4 py-2.5 bg-white">
-              <option value={15}>15 minutos</option>
               <option value={30}>30 minutos</option>
-              <option value={60}>60 minutos (1 hora)</option>
+              <option value={60}>1 hora</option>
+              <option value={90}>1 hora y media</option>
             </select>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-[#1F2933] mb-1.5 block">Cantidad de mesas disponibles</label>
+            <input type="number" min="1" value={settings.available_tables || 5} onChange={e => setSettings({...settings, available_tables: parseInt(e.target.value)})} className="w-full border border-[#E5E7EB] rounded-xl px-4 py-2.5" />
           </div>
 
           <div>

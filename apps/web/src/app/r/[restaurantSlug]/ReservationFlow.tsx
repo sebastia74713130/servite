@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isBefore, startOfDay, getDay, addMinutes, parse } from "date-fns";
 import { es } from "date-fns/locale";
@@ -79,6 +79,31 @@ export default function ReservationFlow({ restaurant, branchId }: { restaurant: 
     phone: ""
   });
 
+  const [existingReservations, setExistingReservations] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!selectedDate || !branchId) {
+      setExistingReservations([]);
+      return;
+    }
+
+    const fetchReservations = async () => {
+      const formattedDate = format(selectedDate, 'yyyy-MM-dd');
+      const { data, error } = await supabase
+        .from('reservations')
+        .select('reservation_time, duration_minutes')
+        .eq('branch_id', branchId)
+        .eq('reservation_date', formattedDate)
+        .neq('status', 'cancelled');
+        
+      if (!error && data) {
+        setExistingReservations(data);
+      }
+    };
+    
+    fetchReservations();
+  }, [selectedDate, branchId]);
+
   const handleNextStep = () => {
     if (step === 1) {
       if (!selectedDate || !selectedTime) {
@@ -125,7 +150,7 @@ export default function ReservationFlow({ restaurant, branchId }: { restaurant: 
         reservation_date: format(selectedDate!, 'yyyy-MM-dd'),
         reservation_time: selectedTime,
         status: 'pending',
-        duration_minutes: 120 // standard 2 hours
+        duration_minutes: 90 // standard 1.5 hours
       });
 
       if (insertError) throw insertError;
@@ -161,7 +186,6 @@ export default function ReservationFlow({ restaurant, branchId }: { restaurant: 
     
     const slots = [];
     let current = parse(settings.open_time, 'HH:mm:ss', selectedDate);
-    // if settings string doesn't have seconds:
     if (isNaN(current.getTime())) {
       current = parse(settings.open_time, 'HH:mm', selectedDate);
     }
@@ -171,8 +195,32 @@ export default function ReservationFlow({ restaurant, branchId }: { restaurant: 
       end = parse(settings.close_time, 'HH:mm', selectedDate);
     }
 
+    const availableTables = settings.available_tables || 5;
+
     while (isBefore(current, end) || current.getTime() === end.getTime()) {
-      slots.push(format(current, 'HH:mm'));
+      let overlaps = 0;
+      const currentEnd = addMinutes(current, 90); // Each reservation blocks table for 90 mins
+
+      for (const res of existingReservations) {
+        let resStart = parse(res.reservation_time, 'HH:mm:ss', selectedDate);
+        if (isNaN(resStart.getTime())) {
+          resStart = parse(res.reservation_time, 'HH:mm', selectedDate);
+        }
+        
+        const duration = res.duration_minutes || 90;
+        const resEnd = addMinutes(resStart, duration);
+
+        // Check if there is an overlap in time
+        if (current.getTime() < resEnd.getTime() && currentEnd.getTime() > resStart.getTime()) {
+          overlaps++;
+        }
+      }
+
+      // Only add slot if we haven't reached table capacity
+      if (overlaps < availableTables) {
+        slots.push(format(current, 'HH:mm'));
+      }
+      
       current = addMinutes(current, settings.interval_minutes);
     }
     return slots;

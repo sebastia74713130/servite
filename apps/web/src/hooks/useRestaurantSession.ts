@@ -9,6 +9,7 @@ export function useRestaurantSession() {
   const router = useRouter();
   const [restaurant, setRestaurant] = useState<any>(null);
   const [branch, setBranch] = useState<any>(null);
+  const [role, setRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -23,15 +24,13 @@ export function useRestaurantSession() {
         const userRest = await getUserRestaurant(session.user.id);
         
         if (!userRest || !userRest.restaurant || !userRest.restaurant.onboarding_completed) {
-          // El usuario no tiene restaurante configurado o no ha completado el onboarding
           router.push('/register/complete');
           return;
         }
 
         setRestaurant(userRest.restaurant);
-        if (userRest.branch) {
-          setBranch(userRest.branch);
-        }
+        if (userRest.branch) setBranch(userRest.branch);
+        if (userRest.role) setRole(userRest.role);
       } catch (e) {
         console.error('Session error:', e);
       } finally {
@@ -41,6 +40,6 @@ export function useRestaurantSession() {
     loadSession();
   }, [router]);
 
-  return { restaurant, branch, loading };
+  return { restaurant, branch, role, loading };
 }
 
