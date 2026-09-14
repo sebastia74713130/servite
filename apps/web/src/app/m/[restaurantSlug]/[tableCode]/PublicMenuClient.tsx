@@ -567,7 +567,7 @@ export default function PublicMenuClient({
         .from('tables')
         .update({ 
           service_status: 'requesting_bill',
-          siat_customer_nit: omit ? '0' : customerNit,
+          siat_customer_nit: omit ? '99002' : customerNit,
           siat_customer_name: omit ? 'S/N' : customerName,
           siat_customer_email: omit ? null : customerEmail,
           requested_payment_method: requestedPaymentMethod,

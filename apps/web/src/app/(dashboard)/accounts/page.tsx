@@ -149,6 +149,9 @@ export default function AccountsPage() {
       // 1. SIAT Emission Logic (If requested)
       if (selectedTable.service_status === 'requesting_bill' && selectedTable.siat_customer_name) {
         try {
+          const nitCi = (selectedTable.siat_customer_nit === '0' || !selectedTable.siat_customer_nit) ? '99002' : selectedTable.siat_customer_nit;
+          const rznSocial = (selectedTable.siat_customer_name === 'S/N' || !selectedTable.siat_customer_name) ? 'S/N' : selectedTable.siat_customer_name;
+
           const totalAmount = tableOrders.reduce((acc, o) => acc + o.total, 0);
           const facturaParams = {
             cabecera: {
@@ -156,8 +159,8 @@ export default function AccountsPage() {
               numeroFactura: Math.floor(Math.random() * 10000) + 1, // Número correlativo simulado
               montoTotal: totalAmount,
               montoTotalSujetoIva: totalAmount,
-              nombreRazonSocial: selectedTable.siat_customer_name,
-              numeroDocumento: selectedTable.siat_customer_nit || '0'
+              nombreRazonSocial: rznSocial,
+              numeroDocumento: nitCi
             },
             detalle: tableOrders.flatMap(o => o.order_items).map((item: any) => ({
               codigoProducto: item.product_id ? item.product_id.substring(0, 8) : '00000000',
@@ -202,8 +205,8 @@ export default function AccountsPage() {
                     <h1>FACTURA ELECTRÓNICA</h1>
                     <h2>${restaurant?.name || "Servido"}</h2>
                     <div style="text-align:left; font-size:12px; margin-bottom: 10px;">
-                      NIT/CI: ${selectedTable.siat_customer_nit}<br/>
-                      Razón Social: ${selectedTable.siat_customer_name}
+                      NIT/CI: ${nitCi}<br/>
+                      Razón Social: ${rznSocial}
                     </div>
                     <div class="items">
                       ${tableOrders.flatMap(o => (o.order_items || [])).map(item => `
