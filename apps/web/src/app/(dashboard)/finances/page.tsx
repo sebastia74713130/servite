@@ -7,6 +7,9 @@ import { createExpense, openCashRegister, closeCashRegister, getExpenses } from 
 import { LoadingState } from '@/components/LoadingState';
 import { Wallet, TrendingUp, TrendingDown, Plus, X } from 'lucide-react';
 import { CashRegister, Expense, Order } from '@shared/types';
+import { 
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer
+} from 'recharts';
 
 export default function FinancesPage() {
   const { restaurant, branch, loading: sessionLoading } = useRestaurantSession();
@@ -153,6 +156,8 @@ export default function FinancesPage() {
     }
   };
 
+  const [viewTab, setViewTab] = useState<'caja' | 'stats'>('stats');
+
   if (sessionLoading || loading) return <LoadingState />;
 
   const totalIngresos = paidOrders.reduce((sum, order) => sum + order.total, 0);
@@ -189,129 +194,154 @@ export default function FinancesPage() {
   ].sort((a, b) => b.date.getTime() - a.date.getTime());
 
   return (
-    <div className="p-8 h-full flex flex-col">
+    <div className="p-8 h-full flex flex-col overflow-y-auto">
       <div className="mb-8 flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-[#1F2933]">Finanzas (Caja)</h1>
-          <p className="text-gray-500 mt-1">Controla los ingresos, egresos y el cierre de caja diario.</p>
+          <h1 className="text-3xl font-bold text-[#1F2933]">Finanzas</h1>
+          <p className="text-gray-500 mt-1">Controla los ingresos, egresos y estadísticas de venta.</p>
         </div>
-        <div className="flex gap-4">
+        
+        {/* Toggle Tabs */}
+        <div className="bg-gray-100 p-1 rounded-xl flex items-center">
           <button 
-            disabled={!activeRegister}
-            onClick={() => setShowExpenseModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-[#E76F51] text-white rounded-lg hover:bg-[#D55D40] transition-colors disabled:opacity-50"
+            onClick={() => setViewTab('stats')}
+            className={`px-6 py-2 rounded-lg font-medium text-sm transition-colors ${viewTab === 'stats' ? 'bg-white text-[#1F2933] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
           >
-            <Plus size={20} />
-            Registrar Gasto
+            Estadísticas
           </button>
-          {!activeRegister ? (
-            <button 
-              onClick={() => setShowOpenModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-[#2F4F3E] text-white rounded-lg hover:bg-[#233A2E] transition-colors"
-            >
-              <Wallet size={20} />
-              Abrir Caja
-            </button>
-          ) : (
-            <button 
-              onClick={() => setShowCloseModal(true)}
-              className="flex items-center gap-2 px-4 py-2 border-2 border-[#E76F51] text-[#E76F51] rounded-lg hover:bg-[#E76F51]/10 transition-colors"
-            >
-              <Wallet size={20} />
-              Cerrar Caja
-            </button>
-          )}
+          <button 
+            onClick={() => setViewTab('caja')}
+            className={`px-6 py-2 rounded-lg font-medium text-sm transition-colors ${viewTab === 'caja' ? 'bg-white text-[#1F2933] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+          >
+            Caja Diaria
+          </button>
         </div>
       </div>
       
-      {activeRegister ? (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
-            <div>
-              <p className="text-gray-500 text-sm font-medium mb-1">Base Inicial</p>
-              <p className="text-2xl font-bold text-[#1F2933]">Bs {activeRegister.opening_balance.toLocaleString('es-BO')}</p>
-            </div>
-            <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
-              <Wallet size={24} />
-            </div>
-          </div>
-          
-          <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
-            <div>
-              <p className="text-gray-500 text-sm font-medium mb-1">Ingresos (Ventas)</p>
-              <p className="text-2xl font-bold text-green-600">Bs {totalIngresos.toLocaleString('es-BO')}</p>
-            </div>
-            <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center text-green-600">
-              <TrendingUp size={24} />
-            </div>
-          </div>
-          
-          <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
-            <div>
-              <p className="text-gray-500 text-sm font-medium mb-1">Egresos (Gastos)</p>
-              <p className="text-2xl font-bold text-red-600">Bs {totalEgresos.toLocaleString('es-BO')}</p>
-            </div>
-            <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center text-red-600">
-              <TrendingDown size={24} />
-            </div>
-          </div>
-
-          <div className="bg-[#2F4F3E] p-6 rounded-2xl border border-[#233A2E] shadow-sm flex flex-col justify-center text-white">
-            <p className="text-white/80 text-sm font-medium mb-1">Total Efectivo en Caja</p>
-            <p className="text-3xl font-bold">Bs {currentTotalCash.toLocaleString('es-BO')}</p>
-            <p className="text-white/60 text-xs mt-2">Solo suma transacciones en efectivo</p>
-          </div>
-        </div>
-      ) : (
-        <div className="bg-orange-50 border border-orange-200 text-orange-800 rounded-xl p-6 mb-8 text-center">
-          <Wallet size={48} className="mx-auto mb-4 opacity-50" />
-          <h2 className="text-xl font-bold mb-2">La caja está cerrada</h2>
-          <p>Debes abrir la caja con un monto inicial para registrar ventas y gastos de hoy.</p>
-        </div>
+      {viewTab === 'stats' && (
+        <StatsView />
       )}
 
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm flex-1 flex flex-col overflow-hidden">
-        <div className="p-6 border-b border-gray-100">
-          <h3 className="text-lg font-bold text-[#1F2933]">Movimientos Recientes</h3>
-        </div>
-        
-        <div className="flex-1 overflow-y-auto p-0">
-          {allMovements.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-              No hay movimientos registrados en este turno.
+      {viewTab === 'caja' && (
+        <>
+          <div className="flex justify-end mb-6 gap-4">
+            <button 
+              disabled={!activeRegister}
+              onClick={() => setShowExpenseModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-[#E76F51] text-white rounded-lg hover:bg-[#D55D40] transition-colors disabled:opacity-50 font-medium"
+            >
+              <Plus size={20} />
+              Registrar Gasto
+            </button>
+            {!activeRegister ? (
+              <button 
+                onClick={() => setShowOpenModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-[#2F4F3E] text-white rounded-lg hover:bg-[#233A2E] transition-colors font-medium"
+              >
+                <Wallet size={20} />
+                Abrir Caja
+              </button>
+            ) : (
+              <button 
+                onClick={() => setShowCloseModal(true)}
+                className="flex items-center gap-2 px-4 py-2 border-2 border-[#E76F51] text-[#E76F51] font-bold rounded-lg hover:bg-[#E76F51]/10 transition-colors"
+              >
+                <Wallet size={20} />
+                Cerrar Caja
+              </button>
+            )}
+          </div>
+
+          {activeRegister ? (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+              <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
+                <div>
+                  <p className="text-gray-500 text-sm font-medium mb-1">Base Inicial</p>
+                  <p className="text-2xl font-bold text-[#1F2933]">Bs {activeRegister.opening_balance.toLocaleString('es-BO')}</p>
+                </div>
+                <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                  <Wallet size={24} />
+                </div>
+              </div>
+              
+              <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
+                <div>
+                  <p className="text-gray-500 text-sm font-medium mb-1">Ingresos (Ventas)</p>
+                  <p className="text-2xl font-bold text-green-600">Bs {totalIngresos.toLocaleString('es-BO')}</p>
+                </div>
+                <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center text-green-600">
+                  <TrendingUp size={24} />
+                </div>
+              </div>
+              
+              <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
+                <div>
+                  <p className="text-gray-500 text-sm font-medium mb-1">Egresos (Gastos)</p>
+                  <p className="text-2xl font-bold text-red-600">Bs {totalEgresos.toLocaleString('es-BO')}</p>
+                </div>
+                <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center text-red-600">
+                  <TrendingDown size={24} />
+                </div>
+              </div>
+
+              <div className="bg-[#2F4F3E] p-6 rounded-2xl border border-[#233A2E] shadow-sm flex flex-col justify-center text-white">
+                <p className="text-white/80 text-sm font-medium mb-1">Total Efectivo en Caja</p>
+                <p className="text-3xl font-bold">Bs {currentTotalCash.toLocaleString('es-BO')}</p>
+                <p className="text-white/60 text-xs mt-2">Solo suma transacciones en efectivo</p>
+              </div>
             </div>
           ) : (
-            <table className="w-full text-left">
-              <thead className="bg-gray-50 text-gray-500 text-sm sticky top-0">
-                <tr>
-                  <th className="py-3 px-6 font-medium">Hora</th>
-                  <th className="py-3 px-6 font-medium">Descripción</th>
-                  <th className="py-3 px-6 font-medium">Método</th>
-                  <th className="py-3 px-6 font-medium text-right">Monto (Bs)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {allMovements.map(mov => (
-                  <tr key={mov.id} className="border-b border-gray-50 hover:bg-gray-50/50">
-                    <td className="py-3 px-6 text-sm text-gray-500">
-                      {mov.date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </td>
-                    <td className="py-3 px-6 font-medium text-[#1F2933]">
-                      {mov.description}
-                    </td>
-                    <td className="py-3 px-6 text-sm text-gray-600">
-                      {mov.method}
-                    </td>
-                    <td className={`py-3 px-6 font-bold text-right ${mov.type === 'ingreso' ? 'text-green-600' : 'text-red-600'}`}>
-                      {mov.type === 'ingreso' ? '+' : '-'} {mov.amount.toLocaleString('es-BO')}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="bg-orange-50 border border-orange-200 text-orange-800 rounded-xl p-6 mb-8 text-center">
+              <Wallet size={48} className="mx-auto mb-4 opacity-50" />
+              <h2 className="text-xl font-bold mb-2">La caja está cerrada</h2>
+              <p>Debes abrir la caja con un monto inicial para registrar ventas y gastos de hoy.</p>
+            </div>
           )}
-        </div>
-      </div>
+
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm flex-1 flex flex-col overflow-hidden min-h-[300px]">
+            <div className="p-6 border-b border-gray-100">
+              <h3 className="text-lg font-bold text-[#1F2933]">Movimientos Recientes</h3>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-0">
+              {allMovements.length === 0 ? (
+                <div className="text-center py-12 text-gray-500">
+                  No hay movimientos registrados en este turno.
+                </div>
+              ) : (
+                <table className="w-full text-left">
+                  <thead className="bg-gray-50 text-gray-500 text-sm sticky top-0">
+                    <tr>
+                      <th className="py-3 px-6 font-medium">Hora</th>
+                      <th className="py-3 px-6 font-medium">Descripción</th>
+                      <th className="py-3 px-6 font-medium">Método</th>
+                      <th className="py-3 px-6 font-medium text-right">Monto (Bs)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allMovements.map(mov => (
+                      <tr key={mov.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                        <td className="py-3 px-6 text-sm text-gray-500">
+                          {mov.date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </td>
+                        <td className="py-3 px-6 font-medium text-[#1F2933]">
+                          {mov.description}
+                        </td>
+                        <td className="py-3 px-6 text-sm text-gray-600">
+                          {mov.method}
+                        </td>
+                        <td className={`py-3 px-6 font-bold text-right ${mov.type === 'ingreso' ? 'text-green-600' : 'text-red-600'}`}>
+                          {mov.type === 'ingreso' ? '+' : '-'} {mov.amount.toLocaleString('es-BO')}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </>
+      )}
 
       {/* MODALS */}
       
@@ -484,6 +514,169 @@ export default function FinancesPage() {
         </div>
       )}
 
+    </div>
+  );
+}
+
+// -------------------------------------
+// STATS VIEW COMPONENT
+// -------------------------------------
+
+function StatsView() {
+  const [chartPeriod, setChartPeriod] = useState<'Mensual' | 'Semanal'>('Mensual');
+
+  // Mock data for Line Chart (Mensual)
+  const monthlyData = [
+    { name: 'Ene', value: 0 },
+    { name: 'Feb', value: 0 },
+    { name: 'Mar', value: 0 },
+    { name: 'Abr', value: 0 },
+    { name: 'May', value: 0 },
+    { name: 'Jun', value: 0 },
+    { name: 'Jul', value: 1150 },
+    { name: 'Ago', value: 430 },
+    { name: 'Sep', value: 0 },
+    { name: 'Oct', value: 0 },
+    { name: 'Nov', value: 0 },
+    { name: 'Dic', value: 0 },
+  ];
+
+  const weeklyData = [
+    { name: 'Lun', value: 300 },
+    { name: 'Mar', value: 450 },
+    { name: 'Mié', value: 320 },
+    { name: 'Jue', value: 600 },
+    { name: 'Vie', value: 900 },
+    { name: 'Sáb', value: 1200 },
+    { name: 'Dom', value: 850 },
+  ];
+
+  const chartData = chartPeriod === 'Mensual' ? monthlyData : weeklyData;
+
+  // Mock data for Top Products
+  const topProducts = [
+    { name: 'Hamburguesa Doble', value: 90, max: 100 },
+    { name: 'Pizza Margarita', value: 85, max: 100 },
+    { name: 'Papas Fritas', value: 70, max: 100 },
+    { name: 'Cerveza Artesanal', value: 65, max: 100 },
+    { name: 'Limonada', value: 60, max: 100 },
+    { name: 'Lomito Completo', value: 50, max: 100 },
+    { name: 'Ensalada César', value: 45, max: 100 },
+    { name: 'Torta de Chocolate', value: 35, max: 100 },
+    { name: 'Helado de Vainilla', value: 25, max: 100 },
+    { name: 'Agua Mineral', value: 20, max: 100 },
+  ];
+
+  return (
+    <div className="flex-1 overflow-y-auto space-y-6 pb-10">
+      {/* 3 Top Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Card 1: Ganancia total (Accent style) */}
+        <div className="bg-[#1F2933] text-white p-6 rounded-2xl shadow-sm flex flex-col justify-center">
+          <p className="text-gray-400 text-sm font-medium mb-2">ganancia total</p>
+          <p className="text-4xl font-light">Bs. 1539.00</p>
+        </div>
+        
+        {/* Card 2: Acumulación mensual */}
+        <div className="bg-white border border-gray-100 p-6 rounded-2xl shadow-sm flex flex-col justify-center">
+          <p className="text-gray-500 text-sm font-medium mb-2">acumulación mensual</p>
+          <p className="text-4xl font-light text-[#1F2933]">Bs. 0.00</p>
+          <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
+            <span className="text-gray-500">100% ↓</span> mes anterior
+          </p>
+        </div>
+        
+        {/* Card 3: Comparativa */}
+        <div className="bg-white border border-gray-100 p-6 rounded-2xl shadow-sm flex flex-col justify-center">
+          <p className="text-gray-500 text-sm font-medium mb-2">comparativa con el mes anterior</p>
+          <p className="text-4xl font-light text-[#1F2933]">Bs. 427.50</p>
+          <p className="text-xs text-gray-400 mt-2">
+            total mes anterior
+          </p>
+        </div>
+      </div>
+
+      {/* Charts Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* Line Chart */}
+        <div className="lg:col-span-2 bg-white border border-gray-100 p-6 rounded-2xl shadow-sm flex flex-col h-[450px]">
+          <div className="flex justify-between items-start mb-6">
+            <div className="flex bg-gray-100 p-1 rounded-lg">
+              <button 
+                onClick={() => setChartPeriod('Mensual')}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${chartPeriod === 'Mensual' ? 'bg-white shadow-sm text-[#1F2933]' : 'text-gray-500'}`}
+              >
+                Mensual
+              </button>
+              <button 
+                onClick={() => setChartPeriod('Semanal')}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${chartPeriod === 'Semanal' ? 'bg-white shadow-sm text-[#1F2933]' : 'text-gray-500'}`}
+              >
+                Semanal
+              </button>
+            </div>
+            <span className="text-gray-400 text-sm">2026</span>
+          </div>
+          
+          <div className="flex-1 w-full relative">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                <XAxis 
+                  dataKey="name" 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fill: '#9CA3AF', fontSize: 12 }}
+                  dy={10}
+                />
+                <YAxis 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fill: '#9CA3AF', fontSize: 12 }}
+                  tickFormatter={(val) => val === 0 ? 'Bs. 0' : val.toString()}
+                />
+                <RechartsTooltip 
+                  cursor={{ stroke: '#f3f4f6', strokeWidth: 2 }}
+                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="value" 
+                  stroke="#E76F51" 
+                  strokeWidth={3}
+                  dot={{ r: 3, fill: '#E76F51', strokeWidth: 0 }}
+                  activeDot={{ r: 6, fill: '#E76F51', stroke: '#fff', strokeWidth: 2 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Top Products Breakdown */}
+        <div className="bg-white border border-gray-100 rounded-2xl shadow-sm flex flex-col overflow-hidden h-[450px]">
+          <div className="p-6 pb-2">
+            <h3 className="text-gray-500 text-sm font-medium">Productos más vendidos</h3>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-4 mt-2 custom-scrollbar">
+            {topProducts.map((item, index) => (
+              <div key={index} className="flex items-center gap-4">
+                <div className="w-1/3 truncate text-sm text-gray-500 font-medium">
+                  {item.name}
+                </div>
+                <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full rounded-full bg-[#1F2933]" 
+                    style={{ width: `${(item.value / item.max) * 100}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+      </div>
     </div>
   );
 }

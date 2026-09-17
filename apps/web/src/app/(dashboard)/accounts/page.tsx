@@ -5,7 +5,7 @@ import { useRestaurantSession } from '@/hooks/useRestaurantSession';
 import { supabase } from '@/lib/supabase';
 import { LoadingState } from '@/components/LoadingState';
 import { EmptyState } from '@/components/EmptyState';
-import { Receipt, HandPlatter, BellRing, X, CheckCircle, Printer } from 'lucide-react';
+import { Receipt, HandPlatter, BellRing, X, CheckCircle, Printer, AlertCircle } from 'lucide-react';
 import { RestaurantTable, Order } from '@shared/types';
 import { useOrders } from '@/hooks/useOrders';
 
@@ -20,6 +20,12 @@ export default function AccountsPage() {
   const [tableOrders, setTableOrders] = useState<any[]>([]);
   const [isFetchingBill, setIsFetchingBill] = useState(false);
   const [isClosingBill, setIsClosingBill] = useState(false);
+  const [siatResult, setSiatResult] = useState<{
+    type: 'success' | 'error';
+    title: string;
+    message: string;
+    cuf?: string;
+  } | null>(null);
 
   useEffect(() => {
     if (restaurant?.id) {
@@ -235,14 +241,28 @@ export default function AccountsPage() {
               printWindow.document.close();
             }
             
-            alert('✅ Factura SIAT emitida exitosamente.\nCUF: ' + generatedCuf.substring(0, 15) + '...');
+            setSiatResult({
+              type: 'success',
+              title: 'Factura SIAT Emitida',
+              message: 'La factura se emitió y validó exitosamente.',
+              cuf: generatedCuf
+            });
           } else {
             console.error("SIAT Error:", result.error, result.detalles);
-            const detailMsg = result.detalles ? JSON.stringify(result.detalles, null, 2) : "";
-            alert("⚠️ Atención: Hubo un problema al emitir la factura SIAT:\n" + result.error + "\n" + detailMsg);
+            const detailMsg = result.detalles ? (typeof result.detalles === 'string' ? result.detalles : JSON.stringify(result.detalles, null, 2)) : "";
+            setSiatResult({
+              type: 'error',
+              title: 'Error al emitir factura',
+              message: result.error + (detailMsg ? `\n${detailMsg}` : '')
+            });
           }
-        } catch (e) {
+        } catch (e: any) {
           console.error("Excepción en emisión SIAT:", e);
+          setSiatResult({
+            type: 'error',
+            title: 'Excepción en emisión SIAT',
+            message: e.message || 'Error desconocido'
+          });
         }
       }
 
@@ -537,6 +557,44 @@ export default function AccountsPage() {
               >
                 <Receipt size={24} />
                 {isClosingBill ? 'Cerrando cuenta...' : 'Cobrar y Liberar Mesa'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom SIAT Notification Modal */}
+      {siatResult && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-6 animate-in fade-in duration-200 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className={`p-6 ${siatResult.type === 'success' ? 'bg-[#F0FDF4]' : 'bg-[#FEF2F2]'} border-b ${siatResult.type === 'success' ? 'border-[#DCFCE7]' : 'border-[#FEE2E2]'} flex items-center gap-4`}>
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${siatResult.type === 'success' ? 'bg-[#2E7D32] text-white' : 'bg-red-500 text-white'}`}>
+                {siatResult.type === 'success' ? <CheckCircle size={28} /> : <AlertCircle size={28} />}
+              </div>
+              <div>
+                <h2 className={`text-xl font-bold ${siatResult.type === 'success' ? 'text-[#166534]' : 'text-red-900'}`}>
+                  {siatResult.title}
+                </h2>
+              </div>
+            </div>
+            
+            <div className="p-6">
+              <p className="text-gray-700 whitespace-pre-wrap">{siatResult.message}</p>
+              
+              {siatResult.cuf && (
+                <div className="mt-4 p-4 bg-gray-50 rounded-xl border border-gray-100">
+                  <p className="text-xs text-gray-500 mb-1 font-semibold uppercase tracking-wider">CUF Generado</p>
+                  <p className="text-sm font-mono text-gray-800 break-all">{siatResult.cuf}</p>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-end">
+              <button 
+                onClick={() => setSiatResult(null)}
+                className={`px-6 py-2.5 rounded-xl font-bold text-white transition-colors ${siatResult.type === 'success' ? 'bg-[#2E7D32] hover:bg-[#256629]' : 'bg-gray-800 hover:bg-gray-900'}`}
+              >
+                Entendido
               </button>
             </div>
           </div>
