@@ -150,7 +150,9 @@ export default function AccountsPage() {
       if (selectedTable.service_status === 'requesting_bill' && selectedTable.siat_customer_name) {
         try {
           const nitCi = (selectedTable.siat_customer_nit === '0' || !selectedTable.siat_customer_nit) ? '99002' : selectedTable.siat_customer_nit;
-          const rznSocial = (selectedTable.siat_customer_name === 'S/N' || !selectedTable.siat_customer_name) ? 'S/N' : selectedTable.siat_customer_name;
+          const rznSocial = nitCi === '99002' 
+            ? 'CONTROL TRIBUTARIO' 
+            : ((selectedTable.siat_customer_name === 'S/N' || !selectedTable.siat_customer_name) ? 'S/N' : selectedTable.siat_customer_name);
 
           const totalAmount = tableOrders.reduce((acc, o) => acc + o.total, 0);
           const facturaParams = {

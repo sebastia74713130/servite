@@ -78,7 +78,10 @@ export async function POST(req: Request) {
     facturaParams.cabecera.codigoPuntoVenta = parseInt(siatSettings.siat_codigo_punto_venta);
     if (!facturaParams.cabecera.numeroDocumento || facturaParams.cabecera.numeroDocumento === '0') {
       facturaParams.cabecera.numeroDocumento = '99002'; // NIT/CI genérico para S/N
-      facturaParams.cabecera.nombreRazonSocial = facturaParams.cabecera.nombreRazonSocial || 'S/N';
+    }
+    
+    if (facturaParams.cabecera.numeroDocumento === '99002') {
+      facturaParams.cabecera.nombreRazonSocial = 'CONTROL TRIBUTARIO';
     }
 
     facturaParams.cabecera.codigoTipoDocumentoIdentidad = facturaParams.cabecera.codigoTipoDocumentoIdentidad || (facturaParams.cabecera.numeroDocumento === '99002' ? 1 : 5); // 1 = CI, 5 = NIT

@@ -568,7 +568,7 @@ export default function PublicMenuClient({
         .update({ 
           service_status: 'requesting_bill',
           siat_customer_nit: omit ? '99002' : customerNit,
-          siat_customer_name: omit ? 'S/N' : customerName,
+          siat_customer_name: omit ? 'CONTROL TRIBUTARIO' : customerName,
           siat_customer_email: omit ? null : customerEmail,
           requested_payment_method: requestedPaymentMethod,
           updated_at: new Date().toISOString()
