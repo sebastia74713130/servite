@@ -572,7 +572,7 @@ function StatsView() {
       {/* 3 Top Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Card 1: Ganancia total (Accent style) */}
-        <div className="bg-[#1F2933] text-white p-6 rounded-2xl shadow-sm flex flex-col justify-center">
+        <div className="bg-[#2F4F3E] text-white p-6 rounded-2xl shadow-sm flex flex-col justify-center">
           <p className="text-gray-400 text-sm font-medium mb-2">ganancia total</p>
           <p className="text-4xl font-light">Bs. 1539.00</p>
         </div>
@@ -667,7 +667,7 @@ function StatsView() {
                 </div>
                 <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
                   <div 
-                    className="h-full rounded-full bg-[#1F2933]" 
+                    className="h-full rounded-full bg-[#2F4F3E]" 
                     style={{ width: `${(item.value / item.max) * 100}%` }}
                   />
                 </div>
