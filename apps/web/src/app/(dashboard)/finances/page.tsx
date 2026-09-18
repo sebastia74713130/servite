@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRestaurantSession } from '@/hooks/useRestaurantSession';
 import { supabase } from '@/lib/supabase';
-import { createExpense, openCashRegister, closeCashRegister, getExpenses } from '@/app/actions';
+import { createExpense, openCashRegister, closeCashRegister, getExpenses, getDashboardStats } from '@/app/actions';
 import { LoadingState } from '@/components/LoadingState';
 import { Wallet, TrendingUp, TrendingDown, Plus, X } from 'lucide-react';
 import { CashRegister, Expense, Order } from '@shared/types';
@@ -218,8 +218,8 @@ export default function FinancesPage() {
         </div>
       </div>
       
-      {viewTab === 'stats' && (
-        <StatsView />
+      {viewTab === 'stats' && restaurant && (
+        <StatsView restaurantId={restaurant.id} branchId={branch?.id} />
       )}
 
       {viewTab === 'caja' && (
@@ -522,50 +522,55 @@ export default function FinancesPage() {
 // STATS VIEW COMPONENT
 // -------------------------------------
 
-function StatsView() {
+function StatsView({ restaurantId, branchId }: { restaurantId: string, branchId?: string }) {
   const [chartPeriod, setChartPeriod] = useState<'Mensual' | 'Semanal'>('Mensual');
+  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<any>(null);
 
-  // Mock data for Line Chart (Mensual)
-  const monthlyData = [
-    { name: 'Ene', value: 0 },
-    { name: 'Feb', value: 0 },
-    { name: 'Mar', value: 0 },
-    { name: 'Abr', value: 0 },
-    { name: 'May', value: 0 },
-    { name: 'Jun', value: 0 },
-    { name: 'Jul', value: 1150 },
-    { name: 'Ago', value: 430 },
-    { name: 'Sep', value: 0 },
-    { name: 'Oct', value: 0 },
-    { name: 'Nov', value: 0 },
-    { name: 'Dic', value: 0 },
-  ];
+  useEffect(() => {
+    let isMounted = true;
+    setLoading(true);
+    getDashboardStats(restaurantId, branchId)
+      .then(res => {
+        if (isMounted) {
+          setData(res);
+          setLoading(false);
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        if (isMounted) setLoading(false);
+      });
+    return () => { isMounted = false; };
+  }, [restaurantId, branchId]);
 
-  const weeklyData = [
-    { name: 'Lun', value: 300 },
-    { name: 'Mar', value: 450 },
-    { name: 'Mié', value: 320 },
-    { name: 'Jue', value: 600 },
-    { name: 'Vie', value: 900 },
-    { name: 'Sáb', value: 1200 },
-    { name: 'Dom', value: 850 },
-  ];
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#E76F51]" />
+      </div>
+    );
+  }
+
+  if (!data) {
+    return <div className="p-4 text-gray-500">No se pudieron cargar las estadísticas.</div>;
+  }
+
+  const {
+    totalGanancia,
+    monthlyGanancia,
+    prevMonthlyGanancia,
+    monthlyData,
+    weeklyData,
+    topProducts
+  } = data;
 
   const chartData = chartPeriod === 'Mensual' ? monthlyData : weeklyData;
 
-  // Mock data for Top Products
-  const topProducts = [
-    { name: 'Hamburguesa Doble', value: 90, max: 100 },
-    { name: 'Pizza Margarita', value: 85, max: 100 },
-    { name: 'Papas Fritas', value: 70, max: 100 },
-    { name: 'Cerveza Artesanal', value: 65, max: 100 },
-    { name: 'Limonada', value: 60, max: 100 },
-    { name: 'Lomito Completo', value: 50, max: 100 },
-    { name: 'Ensalada César', value: 45, max: 100 },
-    { name: 'Torta de Chocolate', value: 35, max: 100 },
-    { name: 'Helado de Vainilla', value: 25, max: 100 },
-    { name: 'Agua Mineral', value: 20, max: 100 },
-  ];
+  const monthOverMonthChange = prevMonthlyGanancia === 0 
+    ? 100 
+    : ((monthlyGanancia - prevMonthlyGanancia) / prevMonthlyGanancia) * 100;
+  const isPositiveGrowth = monthOverMonthChange >= 0;
 
   return (
     <div className="flex-1 overflow-y-auto space-y-6 pb-10">
@@ -574,22 +579,24 @@ function StatsView() {
         {/* Card 1: Ganancia total (Accent style) */}
         <div className="bg-[#2F4F3E] text-white p-6 rounded-2xl shadow-sm flex flex-col justify-center">
           <p className="text-gray-400 text-sm font-medium mb-2">ganancia total</p>
-          <p className="text-4xl font-light">Bs. 1539.00</p>
+          <p className="text-4xl font-light">Bs. {totalGanancia.toLocaleString('es-BO', {minimumFractionDigits: 2})}</p>
         </div>
         
         {/* Card 2: Acumulación mensual */}
         <div className="bg-white border border-gray-100 p-6 rounded-2xl shadow-sm flex flex-col justify-center">
           <p className="text-gray-500 text-sm font-medium mb-2">acumulación mensual</p>
-          <p className="text-4xl font-light text-[#1F2933]">Bs. 0.00</p>
+          <p className="text-4xl font-light text-[#1F2933]">Bs. {monthlyGanancia.toLocaleString('es-BO', {minimumFractionDigits: 2})}</p>
           <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
-            <span className="text-gray-500">100% ↓</span> mes anterior
+            <span className={isPositiveGrowth ? 'text-green-500' : 'text-red-500'}>
+              {Math.abs(monthOverMonthChange).toFixed(1)}% {isPositiveGrowth ? '↑' : '↓'}
+            </span> mes anterior
           </p>
         </div>
         
         {/* Card 3: Comparativa */}
         <div className="bg-white border border-gray-100 p-6 rounded-2xl shadow-sm flex flex-col justify-center">
           <p className="text-gray-500 text-sm font-medium mb-2">comparativa con el mes anterior</p>
-          <p className="text-4xl font-light text-[#1F2933]">Bs. 427.50</p>
+          <p className="text-4xl font-light text-[#1F2933]">Bs. {prevMonthlyGanancia.toLocaleString('es-BO', {minimumFractionDigits: 2})}</p>
           <p className="text-xs text-gray-400 mt-2">
             total mes anterior
           </p>

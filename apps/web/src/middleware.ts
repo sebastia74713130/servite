@@ -12,17 +12,27 @@ import { NextRequest, NextResponse } from 'next/server';
  * Si no está configurado, el middleware no hace nada.
  */
 export function middleware(request: NextRequest) {
-  const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN;
+  let rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN;
+  const hostname = request.headers.get('host') || '';
+  const hostnameWithoutPort = hostname.split(':')[0];
 
-  // Si no hay dominio raíz configurado, no hacer nada
+  // Si no hay dominio raíz configurado, intentamos deducirlo (ej. servite.com)
+  if (!rootDomain) {
+    if (hostnameWithoutPort === 'localhost' || hostnameWithoutPort.match(/^\d+\.\d+\.\d+\.\d+$/)) {
+      return NextResponse.next();
+    }
+    const parts = hostnameWithoutPort.split('.');
+    if (parts.length >= 2) {
+      rootDomain = parts.slice(-2).join('.');
+    }
+  }
+
   if (!rootDomain) {
     return NextResponse.next();
   }
-
-  const hostname = request.headers.get('host') || '';
   
   // Remover el puerto si existe (para desarrollo local)
-  const hostnameWithoutPort = hostname.split(':')[0];
+  // (ya fue declarado arriba)
 
   // Si es el dominio raíz o www, dejar pasar normalmente (dashboard)
   if (

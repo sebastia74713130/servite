@@ -98,7 +98,7 @@ export default function TablesPage() {
               {/* mini QR preview */}
               <div className="flex justify-center mb-4 p-3 bg-[#F9FAFB] rounded-xl border border-[#E5E7EB]">
                 <QRCodeSVG
-                  value={typeof window !== 'undefined' && restaurant ? (process.env.NEXT_PUBLIC_ROOT_DOMAIN ? `https://${restaurant.slug}.${process.env.NEXT_PUBLIC_ROOT_DOMAIN}/${table.table_code}` : `${window.location.origin}/m/${restaurant.slug}/${table.table_code}`) : ''}
+                  value={typeof window !== 'undefined' && restaurant ? `https://${restaurant.slug}.${process.env.NEXT_PUBLIC_ROOT_DOMAIN || (window.location.hostname === 'localhost' ? window.location.host : window.location.hostname.split('.').slice(-2).join('.'))}/${table.table_code}` : ''}
                   size={100}
                   level="H"
                 />
@@ -169,12 +169,13 @@ export default function TablesPage() {
 function QrModal({ table, restaurantSlug, onClose }: { table: RestaurantTable; restaurantSlug: string; onClose: () => void }) {
   const qrRef = useRef<HTMLDivElement>(null);
   
-  // Usamos el origen actual (ej. https://servite.com) + /m/ + slug + codigo de mesa
-  const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-  const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN;
-  const qrValue = rootDomain 
-    ? `https://${restaurantSlug}.${rootDomain}/${table.table_code}`
-    : `${baseUrl}/m/${restaurantSlug}/${table.table_code}`;
+  // Generar URL con formato: https://[slug].[dominio]/[codigo]
+  let rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN;
+  if (!rootDomain && typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    rootDomain = hostname === 'localhost' ? window.location.host : hostname.split('.').slice(-2).join('.');
+  }
+  const qrValue = rootDomain ? `https://${restaurantSlug}.${rootDomain}/${table.table_code}` : '';
 
   const handleDownload = () => {
     const svg = qrRef.current?.querySelector('svg');
