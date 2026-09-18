@@ -67,9 +67,15 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Reescribir: /MESA-1 → /m/mi-restaurante/MESA-1
+  // Reescribir rutas de menús y reservas
   const rewrittenUrl = request.nextUrl.clone();
-  rewrittenUrl.pathname = `/m/${subdomain}${pathname}`;
+  
+  if (pathname === '/reservas' || pathname === '/r') {
+    rewrittenUrl.pathname = `/r/${subdomain}`;
+  } else {
+    // Si no es reservas, asumimos que es el código de mesa (ej: /MESA-1 -> /m/mi-restaurante/MESA-1)
+    rewrittenUrl.pathname = `/m/${subdomain}${pathname}`;
+  }
   
   return NextResponse.rewrite(rewrittenUrl);
 }

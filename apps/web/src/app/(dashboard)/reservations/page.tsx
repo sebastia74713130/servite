@@ -564,7 +564,17 @@ export default function ReservationsPage() {
 
   const handleShareLink = () => {
     if (!restaurant?.slug) return;
-    const url = `${window.location.origin}/r/${restaurant.slug}`;
+    
+    let rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN;
+    if (!rootDomain && typeof window !== 'undefined') {
+      const hostname = window.location.hostname;
+      rootDomain = hostname === 'localhost' ? window.location.host : hostname.split('.').slice(-2).join('.');
+    }
+    
+    const url = rootDomain 
+      ? `https://${restaurant.slug}.${rootDomain}/reservas` 
+      : `${window.location.origin}/r/${restaurant.slug}`;
+      
     navigator.clipboard.writeText(url);
     setShowCopiedToast(true);
     setTimeout(() => setShowCopiedToast(false), 3000);
