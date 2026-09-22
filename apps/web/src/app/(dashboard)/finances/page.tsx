@@ -667,7 +667,7 @@ function StatsView({ restaurantId, branchId }: { restaurantId: string, branchId?
           </div>
           
           <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-4 mt-2 custom-scrollbar">
-            {topProducts.map((item, index) => (
+            {topProducts.map((item: any, index: number) => (
               <div key={index} className="flex items-center gap-4">
                 <div className="w-1/3 truncate text-sm text-gray-500 font-medium">
                   {item.name}
