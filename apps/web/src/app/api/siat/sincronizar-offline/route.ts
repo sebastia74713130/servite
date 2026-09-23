@@ -109,9 +109,11 @@ export async function GET(req: Request) {
                     });
                     if (eventResult.RespuestaListaEventos?.transaccion) {
                         codigoEvento = eventResult.RespuestaListaEventos.codigoRecepcionEventoSignificativo;
+                    } else {
+                        logs.push(`SIAT rechazó el evento: ${JSON.stringify(eventResult)}`);
                     }
-                } catch(e) {
-                    logs.push(`Falla al registrar evento para rest ${restaurantId}`);
+                } catch(e: any) {
+                    logs.push(`Falla al registrar evento para rest ${restaurantId}: ${e.message} | ${JSON.stringify(e.Fault || e)}`);
                     continue;
                 }
 
