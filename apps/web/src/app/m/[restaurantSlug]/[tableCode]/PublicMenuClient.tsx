@@ -569,7 +569,7 @@ export default function PublicMenuClient({
         // Food court mode: fetch ALL paid orders in this session across all restaurants
         const result = await supabase
           .from('orders')
-          .select(`*, order_items (*), restaurants(name, logo_url)`)
+          .select(`*, order_items (*), restaurants(name, logo_url), invoices(id, cuf)`)
           .eq('food_court_session_id', foodCourtSessionId)
           .eq('is_paid', true)
           .neq('status', 'cancelled')
@@ -580,7 +580,7 @@ export default function PublicMenuClient({
         // Fallback: no food court session yet, use device session
         const result = await supabase
           .from('orders')
-          .select(`*, order_items (*), restaurants(name, logo_url)`)
+          .select(`*, order_items (*), restaurants(name, logo_url), invoices(id, cuf)`)
           .eq('customer_session_id', deviceSessionId)
           .eq('is_paid', true)
           .neq('status', 'cancelled')
@@ -591,7 +591,7 @@ export default function PublicMenuClient({
         // Normal table: show unpaid orders for this table
         const result = await supabase
           .from('orders')
-          .select(`*, order_items (*), restaurants(name, logo_url)`)
+          .select(`*, order_items (*), restaurants(name, logo_url), invoices(id, cuf)`)
           .eq('table_id', table.id)
           .eq('is_paid', false)
           .neq('status', 'cancelled')
@@ -1415,6 +1415,17 @@ export default function PublicMenuClient({
                             <span>Subtotal</span>
                             <span>Bs {order.total.toLocaleString('es-BO')}</span>
                           </div>
+                          {order.invoices && order.invoices.length > 0 && (
+                            <div className="mt-3 pt-3 border-t border-dashed border-gray-200">
+                              <button 
+                                onClick={() => window.open(`/api/siat/factura/print?cuf=${order.invoices[0].cuf}`, '_blank')}
+                                className="w-full py-2 bg-gray-50 text-gray-700 text-sm font-bold rounded-lg flex items-center justify-center gap-2 border border-gray-200 active:bg-gray-100"
+                              >
+                                <FileText size={16} />
+                                Descargar Factura (PDF)
+                              </button>
+                            </div>
+                          )}
                         </div>
                       ))}
                       {isMultiRestaurant && (

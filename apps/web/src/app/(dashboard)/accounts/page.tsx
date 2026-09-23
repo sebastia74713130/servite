@@ -106,6 +106,9 @@ export default function AccountsPage() {
   };
 
   const [paymentMethod, setPaymentMethod] = useState('Efectivo');
+  const [cardNumber, setCardNumber] = useState('');
+  const [siatPuntoVenta, setSiatPuntoVenta] = useState('0');
+  const [simulateOffline, setSimulateOffline] = useState(false);
   const [activeRegister, setActiveRegister] = useState<any>(null);
 
   useEffect(() => {
@@ -161,14 +164,15 @@ export default function AccountsPage() {
             : ((selectedTable.siat_customer_name === 'S/N' || !selectedTable.siat_customer_name) ? 'S/N' : selectedTable.siat_customer_name);
 
           const totalAmount = tableOrders.reduce((acc, o) => acc + o.total, 0);
-          const facturaParams = {
+          const facturaParams: any = {
             cabecera: {
               fechaEmision: new Date().toISOString(),
               numeroFactura: Math.floor(Math.random() * 10000) + 1, // Número correlativo simulado
               montoTotal: totalAmount,
               montoTotalSujetoIva: totalAmount,
               nombreRazonSocial: rznSocial,
-              numeroDocumento: nitCi
+              numeroDocumento: nitCi,
+              codigoMetodoPago: paymentMethod === 'Tarjeta' ? 2 : (paymentMethod.includes('QR') ? 7 : 1),
             },
             detalle: tableOrders.flatMap(o => o.order_items).map((item: any) => ({
               codigoProducto: item.product_id ? item.product_id.substring(0, 8) : '00000000',
@@ -180,13 +184,21 @@ export default function AccountsPage() {
             }))
           };
 
+          if (siatPuntoVenta !== '0') {
+             facturaParams.cabecera.codigoPuntoVenta = parseInt(siatPuntoVenta);
+          }
+          if (paymentMethod === 'Tarjeta' && cardNumber) {
+             facturaParams.cabecera.numeroTarjeta = cardNumber;
+          }
+
           const response = await fetch('/api/siat/emitir', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               restaurantId: restaurant?.id,
               orderId: orderIds[0],
-              facturaParams
+              facturaParams,
+              simulateOffline
             })
           });
 
@@ -243,8 +255,8 @@ export default function AccountsPage() {
             
             setSiatResult({
               type: 'success',
-              title: 'Factura SIAT Emitida',
-              message: 'La factura se emitió y validó exitosamente.',
+              title: result.estado === 'OFFLINE' ? 'Factura Guardada (Fuera de Línea)' : 'Factura SIAT Emitida',
+              message: result.mensaje || 'La factura se emitió y validó exitosamente.',
               cuf: generatedCuf
             });
           } else {
@@ -543,6 +555,54 @@ export default function AccountsPage() {
                   <option value="Tarjeta">Tarjeta</option>
                   <option value="QR / Transferencia">QR / Transferencia</option>
                 </select>
+
+                {paymentMethod === 'Tarjeta' && (
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Número de Tarjeta (Primeros 4 y últimos 4 ej. 1234000000005678) o Transacción:
+                    </label>
+                    <input 
+                      type="text" 
+                      value={cardNumber}
+                      onChange={e => setCardNumber(e.target.value)}
+                      placeholder="1234000000005678"
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32]"
+                    />
+                  </div>
+                )}
+
+                {selectedTable.service_status === 'requesting_bill' && selectedTable.siat_customer_name && (
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Punto de Venta SIAT:
+                    </label>
+                    <select 
+                      value={siatPuntoVenta}
+                      onChange={e => setSiatPuntoVenta(e.target.value)}
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32]"
+                    >
+                      <option value="0">Punto de Venta 0 (Por Defecto)</option>
+                      <option value="1">Punto de Venta 1</option>
+                      <option value="2">Punto de Venta 2</option>
+                      <option value="3">Punto de Venta 3</option>
+                    </select>
+
+                    <div className="mt-4 flex items-center gap-3 bg-gray-50 p-3 rounded-xl border border-gray-200">
+                      <input 
+                        type="checkbox"
+                        id="simulateOffline"
+                        checked={simulateOffline}
+                        onChange={(e) => setSimulateOffline(e.target.checked)}
+                        className="w-5 h-5 text-[#2E7D32] rounded border-gray-300 focus:ring-[#2E7D32]"
+                      />
+                      <label htmlFor="simulateOffline" className="text-sm text-gray-700 font-medium cursor-pointer flex-1">
+                        Simular Emisión Fuera de Línea (Prueba)
+                        <span className="block text-xs text-gray-500 font-normal">Guarda la factura localmente sin enviarla inmediatamente al SIAT. Luego debes empaquetarla.</span>
+                      </label>
+                    </div>
+                  </div>
+                )}
+
                 {!activeRegister && (
                   <p className="text-xs text-orange-600 mt-2">
                     Nota: La caja está cerrada. El pago se marcará pero no se registrará en la caja diaria.

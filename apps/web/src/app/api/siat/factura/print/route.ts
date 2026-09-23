@@ -54,8 +54,9 @@ export async function GET(req: Request) {
           <h1>FACTURA ELECTRÓNICA</h1>
           <h2>${restaurantName}</h2>
           <div style="text-align:left; font-size:12px; margin-bottom: 10px;">
-            NIT/CI: ${nitCi}<br/>
-            Razón Social: ${rznSocial}
+            <b>Nro. Factura:</b> ${invoice.numero_factura || 'S/N'}<br/>
+            <b>NIT/CI:</b> ${nitCi}<br/>
+            <b>Razón Social:</b> ${rznSocial}
           </div>
           <div class="items">
             ${items.map((item: any) => `

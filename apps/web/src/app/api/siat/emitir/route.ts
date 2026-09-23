@@ -75,7 +75,7 @@ export async function POST(req: Request) {
     facturaParams.cabecera.telefono = "60000000";
     facturaParams.cabecera.codigoSucursal = parseInt(siatSettings.siat_codigo_sucursal);
     facturaParams.cabecera.direccion = "Av. Principal 123";
-    facturaParams.cabecera.codigoPuntoVenta = parseInt(siatSettings.siat_codigo_punto_venta);
+    facturaParams.cabecera.codigoPuntoVenta = facturaParams.cabecera.codigoPuntoVenta !== undefined ? facturaParams.cabecera.codigoPuntoVenta : parseInt(siatSettings.siat_codigo_punto_venta);
     if (!facturaParams.cabecera.numeroDocumento || facturaParams.cabecera.numeroDocumento === '0') {
       facturaParams.cabecera.numeroDocumento = '99002'; // NIT/CI genérico para S/N
     }
