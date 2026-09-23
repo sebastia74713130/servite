@@ -63,6 +63,34 @@ export default function InvoicesPage() {
     }
   };
 
+  const handleRevertir = async (cuf: string) => {
+    if (!confirm('¿Estás seguro de revertir la anulación de esta factura en el SIAT? Volverá a ser válida.')) return;
+    
+    setIsAnulling(cuf);
+    try {
+      const res = await fetch('/api/siat/revertir-anulacion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          restaurantId: restaurant?.id,
+          cuf: cuf
+        })
+      });
+      const data = await res.json();
+      
+      if (data.success) {
+        alert('Anulación revertida exitosamente');
+        fetchInvoices();
+      } else {
+        alert(`Error al revertir: ${JSON.stringify(data.detalles || data.error)}`);
+      }
+    } catch (err: any) {
+      alert('Error de red al revertir anulación');
+    } finally {
+      setIsAnulling(null);
+    }
+  };
+
   if (sessionLoading || loading) return <LoadingState />;
 
   const filteredInvoices = invoices.filter(inv => 
@@ -143,6 +171,15 @@ export default function InvoicesPage() {
                       className="inline-flex items-center gap-2 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50"
                     >
                       {isAnulling === inv.cuf ? 'Anulando...' : 'Anular'}
+                    </button>
+                  )}
+                  {inv.siat_estado === 'ANULADA' && (
+                    <button 
+                      disabled={isAnulling === inv.cuf}
+                      onClick={() => handleRevertir(inv.cuf)}
+                      className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50"
+                    >
+                      {isAnulling === inv.cuf ? 'Revirtiendo...' : 'Revertir'}
                     </button>
                   )}
                 </td>

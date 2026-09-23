@@ -161,7 +161,7 @@ export async function POST(req: Request) {
       : (!isSuccess ? JSON.stringify(resp?.mensajesList || resp) : null);
 
     // Guardar en base de datos la confirmación o estado offline
-    await supabaseAdmin.from('invoices').insert({
+    const { error: insertError } = await supabaseAdmin.from('invoices').insert({
       order_id: orderId,
       restaurant_id: restaurantId,
       cuf: cufFinal,
@@ -171,6 +171,11 @@ export async function POST(req: Request) {
       codigo_recepcion: resp?.codigoRecepcion || null,
       detalles_error: detallesError
     });
+
+    if (insertError) {
+      console.error("DB Insert Error:", insertError);
+      return NextResponse.json({ error: "No se pudo guardar la factura en la base de datos: " + insertError.message }, { status: 500 });
+    }
 
     if (isOffline) {
       return NextResponse.json({
