@@ -39,7 +39,7 @@ export async function POST(req: Request) {
        throw new Error(JSON.stringify(response));
     }
 
-    // 3. Guardar en Supabase (Solo si no es una prueba con override)
+    // 3. Guardar en Supabase 
     if (overridePuntoVenta === undefined) {
       await supabaseAdmin
         .from('restaurant_siat_settings')
