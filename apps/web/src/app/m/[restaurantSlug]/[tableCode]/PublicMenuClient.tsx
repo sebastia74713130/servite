@@ -231,6 +231,7 @@ export default function PublicMenuClient({
   const [generatedQrBase64, setGeneratedQrBase64] = useState<string | null>(null);
   const [qrLoading, setQrLoading] = useState(false);
   const [qrError, setQrError] = useState('');
+  const [autoEmittedCuf, setAutoEmittedCuf] = useState<string | null>(null);
 
   const handleGenerateQR = async () => {
     setQrLoading(true);
@@ -348,35 +349,48 @@ export default function PublicMenuClient({
       }
       if (alarmAudioRef.current) {
         // Pre-cargar la alarma para que esté lista
-        alarmAudioRef.current.load();
+        alarmAudioRef.current.play().then(() => alarmAudioRef.current!.pause()).catch(() => {});
       }
     }
 
     setIsSubmitting(true);
     
     try {
-      // Group cart items by station
-      const itemsByStation = cartItems.reduce((acc, item) => {
+      // Get device/browser ID for cart
+      let deviceSessionId = localStorage.getItem('device_session_id');
+      if (!deviceSessionId) {
+        deviceSessionId = 'dev-' + Math.random().toString(36).substring(2, 15);
+        localStorage.setItem('device_session_id', deviceSessionId);
+      }
+
+      // Group items by station to create separate orders if needed
+      const cartByStation: Record<string, CartItem[]> = {};
+      cartItems.forEach(item => {
         const stationId = item.product.station_id || 'unassigned';
-        if (!acc[stationId]) acc[stationId] = [];
-        acc[stationId].push(item);
-        return acc;
-      }, {} as Record<string, typeof cartItems>);
+        if (!cartByStation[stationId]) {
+          cartByStation[stationId] = [];
+        }
+        cartByStation[stationId].push(item);
+      });
 
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      // Fetch all 'sent' orders for this table today to see if we can merge
-      const { data: existingOrders, error: fetchError } = await supabase
+      // Fetch existing 'sent' orders for this table/session to merge if possible
+      let existingOrdersQuery = supabase
         .from('orders')
-        .select('id, subtotal, total, order_items(station_id)')
-        .eq('table_id', table.id)
-        .eq('status', 'sent')
-        .eq('is_paid', isPaid)
-        .gte('created_at', today.toISOString());
+        .select('id, subtotal, total, status, order_items(station_id)')
+        .eq('status', 'sent');
+
+      if (table.type === 'takeaway') {
+        existingOrdersQuery = existingOrdersQuery.eq('customer_session_id', deviceSessionId);
+      } else {
+        existingOrdersQuery = existingOrdersQuery.eq('table_id', table.id);
+      }
+
+      const { data: existingOrders } = await existingOrdersQuery;
+
+      let firstOrderId: string | null = null;
 
       // We need to process each station group separately
-      for (const [stationId, items] of Object.entries(itemsByStation)) {
+      for (const [stationId, items] of Object.entries(cartByStation)) {
         const groupTotal = items.reduce((acc, item) => acc + (item.product.price * item.quantity), 0);
         const actualStationId = stationId === 'unassigned' ? null : stationId;
         
@@ -441,6 +455,10 @@ export default function PublicMenuClient({
           targetOrderId = newOrder.id;
         }
 
+        if (!firstOrderId) {
+          firstOrderId = targetOrderId;
+        }
+
         // Create order items for this group
         const itemsToInsert = items.map(item => ({
           order_id: targetOrderId,
@@ -466,6 +484,52 @@ export default function PublicMenuClient({
           .update({ updated_at: new Date().toISOString() })
           .eq('id', targetOrderId);
       }
+      
+      // Intentar emitir factura automáticamente si el pago se completó
+      let emittedCuf: string | null = null;
+      if (isPaid && firstOrderId) {
+        try {
+          const nitCi = (customerNit.trim() === '' || customerNit.trim() === '0') ? '99002' : customerNit.trim();
+          const rznSocial = nitCi === '99002' 
+            ? 'CONTROL TRIBUTARIO' 
+            : (customerName.trim() === '' ? 'S/N' : customerName.trim());
+
+          const facturaParams = {
+            cabecera: {
+              fechaEmision: new Date().toISOString(),
+              numeroFactura: Math.floor(Math.random() * 10000) + 1,
+              montoTotal: cartTotal,
+              montoTotalSujetoIva: cartTotal,
+              nombreRazonSocial: rznSocial,
+              numeroDocumento: nitCi
+            },
+            detalle: cartItems.map(item => ({
+              codigoProducto: item.product.id ? item.product.id.substring(0, 8) : '00000000',
+              descripcion: item.product.name,
+              cantidad: item.quantity,
+              precioUnitario: item.product.price,
+              montoDescuento: 0,
+              subTotal: item.product.price * item.quantity
+            }))
+          };
+
+          const emitRes = await fetch('/api/siat/emitir', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              restaurantId: restaurant.id,
+              orderId: firstOrderId,
+              facturaParams
+            })
+          });
+          const emitResult = await emitRes.json();
+          if (emitResult.success) {
+            emittedCuf = emitResult.cuf;
+          }
+        } catch (e) {
+          console.error("Error auto-emitting invoice:", e);
+        }
+      }
 
       // Success
       sessionStorage.setItem(`has_ordered_${table.id}`, 'true');
@@ -473,6 +537,10 @@ export default function PublicMenuClient({
       setShowCart(false);
       setShowTakeawayPaymentQR(false);
       
+      if (emittedCuf) {
+        setAutoEmittedCuf(emittedCuf);
+      }
+
       // Si el pedido se pagó exitosamente, redirigir a la pestaña de Mi Cuenta y actualizar los datos
       if (isPaid) {
         handleFetchBill();
@@ -1529,7 +1597,16 @@ export default function PublicMenuClient({
               </h3>
               <p className="text-gray-600 text-lg">{serviceMessage}</p>
             </div>
-            <div className="p-4 bg-gray-50 border-t border-gray-100">
+            <div className="p-4 bg-gray-50 border-t border-gray-100 flex flex-col gap-2">
+              {autoEmittedCuf && (
+                <button
+                  onClick={() => window.open(`/api/siat/factura/print?cuf=${autoEmittedCuf}`, '_blank')}
+                  className="w-full py-3 rounded-xl font-bold text-gray-700 bg-white border border-gray-200 shadow-sm transition-all active:scale-95 text-lg flex items-center justify-center gap-2 mb-2"
+                >
+                  <FileText size={20} />
+                  Descargar Factura (PDF)
+                </button>
+              )}
               <button 
                 onClick={() => {
                   if (alarmAudioRef.current) {
@@ -1538,6 +1615,7 @@ export default function PublicMenuClient({
                   }
                   setIsAlarmRinging(false);
                   setServiceMessage(null);
+                  setAutoEmittedCuf(null);
                 }}
                 className={`w-full py-4 rounded-xl font-bold text-white transition-all active:scale-95 text-lg ${isAlarmRinging ? 'bg-red-500 hover:bg-red-600 shadow-[0_0_15px_rgba(239,68,68,0.5)]' : ''}`}
                 style={isAlarmRinging ? {} : { backgroundColor: brandColor }}
