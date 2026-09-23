@@ -228,6 +228,33 @@ export default function PublicMenuClient({
   const [quantity, setQuantity] = useState(1);
   const [notes, setNotes] = useState('');
   const [showTakeawayPaymentQR, setShowTakeawayPaymentQR] = useState(false);
+  const [generatedQrBase64, setGeneratedQrBase64] = useState<string | null>(null);
+  const [qrLoading, setQrLoading] = useState(false);
+  const [qrError, setQrError] = useState('');
+
+  const handleGenerateQR = async () => {
+    setQrLoading(true);
+    setQrError('');
+    try {
+      const res = await fetch('/api/qr/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: cartTotal,
+          transactionId: Math.floor(Math.random() * 1000000000).toString(),
+          description: `Pedido ${restaurant.name}`
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error generando QR');
+      
+      setGeneratedQrBase64(data.qrImage);
+    } catch (err: any) {
+      setQrError(err.message);
+    } finally {
+      setQrLoading(false);
+    }
+  };
 
   // Bill Request SIAT Data & Payment Method
   const [showBillRequestModal, setShowBillRequestModal] = useState(false);
@@ -1145,29 +1172,43 @@ export default function PublicMenuClient({
                       if (customerNit.trim()) localStorage.setItem('customer_nit', customerNit.trim());
                       setShowCustomerDataStep(false);
                       setShowTakeawayPaymentQR(true);
+                      handleGenerateQR();
                     }}
                     disabled={!customerName.trim()}
                     className="flex-1 py-3 rounded-xl font-bold text-white disabled:opacity-40 transition-transform active:scale-95"
                     style={{ backgroundColor: brandColor }}
                   >
-                    Continuar →
+                    Continuar
                   </button>
                 </div>
               </div>
             ) : showTakeawayPaymentQR ? (
               <div className="flex flex-col items-center">
-                <p className="text-sm text-gray-600 mb-4 text-center">Escanea el QR para pagar, o presiona el botón para simular el pago.</p>
-                <div className="p-4 bg-white border border-gray-200 rounded-2xl shadow-sm mb-4">
-                  <QRCodeSVG value={`payment-sim-${Date.now()}`} size={150} />
+                <p className="text-sm text-gray-600 mb-4 text-center">Escanea el QR para pagar desde tu aplicación bancaria.</p>
+                <div className="p-4 bg-white border border-gray-200 rounded-2xl shadow-sm mb-4 min-h-[200px] flex items-center justify-center w-full">
+                  {qrLoading ? (
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="w-8 h-8 border-4 border-gray-200 border-t-orange-500 rounded-full animate-spin"></div>
+                      <span className="text-gray-500 text-sm font-medium">Generando QR del Banco...</span>
+                    </div>
+                  ) : qrError ? (
+                    <div className="flex flex-col items-center gap-2 text-red-500 p-4">
+                      <AlertCircle size={32} />
+                      <span className="text-sm text-center">{qrError}</span>
+                      <button onClick={handleGenerateQR} className="mt-2 text-xs font-bold underline">Reintentar</button>
+                    </div>
+                  ) : generatedQrBase64 ? (
+                    <img src={`data:image/png;base64,${generatedQrBase64}`} alt="QR de Pago" className="w-[200px] h-[200px] object-contain" />
+                  ) : null}
                 </div>
                 <button
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || qrLoading || !!qrError}
                   onClick={() => handleSubmitOrder(true)}
                   className="w-full py-3 rounded-xl font-bold text-white flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-50"
                   style={{ backgroundColor: brandColor }}
                 >
                   <CheckCircle size={20} />
-                  {isSubmitting ? 'Procesando pago...' : 'Simular Pago Exitoso'}
+                  {isSubmitting ? 'Procesando pedido...' : 'Ya realicé el pago'}
                 </button>
               </div>
             ) : (

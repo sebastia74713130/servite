@@ -566,13 +566,15 @@ export default function ReservationsPage() {
     if (!restaurant?.slug) return;
     
     let rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN;
+    let protocol = 'https:';
     if (!rootDomain && typeof window !== 'undefined') {
       const hostname = window.location.hostname;
       rootDomain = hostname === 'localhost' ? window.location.host : hostname.split('.').slice(-2).join('.');
+      protocol = window.location.protocol;
     }
     
     const url = rootDomain 
-      ? `https://${restaurant.slug}.${rootDomain}/reservas` 
+      ? `${protocol}//${restaurant.slug}.${rootDomain}/reservas` 
       : `${window.location.origin}/r/${restaurant.slug}`;
       
     navigator.clipboard.writeText(url);
