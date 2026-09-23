@@ -22,15 +22,11 @@ export default function InvoicesPage() {
 
   const fetchInvoices = async () => {
     try {
-      const { data, error } = await supabase
-        .from('invoices')
-        .select('*, orders(id, table_number, total, customer_name, customer_nit)')
-        .eq('restaurant_id', restaurant?.id)
-        .order('created_at', { ascending: false })
-        .limit(100);
+      const res = await fetch(`/api/siat/invoices?restaurantId=${restaurant?.id}`);
+      const json = await res.json();
       
-      if (error) throw error;
-      setInvoices(data || []);
+      if (json.error) throw new Error(json.error);
+      setInvoices(json.invoices || []);
     } catch (err) {
       console.error(err);
     } finally {
