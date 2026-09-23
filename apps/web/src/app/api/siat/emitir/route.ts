@@ -84,7 +84,15 @@ export async function POST(req: Request) {
       facturaParams.cabecera.nombreRazonSocial = 'CONTROL TRIBUTARIO';
     }
 
-    facturaParams.cabecera.codigoTipoDocumentoIdentidad = facturaParams.cabecera.codigoTipoDocumentoIdentidad || (facturaParams.cabecera.numeroDocumento === '99002' ? 1 : 5); // 1 = CI, 5 = NIT
+    const docStr = facturaParams.cabecera.numeroDocumento || '';
+    let tipoDoc = 1; // CI por defecto
+    if (/^\d{10,}$/.test(docStr)) {
+      tipoDoc = 5; // NIT si tiene 10 o más dígitos numéricos
+    }
+    if (docStr === '99002') tipoDoc = 1;
+
+    facturaParams.cabecera.codigoTipoDocumentoIdentidad = facturaParams.cabecera.codigoTipoDocumentoIdentidad || tipoDoc; 
+    facturaParams.cabecera.codigoExcepcion = tipoDoc === 5 ? 1 : 0; // 1 = Permitir emitir aunque el NIT no esté registrado en SIAT
     facturaParams.cabecera.codigoCliente = facturaParams.cabecera.numeroDocumento;
     facturaParams.cabecera.codigoMetodoPago = facturaParams.cabecera.codigoMetodoPago || 1; // Efectivo
     facturaParams.cabecera.codigoMoneda = 1; // Boliviano
