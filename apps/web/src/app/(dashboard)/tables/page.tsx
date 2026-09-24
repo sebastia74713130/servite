@@ -26,6 +26,8 @@ export default function TablesPage() {
   const [showQrModal, setShowQrModal] = useState(false);
   const [showNewModal, setShowNewModal] = useState(false);
   const [selectedTable, setSelectedTable] = useState<RestaurantTable | null>(null);
+  const [tableToDelete, setTableToDelete] = useState<RestaurantTable | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   if (sessionLoading || tablesLoading) return <LoadingState />;
 
@@ -37,14 +39,26 @@ export default function TablesPage() {
     refetch();
   };
 
-  const handleDeleteTable = async (table: RestaurantTable) => {
-    if (!confirm(`¿Estás seguro de que deseas eliminar la ${table.table_code}? Esta acción no se puede deshacer.`)) return;
-    
-    await supabase
-      .from('tables')
-      .delete()
-      .eq('id', table.id);
-    refetch();
+  const handleDeleteTable = (table: RestaurantTable) => {
+    setTableToDelete(table);
+  };
+
+  const confirmDeleteTable = async () => {
+    if (!tableToDelete) return;
+    setIsDeleting(true);
+    try {
+      await supabase
+        .from('tables')
+        .delete()
+        .eq('id', tableToDelete.id);
+      refetch();
+    } catch (err) {
+      console.error(err);
+      alert('Error al eliminar la mesa');
+    } finally {
+      setIsDeleting(false);
+      setTableToDelete(null);
+    }
   };
 
   const openQr = (table: RestaurantTable) => {
@@ -179,6 +193,40 @@ export default function TablesPage() {
           onClose={() => setShowNewModal(false)}
           onSaved={() => { setShowNewModal(false); refetch(); }}
         />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {tableToDelete && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setTableToDelete(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-xl relative animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+            <div className="flex flex-col items-center text-center">
+              <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mb-4">
+                <Trash2 className="text-red-600" size={24} />
+              </div>
+              <h2 className="text-xl font-bold text-gray-900 mb-2">Eliminar Mesa</h2>
+              <p className="text-gray-600 mb-6">
+                ¿Estás seguro de que deseas eliminar la <strong>{tableToDelete.table_code}</strong>?<br/>Esta acción no se puede deshacer.
+              </p>
+              
+              <div className="flex gap-3 w-full">
+                <button
+                  onClick={() => setTableToDelete(null)}
+                  disabled={isDeleting}
+                  className="flex-1 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-colors disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmDeleteTable}
+                  disabled={isDeleting}
+                  className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white font-medium rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {isDeleting ? 'Eliminando...' : 'Sí, eliminar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

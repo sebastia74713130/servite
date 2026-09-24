@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRestaurantSession } from "@/hooks/useRestaurantSession";
 import { LoadingState } from "@/components/LoadingState";
 import { supabase } from "@/lib/supabase";
-import { Store, UserPlus, Users, X, Plus } from "lucide-react";
+import { Store, UserPlus, Users, X, Plus, Trash2 } from "lucide-react";
 import { createBranch, createBranchUser, deleteBranchUser, getBranchUsers } from "./actions";
 
 export default function BranchesPage() {
@@ -22,6 +22,8 @@ export default function BranchesPage() {
   // Forms
   const [branchForm, setBranchForm] = useState({ name: "", address: "" });
   const [userForm, setUserForm] = useState({ name: "", username: "", password: "", role: "kitchen" });
+  const [userToDelete, setUserToDelete] = useState<{ id: string, name: string } | null>(null);
+  const [isDeletingUser, setIsDeletingUser] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -93,15 +95,23 @@ export default function BranchesPage() {
     setActionLoading(false);
   };
 
-  const handleDeleteUser = async (userId: string) => {
-    if (!confirm("¿Estás seguro de eliminar este usuario? Perderá el acceso permanentemente.")) return;
+  const handleDeleteUser = (user: any) => {
+    setUserToDelete({ id: user.id, name: user.name });
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!userToDelete) return;
+    setIsDeletingUser(true);
     
-    const res = await deleteBranchUser(userId);
+    const res = await deleteBranchUser(userToDelete.id);
     if (res.error) {
       alert("Error: " + res.error);
     } else {
       fetchData();
     }
+    
+    setIsDeletingUser(false);
+    setUserToDelete(null);
   };
 
   if (sessionLoading || loadingData) return <LoadingState />;
@@ -192,7 +202,7 @@ export default function BranchesPage() {
                     <td className="px-6 py-4 text-right">
                       {u.role !== 'owner' && (
                         <button
-                          onClick={() => handleDeleteUser(u.id)}
+                          onClick={() => handleDeleteUser(u)}
                           className="text-red-500 hover:text-red-700 text-sm font-medium"
                         >
                           Eliminar
@@ -280,6 +290,40 @@ export default function BranchesPage() {
                 <button type="submit" disabled={actionLoading} className="bg-[#E76F51] text-white px-5 py-2 rounded-xl font-medium disabled:opacity-50">{actionLoading ? "Creando..." : "Crear Perfil"}</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete User Confirmation Modal */}
+      {userToDelete && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setUserToDelete(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-xl relative animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+            <div className="flex flex-col items-center text-center">
+              <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mb-4">
+                <Trash2 className="text-red-600" size={24} />
+              </div>
+              <h2 className="text-xl font-bold text-gray-900 mb-2">Eliminar Usuario</h2>
+              <p className="text-gray-600 mb-6">
+                ¿Estás seguro de que deseas eliminar a <strong>{userToDelete.name}</strong>?<br/>Perderá el acceso permanentemente.
+              </p>
+              
+              <div className="flex gap-3 w-full">
+                <button
+                  onClick={() => setUserToDelete(null)}
+                  disabled={isDeletingUser}
+                  className="flex-1 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-colors disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmDeleteUser}
+                  disabled={isDeletingUser}
+                  className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white font-medium rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {isDeletingUser ? 'Eliminando...' : 'Sí, eliminar'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

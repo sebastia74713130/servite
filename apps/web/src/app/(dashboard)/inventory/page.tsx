@@ -8,12 +8,14 @@ import { Package, Plus, AlertTriangle, ArrowRight, ShoppingCart, Printer } from 
 import { InventoryItem } from '@shared/types';
 import { useReactToPrint } from 'react-to-print';
 import { InventoryItemModal } from './InventoryItemModal';
+import { PurchasesView } from './PurchasesView';
+import { ReconciliationView } from './ReconciliationView';
 
 export default function InventoryPage() {
   const { restaurant, branch, loading: sessionLoading } = useRestaurantSession();
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<InventoryItem[]>([]);
-  const [activeTab, setActiveTab] = useState<'inventory' | 'shopping_list'>('inventory');
+  const [activeTab, setActiveTab] = useState<'inventory' | 'purchases' | 'reconciliation' | 'shopping_list'>('inventory');
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
@@ -54,12 +56,12 @@ export default function InventoryPage() {
 
   return (
     <div className="p-8 h-full flex flex-col">
-      <div className="mb-8 flex justify-between items-center">
+      <div className="mb-6 flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-[#1F2933]">Inventario</h1>
-          <p className="text-gray-500 mt-1">Controla los insumos, configura recetas y crea listas de compras.</p>
+          <p className="text-gray-500 mt-1">Controla los insumos, ingresos de mercadería y cuadre físico.</p>
         </div>
-        <div className="flex gap-4">
+        {activeTab === 'inventory' && (
           <button 
             onClick={() => {
               setSelectedItem(null);
@@ -70,30 +72,44 @@ export default function InventoryPage() {
             <Plus size={18} />
             Nuevo Insumo
           </button>
-          
-          <button 
-            onClick={() => setActiveTab('shopping_list')}
-            className={`flex items-center gap-2 px-4 py-2 border-2 transition-colors rounded-lg ${activeTab === 'shopping_list' ? 'bg-[#2F4F3E] text-white border-[#2F4F3E]' : 'border-[#2F4F3E] text-[#2F4F3E] hover:bg-[#2F4F3E]/10'}`}
-          >
-            <ShoppingCart size={18} />
-            Lista de Compras
-            {lowStockItems.length > 0 && (
-              <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full ml-1">
-                {lowStockItems.length}
-              </span>
-            )}
-          </button>
-          <button 
-            onClick={() => setActiveTab('inventory')}
-            className={`flex items-center gap-2 px-4 py-2 border-2 transition-colors rounded-lg ${activeTab === 'inventory' ? 'bg-[#2F4F3E] text-white border-[#2F4F3E]' : 'border-[#2F4F3E] text-[#2F4F3E] hover:bg-[#2F4F3E]/10'}`}
-          >
-            <Package size={18} />
-            Insumos
-          </button>
-        </div>
+        )}
+      </div>
+
+      <div className="flex gap-2 mb-8 border-b border-[#E5E7EB] pb-4 overflow-x-auto">
+        <button 
+          onClick={() => setActiveTab('inventory')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-colors whitespace-nowrap ${activeTab === 'inventory' ? 'bg-[#2F4F3E] text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+        >
+          <Package size={18} />
+          Catálogo
+        </button>
+        <button 
+          onClick={() => setActiveTab('purchases')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-colors whitespace-nowrap ${activeTab === 'purchases' ? 'bg-[#2F4F3E] text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+        >
+          Ingresos
+        </button>
+        <button 
+          onClick={() => setActiveTab('reconciliation')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-colors whitespace-nowrap ${activeTab === 'reconciliation' ? 'bg-[#2F4F3E] text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+        >
+          Conciliación
+        </button>
+        <button 
+          onClick={() => setActiveTab('shopping_list')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-colors whitespace-nowrap ${activeTab === 'shopping_list' ? 'bg-[#2F4F3E] text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+        >
+          <ShoppingCart size={18} />
+          Lista de Compras
+          {lowStockItems.length > 0 && (
+            <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full ml-1">
+              {lowStockItems.length}
+            </span>
+          )}
+        </button>
       </div>
       
-      {activeTab === 'inventory' ? (
+      {activeTab === 'inventory' && (
         <>
           {lowStockItems.length > 0 && (
             <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-8 rounded-r-xl flex items-start gap-3">
@@ -162,7 +178,17 @@ export default function InventoryPage() {
             </div>
           </div>
         </>
-      ) : (
+      )}
+
+      {activeTab === 'purchases' && restaurant && branch && (
+        <PurchasesView restaurantId={restaurant.id} branchId={branch.id} />
+      )}
+
+      {activeTab === 'reconciliation' && restaurant && (
+        <ReconciliationView restaurantId={restaurant.id} />
+      )}
+
+      {activeTab === 'shopping_list' && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm flex-1 overflow-hidden flex flex-col p-6">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-bold text-[#1F2933]">Lista de Compras Sugerida</h2>

@@ -1,0 +1,1 @@
+-- (Previous tables creation omitted for brevity, I will supply them to the user directly)
