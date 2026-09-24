@@ -1,6 +1,28 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { notFound } from "next/navigation";
 import ReservationFlow from "./ReservationFlow";
+import { Metadata } from 'next';
+
+export async function generateMetadata({ params }: { params: Promise<{ restaurantSlug: string }> }): Promise<Metadata> {
+  const { restaurantSlug } = await params;
+
+  const { data: restaurant } = await supabaseAdmin
+    .from('restaurants')
+    .select('name, logo_url')
+    .eq('slug', restaurantSlug)
+    .single();
+
+  if (restaurant) {
+    return {
+      title: `Reservas | ${restaurant.name}`,
+      icons: restaurant.logo_url ? [{ rel: 'icon', url: restaurant.logo_url }] : undefined,
+    };
+  }
+  
+  return {
+    title: 'Reservas'
+  };
+}
 
 export default async function PublicReservationPage({ params }: { params: Promise<{ restaurantSlug: string }> }) {
   const { restaurantSlug } = await params;

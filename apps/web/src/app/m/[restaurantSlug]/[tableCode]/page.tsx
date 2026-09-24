@@ -1,8 +1,31 @@
 import { supabase } from '@/lib/supabase';
 import PublicMenuClient from './PublicMenuClient';
 import { notFound } from 'next/navigation';
+import { Metadata } from 'next';
 
 export const revalidate = 0;
+
+export async function generateMetadata({ params }: { params: Promise<{ restaurantSlug: string, tableCode: string }> }): Promise<Metadata> {
+  const { restaurantSlug: rawSlug } = await params;
+  const restaurantSlug = decodeURIComponent(rawSlug);
+
+  const { data: restaurant } = await supabase
+    .from('restaurants')
+    .select('name, logo_url')
+    .eq('slug', restaurantSlug)
+    .single();
+
+  if (restaurant) {
+    return {
+      title: `${restaurant.name}`,
+      icons: restaurant.logo_url ? [{ rel: 'icon', url: restaurant.logo_url }] : undefined,
+    };
+  }
+  
+  return {
+    title: 'Menú'
+  };
+}
 
 export default async function PublicMenuPage({ params }: { params: Promise<{ restaurantSlug: string, tableCode: string }> }) {
   const { restaurantSlug: rawSlug, tableCode: rawTableCode } = await params;

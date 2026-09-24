@@ -7,7 +7,7 @@ import { emitirFacturaSIAT } from "@/lib/siat/services/emitirFactura";
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { restaurantId, orderId, facturaParams, simulateOffline } = body;
+    const { restaurantId, orderId, facturaParams } = body;
 
     if (!restaurantId || !facturaParams) {
       return NextResponse.json({ error: "Faltan parámetros requeridos" }, { status: 400 });
@@ -128,9 +128,6 @@ export async function POST(req: Request) {
     let cufFinal = cuf;
 
     try {
-      if (simulateOffline) {
-        throw new Error("Simulación de corte de internet (Inspección SIAT)");
-      }
       // 6. Enviar al SIAT (WSDL)
       const respuestaSiat = await emitirFacturaSIAT(xmlFirmado, siatSettings);
       resp = respuestaSiat.RespuestaServicioFacturacion;

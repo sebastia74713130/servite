@@ -108,7 +108,6 @@ export default function AccountsPage() {
   const [paymentMethod, setPaymentMethod] = useState('Efectivo');
   const [cardNumber, setCardNumber] = useState('');
   const [siatPuntoVenta, setSiatPuntoVenta] = useState('0');
-  const [simulateOffline, setSimulateOffline] = useState(false);
   const [activeRegister, setActiveRegister] = useState<any>(null);
 
   useEffect(() => {
@@ -151,12 +150,11 @@ export default function AccountsPage() {
     
     try {
       const orderIds = tableOrders.map(o => o.id);
-      if (orderIds.length === 0) throw new Error("No hay órdenes");
-
+      
       let generatedCuf = null;
 
-      // 1. SIAT Emission Logic (If requested)
-      if (selectedTable.service_status === 'requesting_bill' && selectedTable.siat_customer_name) {
+      // 1. SIAT Emission Logic (If requested and there are orders)
+      if (orderIds.length > 0 && selectedTable.service_status === 'requesting_bill' && selectedTable.siat_customer_name) {
         try {
           const nitCi = (selectedTable.siat_customer_nit === '0' || !selectedTable.siat_customer_nit) ? '99002' : selectedTable.siat_customer_nit;
           const rznSocial = nitCi === '99002' 
@@ -197,8 +195,7 @@ export default function AccountsPage() {
             body: JSON.stringify({
               restaurantId: restaurant?.id,
               orderId: orderIds[0],
-              facturaParams,
-              simulateOffline
+              facturaParams
             })
           });
 
@@ -278,17 +275,19 @@ export default function AccountsPage() {
         }
       }
 
-      // 2. Mark all active orders for this table as paid
-      await supabase
-        .from('orders')
-        .update({ 
-          is_paid: true,
-          payment_method: paymentMethod,
-          cash_register_id: activeRegister?.id || null,
-          paid_at: new Date().toISOString()
-          // Nota: Guardar el CUF en la BD requeriría una columna 'siat_cuf' en 'orders'
-        })
-        .in('id', orderIds);
+      // 2. Mark all active orders for this table as paid (if any)
+      if (orderIds.length > 0) {
+        await supabase
+          .from('orders')
+          .update({ 
+            is_paid: true,
+            payment_method: paymentMethod,
+            cash_register_id: activeRegister?.id || null,
+            paid_at: new Date().toISOString()
+            // Nota: Guardar el CUF en la BD requeriría una columna 'siat_cuf' en 'orders'
+          })
+          .in('id', orderIds);
+      }
       
       // 3. Clear table service status and temporary SIAT data
       await supabase
@@ -587,19 +586,6 @@ export default function AccountsPage() {
                       <option value="3">Punto de Venta 3</option>
                     </select>
 
-                    <div className="mt-4 flex items-center gap-3 bg-gray-50 p-3 rounded-xl border border-gray-200">
-                      <input 
-                        type="checkbox"
-                        id="simulateOffline"
-                        checked={simulateOffline}
-                        onChange={(e) => setSimulateOffline(e.target.checked)}
-                        className="w-5 h-5 text-[#2E7D32] rounded border-gray-300 focus:ring-[#2E7D32]"
-                      />
-                      <label htmlFor="simulateOffline" className="text-sm text-gray-700 font-medium cursor-pointer flex-1">
-                        Simular Emisión Fuera de Línea (Prueba)
-                        <span className="block text-xs text-gray-500 font-normal">Guarda la factura localmente sin enviarla inmediatamente al SIAT. Luego debes empaquetarla.</span>
-                      </label>
-                    </div>
                   </div>
                 )}
 
