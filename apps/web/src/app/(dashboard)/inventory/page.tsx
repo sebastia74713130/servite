@@ -122,17 +122,19 @@ export default function InventoryPage() {
           )}
 
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm flex-1 overflow-hidden flex flex-col">
-            <div className="p-4 border-b border-gray-100 font-medium text-gray-500 grid grid-cols-12 gap-4">
-              <div className="col-span-5">Insumo</div>
-              <div className="col-span-2 text-center">Stock Actual</div>
-              <div className="col-span-2 text-center">Mínimo</div>
-              <div className="col-span-2 text-center">Costo Unit.</div>
-              <div className="col-span-1 text-center">Acción</div>
-            </div>
-            
-            <div className="overflow-y-auto flex-1">
-              {items.length === 0 ? (
-                <div className="text-center py-12 text-gray-400">
+            <div className="overflow-x-auto">
+              <div className="min-w-[700px]">
+                <div className="p-4 border-b border-gray-100 font-medium text-gray-500 grid grid-cols-12 gap-4">
+                  <div className="col-span-5">Insumo</div>
+                  <div className="col-span-2 text-center">Stock Actual</div>
+                  <div className="col-span-2 text-center">Mínimo</div>
+                  <div className="col-span-2 text-center">Costo Unit.</div>
+                  <div className="col-span-1 text-center">Acción</div>
+                </div>
+                
+                <div className="overflow-y-auto max-h-[calc(100vh-20rem)]">
+                  {items.length === 0 ? (
+                    <div className="text-center py-12 text-gray-400">
                   <Package size={48} className="mx-auto mb-4 opacity-30" />
                   <p>No tienes insumos registrados.</p>
                 </div>
@@ -175,6 +177,8 @@ export default function InventoryPage() {
                   );
                 })
               )}
+            </div>
+              </div>
             </div>
           </div>
         </>

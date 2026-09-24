@@ -151,10 +151,10 @@ export default function MenuPage() {
         </button>
       </div>
 
-      <div className="flex gap-6 h-[calc(100vh-14rem)]">
+      <div className="flex flex-col lg:flex-row gap-6 h-auto lg:h-[calc(100vh-14rem)]">
       {/* ─── categories sidebar ─────────────────────────────────── */}
-      <aside className="w-72 flex-shrink-0 flex flex-col">
-        <div className="flex items-center justify-between mb-4">
+      <aside className="w-full lg:w-72 flex-shrink-0 flex flex-col h-[50vh] lg:h-auto border lg:border-none border-gray-200 rounded-xl lg:rounded-none bg-white lg:bg-transparent overflow-hidden">
+        <div className="flex items-center justify-between mb-4 p-4 lg:p-0">
           <h2 className="text-lg font-bold text-[#1F2933] flex items-center gap-2">
             <Tag size={18} className="text-[#E76F51]" />
             Categorías
@@ -168,7 +168,7 @@ export default function MenuPage() {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto space-y-2 pr-1 pb-4">
+        <div className="flex-1 overflow-y-auto space-y-2 pr-1 pb-4 px-4 lg:px-0">
           <DndContext 
             sensors={sensors}
             collisionDetection={closestCenter}
