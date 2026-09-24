@@ -12,6 +12,7 @@ import {
   X,
   Eye,
   Download,
+  Trash2,
   Printer,
   QrCode,
   AlertCircle,
@@ -32,6 +33,16 @@ export default function TablesPage() {
     await supabase
       .from('tables')
       .update({ is_active: !table.is_active })
+      .eq('id', table.id);
+    refetch();
+  };
+
+  const handleDeleteTable = async (table: RestaurantTable) => {
+    if (!confirm(`¿Estás seguro de que deseas eliminar la ${table.table_code}? Esta acción no se puede deshacer.`)) return;
+    
+    await supabase
+      .from('tables')
+      .delete()
       .eq('id', table.id);
     refetch();
   };
@@ -119,6 +130,14 @@ export default function TablesPage() {
                   title="Descargar QR"
                 >
                   <Download size={14} />
+                </button>
+
+                <button
+                  onClick={() => handleDeleteTable(table)}
+                  className="flex items-center justify-center gap-1.5 border border-[#E5E7EB] text-red-500 rounded-lg px-3 py-2 text-sm hover:text-red-700 hover:bg-red-50 hover:border-red-200 transition-colors"
+                  title="Eliminar Mesa"
+                >
+                  <Trash2 size={14} />
                 </button>
 
                 <button
