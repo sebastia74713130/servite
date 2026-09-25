@@ -94,7 +94,7 @@ function ReservationCard({
       </div>
 
       <div className="pt-4 border-t border-[#E5E7EB] flex flex-wrap gap-2 items-center justify-between">
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {reservation.status === 'pending' && (
             <>
               <button
@@ -625,7 +625,7 @@ export default function ReservationsPage() {
               {filteredReservations.length} {filteredReservations.length === 1 ? 'reserva' : 'reservas'} para esta fecha
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2 mt-2 sm:mt-0">
             <button
               onClick={handleShareLink}
               className="bg-white border border-[#E5E7EB] text-[#1F2933] hover:bg-[#F9FAFB] rounded-xl font-medium px-4 py-2.5 transition-colors flex items-center gap-2"
@@ -661,12 +661,12 @@ export default function ReservationsPage() {
             />
           </div>
           
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-nowrap md:flex-wrap gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0">
             {statusTabs.map(tab => (
               <button
                 key={tab.value}
                 onClick={() => setStatusFilter(tab.value)}
-                className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+                className={`whitespace-nowrap px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
                   statusFilter === tab.value
                     ? 'bg-[#FDF0EC] text-[#E76F51] border border-[#E76F51]'
                     : 'bg-white border border-[#E5E7EB] text-[#6B7280] hover:bg-[#F9FAFB]'

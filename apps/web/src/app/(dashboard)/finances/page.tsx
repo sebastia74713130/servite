@@ -194,24 +194,24 @@ export default function FinancesPage() {
   ].sort((a, b) => b.date.getTime() - a.date.getTime());
 
   return (
-    <div className="p-8 h-full flex flex-col overflow-y-auto">
-      <div className="mb-8 flex justify-between items-center">
+    <div className="p-4 md:p-8 h-full flex flex-col overflow-y-auto">
+      <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold text-[#1F2933]">Finanzas</h1>
           <p className="text-gray-500 mt-1">Controla los ingresos, egresos y estadísticas de venta.</p>
         </div>
         
         {/* Toggle Tabs */}
-        <div className="bg-gray-100 p-1 rounded-xl flex items-center">
+        <div className="bg-gray-100 p-1 rounded-xl flex items-center self-stretch md:self-auto overflow-x-auto">
           <button 
             onClick={() => setViewTab('stats')}
-            className={`px-6 py-2 rounded-lg font-medium text-sm transition-colors ${viewTab === 'stats' ? 'bg-white text-[#1F2933] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            className={`flex-1 md:flex-none px-6 py-2 rounded-lg font-medium text-sm transition-colors whitespace-nowrap ${viewTab === 'stats' ? 'bg-white text-[#1F2933] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
           >
             Estadísticas
           </button>
           <button 
             onClick={() => setViewTab('caja')}
-            className={`px-6 py-2 rounded-lg font-medium text-sm transition-colors ${viewTab === 'caja' ? 'bg-white text-[#1F2933] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            className={`flex-1 md:flex-none px-6 py-2 rounded-lg font-medium text-sm transition-colors whitespace-nowrap ${viewTab === 'caja' ? 'bg-white text-[#1F2933] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
           >
             Caja Diaria
           </button>
@@ -224,7 +224,7 @@ export default function FinancesPage() {
 
       {viewTab === 'caja' && (
         <>
-          <div className="flex justify-end mb-6 gap-4">
+          <div className="flex flex-wrap justify-start md:justify-end mb-6 gap-4">
             <button 
               disabled={!activeRegister}
               onClick={() => setShowExpenseModal(true)}
@@ -303,40 +303,42 @@ export default function FinancesPage() {
               <h3 className="text-lg font-bold text-[#1F2933]">Movimientos Recientes</h3>
             </div>
             
-            <div className="flex-1 overflow-y-auto p-0">
+            <div className="flex-1 overflow-auto p-0">
               {allMovements.length === 0 ? (
                 <div className="text-center py-12 text-gray-500">
                   No hay movimientos registrados en este turno.
                 </div>
               ) : (
-                <table className="w-full text-left">
-                  <thead className="bg-gray-50 text-gray-500 text-sm sticky top-0">
-                    <tr>
-                      <th className="py-3 px-6 font-medium">Hora</th>
-                      <th className="py-3 px-6 font-medium">Descripción</th>
-                      <th className="py-3 px-6 font-medium">Método</th>
-                      <th className="py-3 px-6 font-medium text-right">Monto (Bs)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {allMovements.map(mov => (
-                      <tr key={mov.id} className="border-b border-gray-50 hover:bg-gray-50/50">
-                        <td className="py-3 px-6 text-sm text-gray-500">
-                          {mov.date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </td>
-                        <td className="py-3 px-6 font-medium text-[#1F2933]">
-                          {mov.description}
-                        </td>
-                        <td className="py-3 px-6 text-sm text-gray-600">
-                          {mov.method}
-                        </td>
-                        <td className={`py-3 px-6 font-bold text-right ${mov.type === 'ingreso' ? 'text-green-600' : 'text-red-600'}`}>
-                          {mov.type === 'ingreso' ? '+' : '-'} {mov.amount.toLocaleString('es-BO')}
-                        </td>
+                <div className="min-w-[600px]">
+                  <table className="w-full text-left">
+                    <thead className="bg-gray-50 text-gray-500 text-sm sticky top-0">
+                      <tr>
+                        <th className="py-3 px-4 md:px-6 font-medium">Hora</th>
+                        <th className="py-3 px-4 md:px-6 font-medium">Descripción</th>
+                        <th className="py-3 px-4 md:px-6 font-medium">Método</th>
+                        <th className="py-3 px-4 md:px-6 font-medium text-right">Monto (Bs)</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {allMovements.map(mov => (
+                        <tr key={mov.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                          <td className="py-3 px-4 md:px-6 text-sm text-gray-500 whitespace-nowrap">
+                            {mov.date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </td>
+                          <td className="py-3 px-4 md:px-6 font-medium text-[#1F2933]">
+                            {mov.description}
+                          </td>
+                          <td className="py-3 px-4 md:px-6 text-sm text-gray-600">
+                            {mov.method}
+                          </td>
+                          <td className={`py-3 px-4 md:px-6 font-bold text-right whitespace-nowrap ${mov.type === 'ingreso' ? 'text-green-600' : 'text-red-600'}`}>
+                            {mov.type === 'ingreso' ? '+' : '-'} {mov.amount.toLocaleString('es-BO')}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           </div>
