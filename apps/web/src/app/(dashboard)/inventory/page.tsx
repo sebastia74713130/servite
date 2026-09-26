@@ -10,12 +10,13 @@ import { useReactToPrint } from 'react-to-print';
 import { InventoryItemModal } from './InventoryItemModal';
 import { PurchasesView } from './PurchasesView';
 import { ReconciliationView } from './ReconciliationView';
+import { FoodCostView } from './FoodCostView';
 
 export default function InventoryPage() {
   const { restaurant, branch, loading: sessionLoading } = useRestaurantSession();
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<InventoryItem[]>([]);
-  const [activeTab, setActiveTab] = useState<'inventory' | 'purchases' | 'reconciliation' | 'shopping_list'>('inventory');
+  const [activeTab, setActiveTab] = useState<'inventory' | 'purchases' | 'reconciliation' | 'shopping_list' | 'food_cost'>('inventory');
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
@@ -107,6 +108,12 @@ export default function InventoryPage() {
             </span>
           )}
         </button>
+        <button 
+          onClick={() => setActiveTab('food_cost')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-colors whitespace-nowrap ${activeTab === 'food_cost' ? 'bg-[#2F4F3E] text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+        >
+          Food Cost & Stats
+        </button>
       </div>
       
       {activeTab === 'inventory' && (
@@ -190,6 +197,10 @@ export default function InventoryPage() {
 
       {activeTab === 'reconciliation' && restaurant && (
         <ReconciliationView restaurantId={restaurant.id} />
+      )}
+
+      {activeTab === 'food_cost' && restaurant && branch && (
+        <FoodCostView restaurantId={restaurant.id} branchId={branch.id} />
       )}
 
       {activeTab === 'shopping_list' && (

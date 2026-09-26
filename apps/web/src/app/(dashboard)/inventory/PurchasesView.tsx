@@ -53,11 +53,22 @@ export function PurchasesView({ restaurantId, branchId }: { restaurantId: string
       if (!selectedItem) throw new Error("Item no encontrado");
 
       const qtyNum = parseFloat(quantity);
+      const totalCostNum = parseFloat(totalCost);
       const newStock = Number(selectedItem.current_stock) + qtyNum;
 
-      // 1. Update stock
+      // Calcular el nuevo Costo Promedio (Moving Average Cost)
+      const currentStockForMath = Math.max(0, Number(selectedItem.current_stock));
+      const currentTotalValue = currentStockForMath * Number(selectedItem.cost_per_unit || 0);
+      const newTotalValue = currentTotalValue + totalCostNum;
+      const newStockForMath = currentStockForMath + qtyNum;
+      const newCostPerUnit = newTotalValue / newStockForMath;
+
+      // 1. Update stock y costo
       await supabase.from('inventory_items')
-        .update({ current_stock: newStock })
+        .update({ 
+          current_stock: newStock,
+          cost_per_unit: newCostPerUnit 
+        })
         .eq('id', selectedItemId);
 
       // 2. Insert into inventory_movements

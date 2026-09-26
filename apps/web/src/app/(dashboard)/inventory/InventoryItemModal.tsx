@@ -203,7 +203,7 @@ export function InventoryItemModal({ item, restaurantId, branchId, onClose, onSa
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               <div>
                 <label className="text-sm font-medium text-[#1F2933] mb-1.5 block">Stock Mínimo</label>
                 <input
@@ -211,16 +211,6 @@ export function InventoryItemModal({ item, restaurantId, branchId, onClose, onSa
                   step="any"
                   value={minStock}
                   onChange={e => setMinStock(e.target.value)}
-                  className="w-full border border-[#E5E7EB] rounded-xl px-4 py-3 text-[#1F2933] focus:outline-none focus:ring-2 focus:ring-[#2F4F3E]/30 focus:border-[#2F4F3E] transition-colors"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium text-[#1F2933] mb-1.5 block">Costo Unitario (Bs)</label>
-                <input
-                  type="number"
-                  step="any"
-                  value={costPerUnit}
-                  onChange={e => setCostPerUnit(e.target.value)}
                   className="w-full border border-[#E5E7EB] rounded-xl px-4 py-3 text-[#1F2933] focus:outline-none focus:ring-2 focus:ring-[#2F4F3E]/30 focus:border-[#2F4F3E] transition-colors"
                 />
               </div>
