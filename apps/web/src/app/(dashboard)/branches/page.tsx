@@ -57,6 +57,19 @@ export default function BranchesPage() {
 
   const handleCreateBranch = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!restaurant) return;
+
+    const currentPlan = restaurant?.subscription_plan || 'BASIC';
+    if (currentPlan === 'BASIC' && branches.length >= 1) {
+      alert("El plan BASIC solo permite 1 sucursal. Por favor, actualiza tu plan a PRO o FULL para agregar más sucursales.");
+      return;
+    }
+
+    if ((currentPlan === 'PRO' || currentPlan === 'FULL') && branches.length >= 1) {
+      const confirmAdd = confirm("Al crear una sucursal adicional, se agregará un recargo de Bs200 a tu facturación mensual. ¿Deseas continuar?");
+      if (!confirmAdd) return;
+    }
+
     setActionLoading(true);
     setError("");
 

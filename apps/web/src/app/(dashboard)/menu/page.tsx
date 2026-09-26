@@ -10,7 +10,7 @@ import { useSubsections } from '@/hooks/useSubsections';
 import { LoadingState } from '@/components/LoadingState';
 import { supabase } from '@/lib/supabase';
 import { compressImage } from '@/lib/imageUtils';
-import { Category, Product, KitchenStation } from '@shared/types';
+import { Category, Product, KitchenStation, MacroCategory } from '@shared/types';
 import {
   Plus,
   X,
@@ -367,6 +367,7 @@ function CategoryModal({
   onDeleted?: () => void;
 }) {
   const [name, setName] = useState(category?.name || '');
+  const [macroCategory, setMacroCategory] = useState<MacroCategory>(category?.macro_category || 'food');
   const [description, setDescription] = useState(category?.description || '');
   const [sortOrder, setSortOrder] = useState(category?.sort_order ?? 0);
   const [backgroundColor, setBackgroundColor] = useState(category?.background_color || '#FFFFFF');
@@ -384,6 +385,7 @@ function CategoryModal({
 
     const payload = {
       name: name.trim(),
+      macro_category: macroCategory,
       description: description.trim() || null,
       sort_order: sortOrder,
       restaurant_id: restaurantId,
@@ -449,15 +451,30 @@ function CategoryModal({
 
         <div className="p-6 overflow-y-auto">
           <form id="category-form" onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label className="text-sm font-medium text-[#1F2933] mb-1.5 block">Nombre *</label>
-            <input
-              type="text"
-              value={name}
-              onChange={e => setName(e.target.value)}
-              className="w-full border border-[#E5E7EB] rounded-xl px-4 py-3 text-[#1F2933] focus:outline-none focus:ring-2 focus:ring-[#E76F51]/30 focus:border-[#E76F51] transition-colors"
-              placeholder="Ej: Bebidas, Postres..."
-            />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-[#1F2933] mb-1.5 block">Nombre *</label>
+              <input
+                type="text"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                className="w-full border border-[#E5E7EB] rounded-xl px-4 py-3 text-[#1F2933] focus:outline-none focus:ring-2 focus:ring-[#E76F51]/30 focus:border-[#E76F51] transition-colors"
+                placeholder="Ej: Bebidas, Postres..."
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-[#1F2933] mb-1.5 block">Grupo Analítico (Sales Mix) *</label>
+              <select
+                value={macroCategory}
+                onChange={e => setMacroCategory(e.target.value as MacroCategory)}
+                className="w-full border border-[#E5E7EB] rounded-xl px-4 py-3 text-[#1F2933] focus:outline-none focus:ring-2 focus:ring-[#E76F51]/30 focus:border-[#E76F51] transition-colors bg-white"
+              >
+                <option value="food">Comida / Platos</option>
+                <option value="beverage">Bebidas / Bar</option>
+                <option value="dessert">Postres / Cafetería</option>
+                <option value="other">Otros</option>
+              </select>
+            </div>
           </div>
 
           <div>

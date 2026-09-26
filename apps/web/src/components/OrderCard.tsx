@@ -62,7 +62,7 @@ export function OrderCard({ orders, stations, onDismiss }: OrderCardProps) {
           </style>
         </head>
         <body>
-          <h1>${tableName.toUpperCase()}</h1>
+          <h1>${tableName ? tableName.toUpperCase() : 'DELIVERY/LLEVAR'}</h1>
           <h2>Pedido #${orderCodes}</h2>
           <div class="items">
             ${itemsHtml}

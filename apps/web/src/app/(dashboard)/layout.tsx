@@ -15,7 +15,7 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const isKitchen = pathname === "/kitchen";
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const { loading, restaurant } = useRestaurantSession();
+  const { loading, restaurant, billingCycle } = useRestaurantSession();
 
   if (isKitchen) {
     return <div className="min-h-screen bg-[#F9FAFB]">{children}</div>;
@@ -31,9 +31,13 @@ export default function DashboardLayout({
     return null;
   }
 
-
   return (
     <div className="min-h-screen bg-[#F9FAFB] flex flex-col">
+      {billingCycle?.limit_exceeded && (
+        <div className="bg-[#E76F51] text-white text-center py-2 px-4 text-sm font-medium">
+          Has superado tu límite de tickets mensuales. Tu servicio sigue activo sin interrupciones. El excedente será facturado en el próximo ciclo.
+        </div>
+      )}
       <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
       <Header toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
       <main className="lg:ml-64 flex-1 p-4 lg:p-8">

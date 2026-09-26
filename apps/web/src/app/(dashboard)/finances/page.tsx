@@ -193,6 +193,8 @@ export default function FinancesPage() {
     }))
   ].sort((a, b) => b.date.getTime() - a.date.getTime());
 
+  const currentPlan = restaurant?.subscription_plan || 'BASIC';
+
   return (
     <div className="p-4 md:p-8 h-full flex flex-col overflow-y-auto">
       <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -204,22 +206,50 @@ export default function FinancesPage() {
         {/* Toggle Tabs */}
         <div className="bg-gray-100 p-1 rounded-xl flex items-center self-stretch md:self-auto overflow-x-auto">
           <button 
-            onClick={() => setViewTab('stats')}
-            className={`flex-1 md:flex-none px-6 py-2 rounded-lg font-medium text-sm transition-colors whitespace-nowrap ${viewTab === 'stats' ? 'bg-white text-[#1F2933] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-          >
-            Estadísticas
-          </button>
-          <button 
             onClick={() => setViewTab('caja')}
             className={`flex-1 md:flex-none px-6 py-2 rounded-lg font-medium text-sm transition-colors whitespace-nowrap ${viewTab === 'caja' ? 'bg-white text-[#1F2933] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
           >
             Caja Diaria
           </button>
+          <button 
+            onClick={() => setViewTab('stats')}
+            className={`flex-1 md:flex-none px-6 py-2 rounded-lg font-medium text-sm transition-colors whitespace-nowrap ${viewTab === 'stats' ? 'bg-white text-[#1F2933] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+          >
+            Estadísticas
+          </button>
+          {currentPlan === 'FULL' && (
+            <button 
+              onClick={() => setViewTab('analytics' as any)}
+              className={`flex-1 md:flex-none px-6 py-2 rounded-lg font-medium text-sm transition-colors whitespace-nowrap ${viewTab === 'analytics' as any ? 'bg-white text-[#1F2933] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              Analítica Avanzada
+            </button>
+          )}
         </div>
       </div>
       
-      {viewTab === 'stats' && restaurant && (
+      {viewTab === 'stats' && currentPlan === 'BASIC' && (
+        <div className="flex-1 flex flex-col items-center justify-center p-8 bg-white rounded-2xl border border-gray-100">
+          <TrendingUp className="w-16 h-16 text-gray-300 mb-4" />
+          <h2 className="text-xl font-bold text-[#1F2933] mb-2">Módulo bloqueado</h2>
+          <p className="text-gray-500 text-center max-w-md">
+            Las Estadísticas Mensuales están disponibles a partir del plan <strong>PRO</strong>. Actualiza tu suscripción para acceder a reportes y crecimiento de ventas.
+          </p>
+        </div>
+      )}
+
+      {viewTab === 'stats' && currentPlan !== 'BASIC' && restaurant && (
         <StatsView restaurantId={restaurant.id} branchId={branch?.id} />
+      )}
+
+      {(viewTab as any) === 'analytics' && currentPlan === 'FULL' && (
+        <div className="flex-1 flex flex-col items-center justify-center p-8 bg-white rounded-2xl border border-gray-100">
+          <TrendingUp className="w-16 h-16 text-[#E76F51] mb-4" />
+          <h2 className="text-xl font-bold text-[#1F2933] mb-2">Analítica Avanzada</h2>
+          <p className="text-gray-500 text-center max-w-md">
+            Este módulo se habilitará próximamente. Mostrará métricas avanzadas de Mix de Ventas y Canales.
+          </p>
+        </div>
       )}
 
       {viewTab === 'caja' && (

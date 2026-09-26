@@ -38,7 +38,17 @@ export async function getUserRestaurant(userId: string) {
   
   const { data: branch } = await branchQuery.limit(1).single();
 
-  return { restaurant, branch, role: userRole };
+  const { data: billing_cycle } = await supabaseAdmin
+    .from('billing_cycles')
+    .select('*')
+    .eq('restaurant_id', restaurant.id)
+    .gte('end_date', new Date().toISOString())
+    .lte('start_date', new Date().toISOString())
+    .order('start_date', { ascending: false })
+    .limit(1)
+    .single();
+
+  return { restaurant, branch, role: userRole, billingCycle: billing_cycle };
 }
 
 export async function createExpense(data: any) {

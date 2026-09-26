@@ -429,6 +429,7 @@ export default function PublicMenuClient({
             branch_id: table.branch_id,
             table_id: table.id,
             table_number: table.table_number,
+            order_channel: 'dine_in',
             status: 'sent',
             subtotal: groupTotal,
             total: groupTotal,

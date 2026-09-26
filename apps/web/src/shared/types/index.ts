@@ -1,13 +1,25 @@
 // === Enums ===
 export type OrderStatus = 'sent' | 'received' | 'preparing' | 'ready' | 'delivered' | 'cancelled';
 export type UserRole = 'owner' | 'admin' | 'kitchen';
+export type SubscriptionPlan = 'BASIC' | 'PRO' | 'FULL';
+export type OrderChannel = 'dine_in' | 'own_delivery' | 'third_party';
+export type MacroCategory = 'food' | 'beverage' | 'dessert' | 'other';
 
 // === Database Models ===
+export interface BillingCycle {
+  id: string;
+  restaurant_id: string;
+  start_date: string;
+  end_date: string;
+  ticket_count: number;
+  limit_exceeded: boolean;
+}
 export interface Restaurant {
   id: string;
   name: string;
   slug: string;
   logo_url: string | null;
+  subscription_plan?: SubscriptionPlan;
   brand_color?: string | null;
   cover_url?: string | null;
   menu_background_color?: string | null;
@@ -65,6 +77,7 @@ export interface Category {
   restaurant_id: string;
   branch_id: string;
   name: string;
+  macro_category: MacroCategory;
   description: string | null;
   background_color?: string | null;
   image_url?: string | null;
@@ -115,8 +128,9 @@ export interface Order {
   id: string;
   restaurant_id: string;
   branch_id: string;
-  table_id: string;
-  table_number: string;
+  table_id?: string | null;
+  table_number?: string | null;
+  order_channel: OrderChannel;
   customer_session_id: string;
   status: OrderStatus;
   subtotal: number;
