@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { InventoryItem } from '@shared/types';
-import { ShoppingCart, Upload, CheckCircle2, Image as ImageIcon } from 'lucide-react';
+import { ShoppingCart, Upload, CheckCircle2, Image as ImageIcon, Clock, Calendar } from 'lucide-react';
 
 export function PurchasesView({ restaurantId, branchId, onSaved }: { restaurantId: string; branchId: string; onSaved?: () => void; }) {
   const [items, setItems] = useState<InventoryItem[]>([]);
+  const [movements, setMovements] = useState<any[]>([]);
   const [selectedItemId, setSelectedItemId] = useState('');
   const [quantity, setQuantity] = useState('');
   const [totalCost, setTotalCost] = useState('');
@@ -13,6 +14,17 @@ export function PurchasesView({ restaurantId, branchId, onSaved }: { restaurantI
   
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
+
+  const fetchMovements = async () => {
+    const { data } = await supabase
+      .from('inventory_movements')
+      .select('*, inventory_items(name, unit)')
+      .eq('restaurant_id', restaurantId)
+      .eq('movement_type', 'purchase')
+      .order('created_at', { ascending: false })
+      .limit(20);
+    if (data) setMovements(data);
+  };
 
   useEffect(() => {
     supabase.from('inventory_items')
@@ -24,6 +36,8 @@ export function PurchasesView({ restaurantId, branchId, onSaved }: { restaurantI
       .then(({ data }) => {
         if (data) setItems(data);
       });
+      
+    fetchMovements();
   }, [restaurantId, branchId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -108,6 +122,7 @@ export function PurchasesView({ restaurantId, branchId, onSaved }: { restaurantI
       
       // Update local state and trigger parent refresh
       setItems(items.map(i => i.id === selectedItemId ? { ...i, current_stock: newStock, cost_per_unit: newCostPerUnit } : i));
+      fetchMovements();
       if (onSaved) onSaved();
 
       // Reset form
@@ -126,16 +141,17 @@ export function PurchasesView({ restaurantId, branchId, onSaved }: { restaurantI
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-[#E5E7EB] p-6 max-w-2xl">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center">
-          <ShoppingCart className="text-[#E76F51]" />
+    <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start">
+      <div className="lg:col-span-3 bg-white rounded-2xl shadow-sm border border-[#E5E7EB] p-6">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center">
+            <ShoppingCart className="text-[#E76F51]" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-[#1F2933]">Registrar Ingreso de Mercadería</h2>
+            <p className="text-gray-500 text-sm">Actualiza el stock y registra el gasto de la compra.</p>
+          </div>
         </div>
-        <div>
-          <h2 className="text-xl font-bold text-[#1F2933]">Registrar Ingreso de Mercadería</h2>
-          <p className="text-gray-500 text-sm">Actualiza el stock y registra el gasto de la compra.</p>
-        </div>
-      </div>
 
       {successMsg && (
         <div className="mb-6 bg-green-50 text-green-700 p-4 rounded-xl flex items-center gap-3">
@@ -234,6 +250,44 @@ export function PurchasesView({ restaurantId, branchId, onSaved }: { restaurantI
           </button>
         </div>
       </form>
+    </div>
+
+      {/* History panel */}
+      <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-[#E5E7EB] p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-bold text-[#1F2933]">Últimos Ingresos</h3>
+          <Clock className="text-gray-400" size={20} />
+        </div>
+        
+        <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
+          {movements.length === 0 ? (
+            <p className="text-sm text-gray-500 text-center py-8">No hay registros recientes.</p>
+          ) : (
+            movements.map((mov) => {
+              const date = new Date(mov.created_at);
+              return (
+                <div key={mov.id} className="p-4 rounded-xl border border-gray-100 bg-gray-50 flex flex-col gap-2">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="font-bold text-[#1F2933]">{(mov.inventory_items as any)?.name}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{mov.notes || 'Ingreso manual'}</p>
+                    </div>
+                    <span className="font-medium text-green-600 bg-green-100 px-2.5 py-1 rounded-lg text-sm">
+                      +{mov.quantity} {(mov.inventory_items as any)?.unit}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-gray-400 mt-1">
+                    <Calendar size={12} />
+                    <span>{date.toLocaleDateString('es-BO')}</span>
+                    <Clock size={12} className="ml-2" />
+                    <span>{date.toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit' })}</span>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
     </div>
   );
 }
