@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { InventoryItem } from '@shared/types';
 import { Scale, CheckCircle2 } from 'lucide-react';
 
-export function ReconciliationView({ restaurantId }: { restaurantId: string }) {
+export function ReconciliationView({ restaurantId, onSaved }: { restaurantId: string; onSaved?: () => void; }) {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [realStock, setRealStock] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
@@ -57,6 +57,7 @@ export function ReconciliationView({ restaurantId }: { restaurantId: string }) {
 
       // Update local state
       setItems(items.map(i => i.id === item.id ? { ...i, current_stock: rStock } : i));
+      if (onSaved) onSaved();
       setSuccessMsg(`Inventario actualizado para ${item.name}`);
       
       setTimeout(() => setSuccessMsg(''), 3000);

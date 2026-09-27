@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { InventoryItem } from '@shared/types';
 import { ShoppingCart, Upload, CheckCircle2, Image as ImageIcon } from 'lucide-react';
 
-export function PurchasesView({ restaurantId, branchId }: { restaurantId: string; branchId: string }) {
+export function PurchasesView({ restaurantId, branchId, onSaved }: { restaurantId: string; branchId: string; onSaved?: () => void; }) {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [selectedItemId, setSelectedItemId] = useState('');
   const [quantity, setQuantity] = useState('');
@@ -106,6 +106,10 @@ export function PurchasesView({ restaurantId, branchId }: { restaurantId: string
 
       setSuccessMsg('Ingreso registrado con éxito');
       
+      // Update local state and trigger parent refresh
+      setItems(items.map(i => i.id === selectedItemId ? { ...i, current_stock: newStock, cost_per_unit: newCostPerUnit } : i));
+      if (onSaved) onSaved();
+
       // Reset form
       setSelectedItemId('');
       setQuantity('');
