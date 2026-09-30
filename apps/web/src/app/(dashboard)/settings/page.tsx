@@ -23,6 +23,7 @@ import { useKitchenStations } from '@/hooks/useKitchenStations';
 import { compressImage } from '@/lib/imageUtils';
 import { ImageCropperModal } from '@/components/ImageCropperModal';
 import { SiatSettingsForm } from '@/components/SiatSettingsForm';
+import { PaymentSettingsForm } from './PaymentSettingsForm';
 
 export default function SettingsPage() {
   const { restaurant, loading: sessionLoading } = useRestaurantSession();
@@ -514,6 +515,11 @@ export default function SettingsPage() {
       {/* SIAT Configuration Section */}
       {restaurant && (
         <SiatSettingsForm restaurantId={restaurant.id} />
+      )}
+
+      {/* Payment Integrations */}
+      {restaurant && (
+        <PaymentSettingsForm restaurantId={restaurant.id} />
       )}
     </div>
   );

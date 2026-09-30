@@ -16,14 +16,21 @@ export async function generateMetadata({ params }: { params: Promise<{ restauran
     .single();
 
   if (restaurant) {
+    const description = `Menú digital de ${restaurant.name} | Realiza tu pedido desde la mesa.`;
     return {
-      title: `${restaurant.name}`,
+      title: `Menú | ${restaurant.name}`,
+      description,
+      openGraph: {
+        title: `Menú | ${restaurant.name}`,
+        description,
+        images: restaurant.logo_url ? [restaurant.logo_url] : [],
+      },
       icons: restaurant.logo_url ? [{ rel: 'icon', url: restaurant.logo_url }] : undefined,
     };
   }
   
   return {
-    title: 'Menú'
+    title: 'Menú Digital | Servido'
   };
 }
 

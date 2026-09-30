@@ -13,14 +13,21 @@ export async function generateMetadata({ params }: { params: Promise<{ restauran
     .single();
 
   if (restaurant) {
+    const description = `Conoce el menú y reserva tu mesa en ${restaurant.name} a través de Servido.`;
     return {
-      title: `Reservas | ${restaurant.name}`,
+      title: `${restaurant.name} | Menú y Reservas`,
+      description,
+      openGraph: {
+        title: `${restaurant.name} | Menú y Reservas`,
+        description,
+        images: restaurant.logo_url ? [restaurant.logo_url] : [],
+      },
       icons: restaurant.logo_url ? [{ rel: 'icon', url: restaurant.logo_url }] : undefined,
     };
   }
   
   return {
-    title: 'Reservas'
+    title: 'Restaurante no encontrado | Servido'
   };
 }
 
