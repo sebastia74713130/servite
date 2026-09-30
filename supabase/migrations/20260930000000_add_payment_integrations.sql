@@ -1,9 +1,8 @@
 CREATE TABLE restaurant_payment_integrations (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     restaurant_id UUID REFERENCES restaurants(id) ON DELETE CASCADE,
-    bank_name VARCHAR(50) NOT NULL,
-    client_id TEXT NOT NULL,
-    client_secret TEXT NOT NULL,
+    bank_name VARCHAR(50) NOT NULL DEFAULT 'Banco Económico',
+    account_number TEXT NOT NULL,
     is_active BOOLEAN DEFAULT false,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()

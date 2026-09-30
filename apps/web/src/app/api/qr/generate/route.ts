@@ -1,9 +1,19 @@
 import { NextResponse } from 'next/server';
+import crypto from 'crypto';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 
 const BANECO_API_URL = process.env.BANECO_API_URL;
 const BANECO_USER = process.env.BANECO_USER;
 const BANECO_PASSWORD_ENC = process.env.BANECO_PASSWORD_ENC;
-const BANECO_ACCOUNT_ENC = process.env.BANECO_ACCOUNT_ENC;
+const BANECO_AES_KEY = process.env.BANECO_AES_KEY;
+
+function encryptAesEcb(text: string, keyString: string) {
+  const key = Buffer.from(keyString, 'utf8');
+  const cipher = crypto.createCipheriv('aes-256-ecb', key, null);
+  let encrypted = cipher.update(text, 'utf8', 'base64');
+  encrypted += cipher.final('base64');
+  return encrypted;
+}
 
 async function getAuthToken() {
   const res = await fetch(`${BANECO_API_URL}/api/authentication/authenticate`, {
@@ -23,25 +33,46 @@ async function getAuthToken() {
 
 export async function POST(request: Request) {
   try {
-    const { amount, transactionId, description } = await request.json();
+    const { restaurantId, amount, transactionId, description } = await request.json();
 
-    if (!amount || !transactionId) {
-      return NextResponse.json({ error: 'Faltan parámetros: amount o transactionId' }, { status: 400 });
+    if (!amount || !transactionId || !restaurantId) {
+      return NextResponse.json({ error: 'Faltan parámetros: restaurantId, amount o transactionId' }, { status: 400 });
     }
 
-    if (!BANECO_API_URL) {
-      throw new Error('Configuración de Banco Económico faltante');
+    if (!BANECO_API_URL || !BANECO_AES_KEY) {
+      throw new Error('Configuración de Banco Económico faltante en el servidor');
     }
 
-    // 1. Obtener Token
+    // 1. Obtener la cuenta bancaria del restaurante
+    const { data: integrations, error: dbError } = await supabaseAdmin
+      .from('restaurant_payment_integrations')
+      .select('account_number')
+      .eq('restaurant_id', restaurantId)
+      .eq('bank_name', 'Banco Económico')
+      .eq('is_active', true)
+      .limit(1);
+
+    if (dbError || !integrations || integrations.length === 0) {
+      return NextResponse.json({ error: 'El restaurante no tiene una cuenta bancaria configurada para recibir pagos QR.' }, { status: 400 });
+    }
+
+    const restaurantAccount = integrations[0].account_number;
+    if (!restaurantAccount) {
+       return NextResponse.json({ error: 'Número de cuenta inválido.' }, { status: 400 });
+    }
+
+    // 2. Encriptar el número de cuenta usando la llave AES maestra
+    const encryptedAccount = encryptAesEcb(restaurantAccount, BANECO_AES_KEY);
+
+    // 3. Obtener Token
     const token = await getAuthToken();
 
-    // 2. Generar fecha de vencimiento (ej: mañana)
+    // 4. Generar fecha de vencimiento (ej: mañana)
     const dueDate = new Date();
     dueDate.setDate(dueDate.getDate() + 1);
     const dueDateStr = dueDate.toISOString().split('T')[0];
 
-    // 3. Generar QR
+    // 5. Generar QR
     const qrRes = await fetch(`${BANECO_API_URL}/api/qrsimple/generateQR`, {
       method: 'POST',
       headers: { 
@@ -50,7 +81,7 @@ export async function POST(request: Request) {
       },
       body: JSON.stringify({
         transactionId: transactionId.toString(),
-        accountCredit: BANECO_ACCOUNT_ENC,
+        accountCredit: encryptedAccount,
         currency: 'BOB',
         amount: parseFloat(amount),
         description: description || 'Cobro Servido',
@@ -77,4 +108,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
-

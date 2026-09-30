@@ -241,6 +241,7 @@ export default function PublicMenuClient({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          restaurantId: restaurant.id,
           amount: cartTotal,
           transactionId: Math.floor(Math.random() * 1000000000).toString(),
           description: `Pedido ${restaurant.name}`
