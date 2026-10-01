@@ -158,7 +158,7 @@ export default function SettingsPage() {
     if (!restaurant || !newStationName.trim()) return;
 
     const currentPlan = restaurant?.subscription_plan || 'BASIC';
-    const limit = currentPlan === 'BASIC' ? 1 : currentPlan === 'PRO' ? 2 : 5;
+    const limit = ((currentPlan || '').toUpperCase() === 'BASIC' || (currentPlan || '').toUpperCase() === 'PRO') ? 1 : 5;
     
     if (stations.length >= limit) {
       alert(`Tu plan ${currentPlan} permite un máximo de ${limit} estación(es) de cocina. Contacta soporte para mejorar tu plan.`);

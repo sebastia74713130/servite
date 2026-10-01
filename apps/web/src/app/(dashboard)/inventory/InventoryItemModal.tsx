@@ -137,7 +137,7 @@ export function InventoryItemModal({ item, restaurantId, branchId, subscriptionP
               <div>
                 <label className="text-sm font-medium text-[#1F2933] mb-1.5 flex items-center justify-between">
                   Stock Mínimo (Alerta)
-                  {subscriptionPlan === 'Basic' && <Lock size={14} className="text-gray-400" />}
+                  {(subscriptionPlan || '').toUpperCase() === 'PRO' && <Lock size={14} className="text-gray-400" />}
                 </label>
                 <input
                   type="number"
@@ -145,16 +145,16 @@ export function InventoryItemModal({ item, restaurantId, branchId, subscriptionP
                   step="0.01"
                   value={minStock}
                   onChange={e => setMinStock(parseFloat(e.target.value) || 0)}
-                  disabled={subscriptionPlan === 'Basic'}
+                  disabled={(subscriptionPlan || '').toUpperCase() === 'PRO'}
                   className={`w-full border rounded-xl px-4 py-3 text-[#1F2933] focus:outline-none focus:ring-2 transition-colors ${
-                    subscriptionPlan === 'Basic' 
+                    (subscriptionPlan || '').toUpperCase() === 'PRO' 
                       ? 'bg-gray-50 border-gray-200 text-gray-500 cursor-not-allowed' 
                       : 'border-[#E5E7EB] focus:ring-[#2F4F3E]/30 focus:border-[#2F4F3E] bg-white'
                   }`}
                 />
-                {subscriptionPlan === 'Basic' && (
+                {(subscriptionPlan || '').toUpperCase() === 'PRO' && (
                   <p className="text-xs text-orange-600 mt-1.5 flex items-center gap-1 font-medium">
-                    <Lock size={12} /> Disponible en plan Pro
+                    <Lock size={12} /> Disponible en plan Enterprise
                   </p>
                 )}
               </div>
