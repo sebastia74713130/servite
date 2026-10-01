@@ -113,29 +113,14 @@ function ReservationCard({
             </>
           )}
           {reservation.status === 'confirmed' && (
-            <>
-              <button
-                onClick={() => onStatusChange(reservation.id, 'seated')}
-                className="px-3 py-1.5 text-sm font-medium border border-blue-600 text-blue-600 hover:bg-blue-50 rounded-xl transition-colors"
-              >
-                Sentar
-              </button>
-              <button
-                onClick={() => onStatusChange(reservation.id, 'cancelled')}
-                className="px-3 py-1.5 text-sm font-medium border border-red-600 text-red-600 hover:bg-red-50 rounded-xl transition-colors"
-              >
-                Cancelar
-              </button>
-            </>
-          )}
-          {reservation.status === 'seated' && (
             <button
-              onClick={() => onStatusChange(reservation.id, 'completed')}
-              className="px-3 py-1.5 text-sm font-medium border border-green-600 text-green-600 hover:bg-green-50 rounded-xl transition-colors"
+              onClick={() => onStatusChange(reservation.id, 'cancelled')}
+              className="px-3 py-1.5 text-sm font-medium border border-red-600 text-red-600 hover:bg-red-50 rounded-xl transition-colors"
             >
-              Completar
+              Cancelar
             </button>
           )}
+          
         </div>
         
         <button
@@ -606,8 +591,6 @@ export default function ReservationsPage() {
     { label: 'Todas', value: 'Todas' },
     { label: 'Pendientes', value: 'pending' },
     { label: 'Confirmadas', value: 'confirmed' },
-    { label: 'Sentados', value: 'seated' },
-    { label: 'Completadas', value: 'completed' },
     { label: 'Canceladas', value: 'cancelled' }
   ];
 
