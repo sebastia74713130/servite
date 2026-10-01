@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { Order } from "@shared/types";
 
-export function useOrders(restaurantId: string | undefined, options: { onlyUnpaid?: boolean } = { onlyUnpaid: false }) {
+export function useOrders(restaurantId: string | undefined, branchId?: string, options: { onlyUnpaid?: boolean } = { onlyUnpaid: false }) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -23,6 +23,7 @@ export function useOrders(restaurantId: string | undefined, options: { onlyUnpai
       .eq("restaurant_id", restaurantId)
       .gte("created_at", today.toISOString())
       .order("created_at", { ascending: false });
+    if (branchId) query = query.eq("branch_id", branchId);
 
     if (options.onlyUnpaid) {
       query = query.eq("is_paid", false);
@@ -61,7 +62,7 @@ export function useOrders(restaurantId: string | undefined, options: { onlyUnpai
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [restaurantId]);
+  }, [restaurantId, branchId]);
 
   return { orders, loading };
 }

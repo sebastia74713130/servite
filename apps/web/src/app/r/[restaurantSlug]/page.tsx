@@ -45,13 +45,11 @@ export default async function PublicReservationPage({ params }: { params: Promis
   }
 
   // Get the first active branch for reservations
-  const { data: branch } = await supabaseAdmin
+  const { data: branches } = await supabaseAdmin
     .from('branches')
-    .select('id')
+    .select('id, name')
     .eq('restaurant_id', restaurant.id)
-    .eq('is_active', true)
-    .limit(1)
-    .single();
+    .eq('is_active', true);
 
   return (
     <div className="min-h-screen bg-[#111111] text-white selection:bg-[#E76F51] selection:text-white">
@@ -61,7 +59,7 @@ export default async function PublicReservationPage({ params }: { params: Promis
           <p className="text-[#888888]">Reserva tu mesa con nosotros</p>
         </header>
         
-        <ReservationFlow restaurant={restaurant} branchId={branch?.id} />
+        <ReservationFlow restaurant={restaurant} branches={branches || []} />
       </div>
     </div>
   );

@@ -11,8 +11,8 @@ import Link from "next/link";
 import { ArrowLeft, ChefHat } from "lucide-react";
 
 export default function KitchenPage() {
-  const { restaurant, loading: sessionLoading } = useRestaurantSession();
-  const { orders, loading: ordersLoading } = useOrders(restaurant?.id);
+  const { restaurant, branch, loading: sessionLoading } = useRestaurantSession();
+  const { orders, loading: ordersLoading } = useOrders(restaurant?.id, branch?.id);
   const { stations, loading: stationsLoading } = useKitchenStations(restaurant?.id);
   const [selectedStationId, setSelectedStationId] = useState<string>("all");
 

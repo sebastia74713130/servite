@@ -49,7 +49,7 @@ function validatePhoneNumber(phone: string): { isValid: boolean; error?: string 
   return { isValid: true };
 }
 
-export default function ReservationFlow({ restaurant, branchId }: { restaurant: any; branchId: string }) {
+export default function ReservationFlow({ restaurant, branches }: { restaurant: any; branches: any[] }) {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -67,6 +67,7 @@ export default function ReservationFlow({ restaurant, branchId }: { restaurant: 
   const [partySize, setPartySize] = useState(2);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
+  const [selectedBranchId, setSelectedBranchId] = useState<string>(branches.length === 1 ? branches[0].id : "");
   
   // Calendar State
   const [currentMonth, setCurrentMonth] = useState(startOfMonth(new Date()));
@@ -82,7 +83,7 @@ export default function ReservationFlow({ restaurant, branchId }: { restaurant: 
   const [existingReservations, setExistingReservations] = useState<any[]>([]);
 
   useEffect(() => {
-    if (!selectedDate || !branchId) {
+    if (!selectedDate || !selectedBranchId) {
       setExistingReservations([]);
       return;
     }
@@ -92,7 +93,7 @@ export default function ReservationFlow({ restaurant, branchId }: { restaurant: 
       const { data, error } = await supabase
         .from('reservations')
         .select('reservation_time, duration_minutes')
-        .eq('branch_id', branchId)
+        .eq('branch_id', selectedBranchId)
         .eq('reservation_date', formattedDate)
         .neq('status', 'cancelled');
         
@@ -102,7 +103,7 @@ export default function ReservationFlow({ restaurant, branchId }: { restaurant: 
     };
     
     fetchReservations();
-  }, [selectedDate, branchId]);
+  }, [selectedDate, selectedBranchId]);
 
   const handleNextStep = () => {
     if (step === 1) {
@@ -120,7 +121,7 @@ export default function ReservationFlow({ restaurant, branchId }: { restaurant: 
     setError("");
     setPhoneError("");
 
-    if (!branchId) {
+    if (!selectedBranchId) {
       setError("Este restaurante no tiene sucursales activas para reservar.");
       return;
     }
@@ -142,7 +143,7 @@ export default function ReservationFlow({ restaurant, branchId }: { restaurant: 
     try {
       const { error: insertError } = await supabase.from('reservations').insert({
         restaurant_id: restaurant.id,
-        branch_id: branchId,
+        branch_id: selectedBranchId,
         customer_name: `${form.firstName} ${form.lastName}`.trim(),
         customer_phone: form.phone,
         customer_email: form.email || null,
@@ -258,6 +259,23 @@ export default function ReservationFlow({ restaurant, branchId }: { restaurant: 
       {step === 1 && (
         <div className="space-y-10">
           
+          {branches && branches.length > 1 && (
+            <section>
+              <h2 className="text-xl font-bold mb-4">¿En qué sucursal?</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {branches.map(branch => (
+                  <button
+                    key={branch.id}
+                    onClick={() => setSelectedBranchId(branch.id)}
+                    className={`p-4 rounded-2xl border text-left transition-colors ${selectedBranchId === branch.id ? 'bg-[#E76F51] border-[#E76F51] text-white' : 'bg-[#1A1A1A] border-[#2A2A2A] text-[#888888] hover:border-[#444]'}`}
+                  >
+                    <span className="font-bold">{branch.name}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+
           {/* Party Size */}
           <section>
             <h2 className="text-xl font-bold mb-4">¿Para cuántas personas?</h2>

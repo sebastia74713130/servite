@@ -11,8 +11,8 @@ import { ClipboardList } from "lucide-react";
 import { ORDER_STATUS_SEQUENCE } from "@shared/constants";
 
 export default function OrdersPage() {
-  const { restaurant, loading: sessionLoading } = useRestaurantSession();
-  const { orders, loading: ordersLoading } = useOrders(restaurant?.id);
+  const { restaurant, branch, loading: sessionLoading } = useRestaurantSession();
+  const { orders, loading: ordersLoading } = useOrders(restaurant?.id, branch?.id);
   const { stations, loading: stationsLoading } = useKitchenStations(restaurant?.id);
 
   // Allow kitchen to manually dismiss delivered orders

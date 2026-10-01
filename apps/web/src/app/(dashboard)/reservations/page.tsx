@@ -544,11 +544,13 @@ export default function ReservationsPage() {
   const fetchDatesWithReservations = useCallback(async () => {
     if (!restaurant?.id) return;
     try {
-      const { data } = await supabase
+      let query = supabase
         .from('reservations')
         .select('reservation_date')
         .eq('restaurant_id', restaurant.id)
         .neq('status', 'cancelled');
+        if (branch?.id) query = query.eq('branch_id', branch.id);
+      const { data } = await query;
       if (data) {
         const unique = Array.from(new Set(data.map((r: any) => r.reservation_date)));
         setDatesWithReservations(unique as string[]);
@@ -556,7 +558,7 @@ export default function ReservationsPage() {
     } catch (e) {
       console.error('Error fetching reservation dates:', e);
     }
-  }, [restaurant?.id]);
+  }, [restaurant?.id, branch?.id]);
 
   useEffect(() => {
     fetchDatesWithReservations();
@@ -582,7 +584,7 @@ export default function ReservationsPage() {
     setTimeout(() => setShowCopiedToast(false), 3000);
   };
 
-  const { reservations, loading: reservationsLoading, refetch } = useReservations(restaurant?.id, selectedDate);
+  const { reservations, loading: reservationsLoading, refetch } = useReservations(restaurant?.id, branch?.id, selectedDate);
   const { tables } = useTables(restaurant?.id, branch?.id);
 
   if (sessionLoading || reservationsLoading) {

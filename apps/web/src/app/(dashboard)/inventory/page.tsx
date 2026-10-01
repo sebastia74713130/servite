@@ -36,11 +36,13 @@ export default function InventoryPage() {
   const fetchInventory = async () => {
     if (!restaurant) return;
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('inventory_items')
         .select('*')
         .eq('restaurant_id', restaurant.id)
         .order('name');
+      if (branch?.id) query = query.eq('branch_id', branch.id);
+      const { data, error } = await query;
         
       if (error) throw error;
       setItems(data || []);
@@ -267,7 +269,7 @@ export default function InventoryPage() {
       )}
 
       {isModalOpen && restaurant && branch && (
-        <InventoryItemModal
+        <InventoryItemModal 
           item={selectedItem}
           restaurantId={restaurant.id}
           branchId={branch.id}

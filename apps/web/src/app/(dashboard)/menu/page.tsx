@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { copyMenuFromMainBranch } from '@/app/actions';
 import { useRestaurantSession } from '@/hooks/useRestaurantSession';
 import { useCategories } from '@/hooks/useCategories';
 import { useProducts } from '@/hooks/useProducts';
@@ -135,6 +136,23 @@ export default function MenuPage() {
     setShowCatModal(true);
   };
 
+  const [copying, setCopying] = useState(false);
+  
+  const handleCopyMenu = async () => {
+    if (!restaurant?.id || !branch?.id) return;
+    if (!confirm("¿Seguro que deseas copiar el menú de la sucursal principal? Esto reemplazará tu menú actual en esta sucursal.")) return;
+    setCopying(true);
+    try {
+      await copyMenuFromMainBranch(restaurant.id, branch.id);
+      await refetchCats();
+      await refetchProds();
+      alert("Menú copiado exitosamente");
+    } catch (err: any) {
+      alert("Error: " + err.message);
+    }
+    setCopying(false);
+  };
+
   return (
     <div className="flex flex-col gap-6 h-full">
       <div className="flex items-center justify-between bg-white p-6 rounded-2xl border border-[#E5E7EB] shadow-sm">
@@ -142,13 +160,23 @@ export default function MenuPage() {
           <h1 className="text-2xl font-bold text-[#1F2933]">Menú Digital</h1>
           <p className="text-[#4B5563] text-sm mt-1">Administra tus categorías, productos y el diseño de tu menú público.</p>
         </div>
-        <button
-          onClick={() => router.push('/menu/design')}
-          className="flex items-center gap-2 bg-[#1F2933] text-white px-5 py-2.5 rounded-xl font-medium hover:bg-[#323F4B] transition-colors shadow-sm"
-        >
-          <Palette size={18} />
-          Editar diseño del menú
-        </button>
+        <div className="flex flex-wrap gap-2 justify-end mt-4 sm:mt-0">
+          <button
+            onClick={handleCopyMenu}
+            disabled={copying}
+            className="flex items-center gap-2 bg-white border border-[#E5E7EB] text-[#1F2933] px-5 py-2.5 rounded-xl font-medium hover:bg-gray-50 transition-colors shadow-sm disabled:opacity-50"
+          >
+            <Sparkles size={18} />
+            {copying ? 'Copiando...' : 'Copiar menú principal'}
+          </button>
+          <button
+            onClick={() => router.push('/menu/design')}
+            className="flex items-center gap-2 bg-[#1F2933] text-white px-5 py-2.5 rounded-xl font-medium hover:bg-[#323F4B] transition-colors shadow-sm"
+          >
+            <Palette size={18} />
+            Editar diseño
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-col lg:flex-row gap-6 h-auto lg:h-[calc(100vh-14rem)]">

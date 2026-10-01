@@ -24,7 +24,7 @@ export interface Reservation {
   } | null;
 }
 
-export function useReservations(restaurantId?: string, dateFilter?: string) {
+export function useReservations(restaurantId?: string, branchId?: string, dateFilter?: string) {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -39,6 +39,10 @@ export function useReservations(restaurantId?: string, dateFilter?: string) {
       .eq('restaurant_id', restaurantId)
       .order('reservation_time', { ascending: true });
 
+    if (branchId) {
+      query = query.eq('branch_id', branchId);
+    }
+
     if (dateFilter) {
       query = query.eq('reservation_date', dateFilter);
     }
@@ -52,7 +56,7 @@ export function useReservations(restaurantId?: string, dateFilter?: string) {
     }
 
     setLoading(false);
-  }, [restaurantId, dateFilter]);
+  }, [restaurantId, branchId, dateFilter]);
 
   useEffect(() => {
     fetchReservations();
