@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRestaurantSession } from '@/hooks/useRestaurantSession';
 import { supabase } from '@/lib/supabase';
 import { LoadingState } from '@/components/LoadingState';
-import { Package, Plus, AlertTriangle, ArrowRight, ShoppingCart, Printer } from 'lucide-react';
+import { Package, Plus, AlertTriangle, ArrowRight, ShoppingCart, Printer, Lock } from 'lucide-react';
 import { InventoryItem } from '@shared/types';
 import { useReactToPrint } from 'react-to-print';
 import { InventoryItemModal } from './InventoryItemModal';
@@ -104,6 +104,7 @@ export default function InventoryPage() {
         >
           <ShoppingCart size={18} />
           Lista de Compras
+          {restaurant?.subscription_plan === 'Basic' && <Lock size={14} className="ml-1 opacity-70" />}
           {lowStockItems.length > 0 && (
             <span className="bg-[#E76F51] text-white text-xs font-bold px-2 py-0.5 rounded-full ml-1">
               {lowStockItems.length}
@@ -115,6 +116,7 @@ export default function InventoryPage() {
           className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-colors whitespace-nowrap ${activeTab === 'food_cost' ? 'bg-[#2F4F3E] text-white' : 'text-gray-600 hover:bg-gray-100'}`}
         >
           Food Cost & Stats
+          {restaurant?.subscription_plan === 'Basic' && <Lock size={14} className="ml-1 opacity-70" />}
         </button>
       </div>
       
@@ -205,6 +207,23 @@ export default function InventoryPage() {
         <FoodCostView restaurantId={restaurant.id} branchId={branch.id} />
       )}
 
+      
+      {(activeTab === 'shopping_list' || activeTab === 'food_cost') && restaurant?.subscription_plan === 'Basic' ? (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm flex-1 overflow-hidden flex flex-col items-center justify-center p-12 text-center">
+          <div className="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center mb-6">
+            <Lock size={32} className="text-[#E76F51]" />
+          </div>
+          <h2 className="text-2xl font-bold text-[#1F2933] mb-3">Función Premium</h2>
+          <p className="text-gray-500 max-w-md mx-auto mb-8 text-lg">
+            {activeTab === 'shopping_list' ? 'La Lista de Compras automática' : 'El análisis de Food Cost y Rentabilidad'} está disponible exclusivamente en nuestros planes Pro y Enterprise.
+          </p>
+          <a href="mailto:ventas@servido.com" className="bg-[#1F2933] hover:bg-[#111827] text-white px-8 py-3 rounded-xl font-bold transition-colors">
+            Mejorar mi plan
+          </a>
+        </div>
+      ) : (
+        <>
+
       {activeTab === 'shopping_list' && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm flex-1 overflow-hidden flex flex-col p-6">
           <div className="flex justify-between items-center mb-6">
@@ -279,6 +298,8 @@ export default function InventoryPage() {
             fetchInventory();
           }}
         />
+      )}
+        </>
       )}
     </div>
   );

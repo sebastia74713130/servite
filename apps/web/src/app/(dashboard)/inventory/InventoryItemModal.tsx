@@ -1,23 +1,24 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { InventoryItem } from '@shared/types';
-import { X, AlertCircle, Check } from 'lucide-react';
+import { X, AlertCircle, Check, Lock } from 'lucide-react';
 
 interface Props {
   item: InventoryItem | null;
   restaurantId: string;
   branchId: string;
+  subscriptionPlan?: string;
   onClose: () => void;
   onSaved: () => void;
 }
 
-export function InventoryItemModal({ item, restaurantId, branchId, onClose, onSaved }: Props) {
+export function InventoryItemModal({ item, restaurantId, branchId, subscriptionPlan, onClose, onSaved }: Props) {
   const [name, setName] = useState(item?.name || '');
   const [unit, setUnit] = useState(item?.unit || 'kg');
   
   // These are kept to preserve their existing values on DB update
   const currentStock = parseFloat(item?.current_stock?.toString() || '0');
-  const minStock = parseFloat(item?.min_stock?.toString() || '0');
+  const [minStock, setMinStock] = useState(parseFloat(item?.min_stock?.toString() || '0'));
   const costPerUnit = parseFloat(item?.cost_per_unit?.toString() || '0');
   const isCompound = item?.is_compound || false;
   
@@ -115,7 +116,8 @@ export function InventoryItemModal({ item, restaurantId, branchId, onClose, onSa
               />
             </div>
             
-            <div className="grid grid-cols-1 gap-4">
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="text-sm font-medium text-[#1F2933] mb-1.5 block">Unidad de Medida</label>
                 <select
@@ -131,7 +133,33 @@ export function InventoryItemModal({ item, restaurantId, branchId, onClose, onSa
                   <option value="paquetes">Paquetes</option>
                 </select>
               </div>
+              
+              <div>
+                <label className="text-sm font-medium text-[#1F2933] mb-1.5 flex items-center justify-between">
+                  Stock Mínimo (Alerta)
+                  {subscriptionPlan === 'Basic' && <Lock size={14} className="text-gray-400" />}
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={minStock}
+                  onChange={e => setMinStock(parseFloat(e.target.value) || 0)}
+                  disabled={subscriptionPlan === 'Basic'}
+                  className={`w-full border rounded-xl px-4 py-3 text-[#1F2933] focus:outline-none focus:ring-2 transition-colors ${
+                    subscriptionPlan === 'Basic' 
+                      ? 'bg-gray-50 border-gray-200 text-gray-500 cursor-not-allowed' 
+                      : 'border-[#E5E7EB] focus:ring-[#2F4F3E]/30 focus:border-[#2F4F3E] bg-white'
+                  }`}
+                />
+                {subscriptionPlan === 'Basic' && (
+                  <p className="text-xs text-orange-600 mt-1.5 flex items-center gap-1 font-medium">
+                    <Lock size={12} /> Disponible en plan Pro
+                  </p>
+                )}
+              </div>
             </div>
+
 
             {error && (
               <div className="flex items-center gap-2 text-red-600 text-sm bg-red-50 border border-red-200 rounded-xl p-3">
