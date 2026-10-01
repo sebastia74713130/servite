@@ -11,6 +11,7 @@ export function useRestaurantSession() {
   const [branch, setBranch] = useState<any>(null);
   const [role, setRole] = useState<string | null>(null);
   const [billingCycle, setBillingCycle] = useState<any>(null);
+  const [isMainBranch, setIsMainBranch] = useState<boolean>(true);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -33,6 +34,7 @@ export function useRestaurantSession() {
         if (userRest.branch) setBranch(userRest.branch);
         if (userRest.role) setRole(userRest.role);
         if (userRest.billingCycle) setBillingCycle(userRest.billingCycle);
+        setIsMainBranch(userRest.isMainBranch ?? true);
       } catch (e) {
         console.error('Session error:', e);
       } finally {
@@ -42,6 +44,6 @@ export function useRestaurantSession() {
     loadSession();
   }, [router]);
 
-  return { restaurant, branch, role, billingCycle, loading };
+  return { restaurant, branch, role, billingCycle, loading, isMainBranch };
 }
 

@@ -108,7 +108,7 @@ export default function FinancesPage() {
       fetch('/api/siat/cufd', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ restaurantId: restaurant.id })
+        body: JSON.stringify({ restaurantId: restaurant.id, branchId: branch?.id })
       }).then(res => res.json()).then(data => {
         if (data.success) {
            console.log('CUFD generado automáticamente:', data.cufd);

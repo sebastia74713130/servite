@@ -17,7 +17,7 @@ interface SiatSettingsFormProps {
   restaurantId: string;
 }
 
-export function SiatSettingsForm({ restaurantId }: SiatSettingsFormProps) {
+export function SiatSettingsForm({ restaurantId, branchId, isMainBranch }: { restaurantId: string, branchId?: string, isMainBranch?: boolean }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [syncingCuis, setSyncingCuis] = useState(false);
@@ -256,7 +256,7 @@ export function SiatSettingsForm({ restaurantId }: SiatSettingsFormProps) {
               type="text"
               value={nit}
               onChange={e => setNit(e.target.value)}
-              className="w-full border border-[#E5E7EB] rounded-xl px-4 py-3 text-[#1F2933] focus:outline-none focus:ring-2 focus:ring-[#E76F51]/30 focus:border-[#E76F51] transition-colors"
+              className="w-full border border-[#E5E7EB] rounded-xl px-4 py-3 text-[#1F2933] focus:outline-none focus:ring-2 focus:ring-[#E76F51]/30 focus:border-[#E76F51] transition-colors disabled:bg-gray-100 disabled:cursor-not-allowed"
               placeholder="Ej. 123456789"
               required
             />
@@ -272,7 +272,7 @@ export function SiatSettingsForm({ restaurantId }: SiatSettingsFormProps) {
               type="number"
               value={sucursal}
               onChange={e => setSucursal(e.target.value)}
-              className="w-full border border-[#E5E7EB] rounded-xl px-4 py-3 text-[#1F2933] focus:outline-none focus:ring-2 focus:ring-[#E76F51]/30 focus:border-[#E76F51] transition-colors"
+              className="w-full border border-[#E5E7EB] rounded-xl px-4 py-3 text-[#1F2933] focus:outline-none focus:ring-2 focus:ring-[#E76F51]/30 focus:border-[#E76F51] transition-colors disabled:bg-gray-100 disabled:cursor-not-allowed"
               min="0"
               required
             />
@@ -288,7 +288,7 @@ export function SiatSettingsForm({ restaurantId }: SiatSettingsFormProps) {
               type="number"
               value={puntoVenta}
               onChange={e => setPuntoVenta(e.target.value)}
-              className="w-full border border-[#E5E7EB] rounded-xl px-4 py-3 text-[#1F2933] focus:outline-none focus:ring-2 focus:ring-[#E76F51]/30 focus:border-[#E76F51] transition-colors"
+              className="w-full border border-[#E5E7EB] rounded-xl px-4 py-3 text-[#1F2933] focus:outline-none focus:ring-2 focus:ring-[#E76F51]/30 focus:border-[#E76F51] transition-colors disabled:bg-gray-100 disabled:cursor-not-allowed"
               min="0"
               required
             />
@@ -304,7 +304,7 @@ export function SiatSettingsForm({ restaurantId }: SiatSettingsFormProps) {
               type="text"
               value={cafc}
               onChange={e => setCafc(e.target.value)}
-              className="w-full border border-[#E5E7EB] rounded-xl px-4 py-3 text-[#1F2933] focus:outline-none focus:ring-2 focus:ring-[#E76F51]/30 focus:border-[#E76F51] transition-colors"
+              className="w-full border border-[#E5E7EB] rounded-xl px-4 py-3 text-[#1F2933] focus:outline-none focus:ring-2 focus:ring-[#E76F51]/30 focus:border-[#E76F51] transition-colors disabled:bg-gray-100 disabled:cursor-not-allowed"
               placeholder="Opcional. Ej: 101C155D9178E"
             />
           </div>
@@ -319,7 +319,7 @@ export function SiatSettingsForm({ restaurantId }: SiatSettingsFormProps) {
               type="password"
               value={certPassword}
               onChange={e => setCertPassword(e.target.value)}
-              className="w-full border border-[#E5E7EB] rounded-xl px-4 py-3 text-[#1F2933] focus:outline-none focus:ring-2 focus:ring-[#E76F51]/30 focus:border-[#E76F51] transition-colors"
+              className="w-full border border-[#E5E7EB] rounded-xl px-4 py-3 text-[#1F2933] focus:outline-none focus:ring-2 focus:ring-[#E76F51]/30 focus:border-[#E76F51] transition-colors disabled:bg-gray-100 disabled:cursor-not-allowed"
               placeholder="Contraseña del archivo de AGETIC"
               required
             />
@@ -398,7 +398,7 @@ export function SiatSettingsForm({ restaurantId }: SiatSettingsFormProps) {
         <div className="mt-6 flex justify-end">
           <button
             type="submit"
-            disabled={saving}
+            disabled={saving || isMainBranch === false}
             className="flex items-center gap-2 bg-[#E76F51] text-white rounded-xl px-6 py-3 font-medium hover:bg-[#D4604A] transition-colors shadow-sm disabled:opacity-50"
           >
             <Save size={18} />

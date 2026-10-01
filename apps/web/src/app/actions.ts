@@ -48,7 +48,22 @@ export async function getUserRestaurant(userId: string) {
     .limit(1)
     .single();
 
-  return { restaurant, branch, role: userRole, billingCycle: billing_cycle };
+  
+  let isMainBranch = true;
+  if (branch) {
+    const { data: firstBranch } = await supabaseAdmin
+      .from('branches')
+      .select('id')
+      .eq('restaurant_id', restaurant.id)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .single();
+    if (firstBranch && firstBranch.id !== branch.id) {
+      isMainBranch = false;
+    }
+  }
+
+  return { restaurant, branch, role: userRole, billingCycle: billing_cycle, isMainBranch };
 }
 
 export async function createExpense(data: any) {

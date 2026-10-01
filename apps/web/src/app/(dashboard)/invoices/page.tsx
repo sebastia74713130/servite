@@ -7,7 +7,7 @@ import { LoadingState } from '@/components/LoadingState';
 import { FileText, AlertCircle, CheckCircle, XCircle, Search } from 'lucide-react';
 
 export default function InvoicesPage() {
-  const { restaurant, loading: sessionLoading } = useRestaurantSession();
+  const { restaurant, branch, loading: sessionLoading } = useRestaurantSession();
   const [invoices, setInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -15,14 +15,14 @@ export default function InvoicesPage() {
   const [isAnulling, setIsAnulling] = useState<string | null>(null);
 
   useEffect(() => {
-    if (restaurant?.id) {
+    if (restaurant?.id && branch?.id) {
       fetchInvoices();
     }
-  }, [restaurant?.id]);
+  }, [restaurant?.id, branch?.id]);
 
   const fetchInvoices = async () => {
     try {
-      const res = await fetch(`/api/siat/invoices?restaurantId=${restaurant?.id}`);
+      const res = await fetch(`/api/siat/invoices?restaurantId=${restaurant?.id}&branchId=${branch?.id || ''}`);
       const json = await res.json();
       
       if (json.error) throw new Error(json.error);

@@ -26,7 +26,7 @@ import { SiatSettingsForm } from '@/components/SiatSettingsForm';
 import { PaymentSettingsForm } from './PaymentSettingsForm';
 
 export default function SettingsPage() {
-  const { restaurant, loading: sessionLoading } = useRestaurantSession();
+  const { restaurant, branch, isMainBranch, loading: sessionLoading } = useRestaurantSession();
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -548,7 +548,7 @@ export default function SettingsPage() {
 
       {/* SIAT Configuration Section */}
       {restaurant && (
-        <SiatSettingsForm restaurantId={restaurant.id} />
+        <SiatSettingsForm restaurantId={restaurant.id} branchId={branch?.id} isMainBranch={isMainBranch} />
       )}
 
       {/* Payment Integrations */}

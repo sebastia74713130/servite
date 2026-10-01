@@ -6,7 +6,11 @@ import { siatConfig } from "@/lib/siat/config";
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { restaurantId } = body;
+    const { restaurantId, branchId } = body;
+
+    if (!branchId) {
+      return NextResponse.json({ error: "Falta el ID de la sucursal" }, { status: 400 });
+    }
 
     if (!restaurantId) {
       return NextResponse.json({ error: "Falta el ID del restaurante" }, { status: 400 });
@@ -22,8 +26,19 @@ export async function POST(req: Request) {
     if (dbError || !siatSettings) {
       return NextResponse.json({ error: "El restaurante no tiene configurado el SIAT" }, { status: 404 });
     }
+    
+    // Obtener la configuración de la sucursal
+    const { data: branchData, error: branchError } = await supabaseAdmin
+      .from('branches')
+      .select('siat_codigo_sucursal, siat_codigo_punto_venta, siat_cuis')
+      .eq('id', branchId)
+      .single();
 
-    if (!siatSettings.siat_cuis) {
+    if (branchError || !branchData) {
+      return NextResponse.json({ error: "No se encontró la configuración de la sucursal" }, { status: 404 });
+    }
+
+    if (!branchData.siat_cuis) {
       return NextResponse.json({ error: "Falta el CUIS. Solicite el CUIS primero." }, { status: 400 });
     }
 
@@ -31,9 +46,9 @@ export async function POST(req: Request) {
     const response = await solicitarCUFD({
       codigoAmbiente: siatConfig.ambiente, 
       codigoModalidad: 1, 
-      codigoPuntoVenta: parseInt(siatSettings.siat_codigo_punto_venta) || 0,
-      codigoSucursal: parseInt(siatSettings.siat_codigo_sucursal) || 0,
-      cuis: siatSettings.siat_cuis,
+      codigoPuntoVenta: parseInt(branchData.siat_codigo_punto_venta) || 0,
+      codigoSucursal: parseInt(branchData.siat_codigo_sucursal) || 0,
+      cuis: branchData.siat_cuis,
       nit: parseInt(siatSettings.siat_nit, 10),
     });
 
@@ -47,13 +62,13 @@ export async function POST(req: Request) {
 
     // 3. Guardar en Supabase
     await supabaseAdmin
-      .from('restaurant_siat_settings')
+      .from('branches')
       .update({ 
         siat_cufd: codigoCufd,
         cufd_fecha_vigencia: fechaVigencia,
         siat_codigo_control_cufd: codigoControl
       })
-      .eq('restaurant_id', restaurantId);
+      .eq('id', branchId);
 
     return NextResponse.json({
       success: true,

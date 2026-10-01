@@ -6,7 +6,7 @@ import { siatConfig } from "@/lib/siat/config";
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { restaurantId } = body;
+    const { restaurantId, branchId } = body;
 
     if (!restaurantId) {
       return NextResponse.json({ error: "Falta el ID del restaurante" }, { status: 400 });
@@ -18,20 +18,30 @@ export async function POST(req: Request) {
       .eq('restaurant_id', restaurantId)
       .single();
 
+    const { data: branchData, error: branchError } = await supabaseAdmin
+      .from('branches')
+      .select('siat_codigo_sucursal, siat_codigo_punto_venta, siat_cuis')
+      .eq('id', branchId)
+      .single();
+
+    if (branchError || !branchData) {
+      return NextResponse.json({ error: "No se encontró la configuración de la sucursal" }, { status: 404 });
+    }
+
     if (dbError || !siatSettings) {
       return NextResponse.json({ error: "El restaurante no tiene configurado el SIAT" }, { status: 404 });
     }
 
-    if (!siatSettings.siat_cuis) {
+    if (!branchData.siat_cuis) {
       return NextResponse.json({ error: "Falta el CUIS. Solicite el CUIS primero." }, { status: 400 });
     }
 
     const catalogos = await sincronizarCatalogosSIAT({
       codigoAmbiente: siatConfig.ambiente,
-      codigoPuntoVenta: parseInt(siatSettings.siat_codigo_punto_venta) || 0,
+      codigoPuntoVenta: parseInt(branchData.siat_codigo_punto_venta) || 0,
       codigoSistema: siatConfig.codigoSistema,
-      codigoSucursal: parseInt(siatSettings.siat_codigo_sucursal) || 0,
-      cuis: siatSettings.siat_cuis,
+      codigoSucursal: parseInt(branchData.siat_codigo_sucursal) || 0,
+      cuis: branchData.siat_cuis,
       nit: parseInt(siatSettings.siat_nit, 10),
     });
 
