@@ -198,7 +198,7 @@ export default function InventoryPage() {
       )}
 
       {activeTab === 'reconciliation' && restaurant && (
-        <ReconciliationView restaurantId={restaurant.id} />
+        <ReconciliationView restaurantId={restaurant.id} branchId={branch?.id as string} />
       )}
 
       {activeTab === 'food_cost' && restaurant && branch && (

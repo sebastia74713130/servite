@@ -45,7 +45,8 @@ export function FoodCostView({ restaurantId, branchId }: { restaurantId: string;
         // 2. Fetch recipes with their items
         const { data: recipes } = await supabase
           .from('product_recipes')
-          .select('*, inventory_items(cost_per_unit)');
+          .select('*, inventory_items!inner(cost_per_unit, branch_id)')
+          .eq('inventory_items.branch_id', branchId);
 
         if (!recipes) return;
 
@@ -89,7 +90,7 @@ export function FoodCostView({ restaurantId, branchId }: { restaurantId: string;
       }
     }
     loadData();
-  }, [restaurantId]);
+  }, [restaurantId, branchId]);
 
   if (loading) return <LoadingState />;
 

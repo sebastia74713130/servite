@@ -16,11 +16,14 @@ export function PurchasesView({ restaurantId, branchId, onSaved }: { restaurantI
   const [successMsg, setSuccessMsg] = useState('');
 
   const fetchMovements = async () => {
-    const { data } = await supabase
+    let query = supabase
       .from('inventory_movements')
       .select('*, inventory_items(name, unit)')
       .eq('restaurant_id', restaurantId)
-      .eq('movement_type', 'purchase')
+      .eq('movement_type', 'purchase');
+    if (branchId) query = query.eq('branch_id', branchId);
+    
+    const { data } = await query
       .order('created_at', { ascending: false })
       .limit(20);
     if (data) setMovements(data);
@@ -88,6 +91,7 @@ export function PurchasesView({ restaurantId, branchId, onSaved }: { restaurantI
       // 2. Insert into inventory_movements
       await supabase.from('inventory_movements').insert({
         restaurant_id: restaurantId,
+        branch_id: branchId,
         inventory_item_id: selectedItemId,
         movement_type: 'purchase',
         quantity: qtyNum,

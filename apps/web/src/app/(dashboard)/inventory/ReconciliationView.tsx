@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { InventoryItem } from '@shared/types';
 import { Scale, CheckCircle2 } from 'lucide-react';
 
-export function ReconciliationView({ restaurantId, onSaved }: { restaurantId: string; onSaved?: () => void; }) {
+export function ReconciliationView({ restaurantId, branchId, onSaved }: { restaurantId: string; branchId: string; onSaved?: () => void; }) {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [realStock, setRealStock] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
@@ -13,6 +13,7 @@ export function ReconciliationView({ restaurantId, onSaved }: { restaurantId: st
     supabase.from('inventory_items')
       .select('*')
       .eq('restaurant_id', restaurantId)
+      .eq('branch_id', branchId)
       .eq('is_active', true)
       .order('name')
       .then(({ data }) => {
@@ -25,7 +26,7 @@ export function ReconciliationView({ restaurantId, onSaved }: { restaurantId: st
           setRealStock(initialStock);
         }
       });
-  }, [restaurantId]);
+  }, [restaurantId, branchId]);
 
   const handleAdjust = async (item: InventoryItem) => {
     const rStock = parseFloat(realStock[item.id]);
@@ -47,6 +48,7 @@ export function ReconciliationView({ restaurantId, onSaved }: { restaurantId: st
       // 2. Insert movement
       await supabase.from('inventory_movements').insert({
         restaurant_id: restaurantId,
+        branch_id: branchId,
         inventory_item_id: item.id,
         movement_type: mType,
         quantity: diff,
