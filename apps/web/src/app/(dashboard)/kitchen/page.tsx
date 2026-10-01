@@ -13,7 +13,7 @@ import { ArrowLeft, ChefHat } from "lucide-react";
 export default function KitchenPage() {
   const { restaurant, branch, loading: sessionLoading } = useRestaurantSession();
   const { orders, loading: ordersLoading } = useOrders(restaurant?.id, branch?.id);
-  const { stations, loading: stationsLoading } = useKitchenStations(restaurant?.id);
+  const { stations, loading: stationsLoading } = useKitchenStations(restaurant?.id, branch?.id);
   const [selectedStationId, setSelectedStationId] = useState<string>("all");
 
   if (sessionLoading || ordersLoading || stationsLoading) return <LoadingState />;

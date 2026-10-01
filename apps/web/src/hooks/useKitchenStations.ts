@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { KitchenStation } from '@shared/types';
 
-export function useKitchenStations(restaurantId: string | undefined) {
+export function useKitchenStations(restaurantId?: string, branchId?: string) {
   const [stations, setStations] = useState<KitchenStation[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -15,12 +15,18 @@ export function useKitchenStations(restaurantId: string | undefined) {
     }
 
     setLoading(true);
-    const { data, error } = await supabase
+    let query = supabase
       .from('kitchen_stations')
       .select('*')
       .eq('restaurant_id', restaurantId)
       .eq('is_active', true)
       .order('created_at', { ascending: true });
+
+    if (branchId) {
+      query = query.eq('branch_id', branchId);
+    }
+
+    const { data, error } = await query;
 
     if (!error && data) {
       setStations(data as KitchenStation[]);
@@ -32,7 +38,7 @@ export function useKitchenStations(restaurantId: string | undefined) {
 
   useEffect(() => {
     fetchStations();
-  }, [restaurantId]);
+  }, [restaurantId, branchId]);
 
   return { stations, loading, refetch: fetchStations };
 }

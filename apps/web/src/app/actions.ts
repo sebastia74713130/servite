@@ -259,6 +259,29 @@ export async function copyMenuFromMainBranch(restaurantId: string, targetBranchI
       .select('id').single();
       
     if (newCat) {
+      // 1. Copiar subsecciones y mantener mapa de IDs
+      const { data: subsections } = await supabaseAdmin
+        .from('subsections')
+        .select('*')
+        .eq('category_id', cat.id);
+
+      const subIdMap = new Map<string, string>(); // oldId -> newId
+
+      if (subsections && subsections.length > 0) {
+        for (const sub of subsections) {
+          const { id: subId, created_at: subCr, updated_at: subUp, category_id: subCat, ...subRest } = sub;
+          const { data: newSub } = await supabaseAdmin
+            .from('subsections')
+            .insert({ ...subRest, category_id: newCat.id })
+            .select('id').single();
+          
+          if (newSub) {
+            subIdMap.set(subId, newSub.id);
+          }
+        }
+      }
+
+      // 2. Copiar productos
       const { data: products } = await supabaseAdmin
         .from('products')
         .select('*')
@@ -266,11 +289,19 @@ export async function copyMenuFromMainBranch(restaurantId: string, targetBranchI
         
       if (products && products.length > 0) {
          for (const prod of products) {
-           const { id: pid, created_at: pcr, updated_at: pup, branch_id: pbr, category_id: pcid, ...prest } = prod;
+           const { id: pid, created_at: pcr, updated_at: pup, branch_id: pbr, category_id: pcid, station_id: stid, subsection_id: ssubid, ...prest } = prod;
+           
+           let newSubsectionId = null;
+           if (ssubid && subIdMap.has(ssubid)) {
+             newSubsectionId = subIdMap.get(ssubid);
+           }
+
            await supabaseAdmin.from('products').insert({
               ...prest,
               category_id: newCat.id,
-              branch_id: targetBranchId
+              branch_id: targetBranchId,
+              subsection_id: newSubsectionId,
+              station_id: null // Ignorar estación de preparación
            });
          }
       }

@@ -61,7 +61,7 @@ export default function MenuPage() {
   const { categories, setCategories, loading: catLoading, refetch: refetchCats } = useCategories(restaurant?.id, branch?.id);
   const [selectedCatId, setSelectedCatId] = useState<string | undefined>();
   const { products, setProducts, loading: prodLoading, refetch: refetchProds } = useProducts(restaurant?.id, branch?.id, selectedCatId);
-  const { stations, loading: stationsLoading } = useKitchenStations(restaurant?.id);
+  const { stations, loading: stationsLoading } = useKitchenStations(restaurant?.id, branch?.id);
   const { subsections, setSubsections, loading: subsectionsLoading, refetch: refetchSubsections } = useSubsections(selectedCatId ? [selectedCatId] : []);
   const router = useRouter();
 

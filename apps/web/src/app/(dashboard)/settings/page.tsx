@@ -61,9 +61,13 @@ export default function SettingsPage() {
     if (restaurant) {
       setName(restaurant.name || '');
       setDescription(restaurant.description || '');
-      setPhone(restaurant.phone || '');
-      setAddress(restaurant.address || '');
-      setCity(restaurant.city || '');
+      setPhone(branch?.phone || restaurant.phone || '');
+      setAddress(branch?.address || restaurant.address || '');
+      setCity(branch?.city || restaurant.city || '');
+      setGoogleMapsUrl(branch?.google_maps_url || '');
+      if (branch?.operating_hours) {
+        setOperatingHours(branch.operating_hours);
+      }
       setIsActive(restaurant.is_active ?? true);
       setBrandColor(restaurant.brand_color || '#F9FAFB');
       setLogoPreview(restaurant.logo_url || '');
@@ -117,20 +121,32 @@ export default function SettingsPage() {
       finalCoverUrl = publicUrlData.publicUrl;
     }
 
-    await supabase
-      .from('restaurants')
-      .update({
-        name: name.trim(),
-        description: description.trim() || null,
-        phone: phone.trim() || null,
-        address: address.trim() || null,
-        city: city.trim() || null,
-        is_active: isActive,
-        brand_color: brandColor,
-        logo_url: finalLogoUrl,
-        cover_url: finalCoverUrl,
-      })
-      .eq('id', restaurant.id);
+    if (isMainBranch) {
+      await supabase
+        .from('restaurants')
+        .update({
+          name: name.trim(),
+          description: description.trim() || null,
+          is_active: isActive,
+          brand_color: brandColor,
+          logo_url: finalLogoUrl,
+          cover_url: finalCoverUrl,
+        })
+        .eq('id', restaurant.id);
+    }
+
+    if (branch) {
+      await supabase
+        .from('branches')
+        .update({
+          phone: phone.trim() || null,
+          address: address.trim() || null,
+          city: city.trim() || null,
+          google_maps_url: googleMapsUrl.trim() || null,
+          operating_hours: operatingHours
+        })
+        .eq('id', branch.id);
+    }
 
     setSaving(false);
     setShowSuccess(true);
@@ -152,6 +168,7 @@ export default function SettingsPage() {
     setAddingStation(true);
     await supabase.from('kitchen_stations').insert({
       restaurant_id: restaurant.id,
+      branch_id: branch?.id,
       name: newStationName.trim(),
     });
     setNewStationName('');
@@ -207,8 +224,39 @@ export default function SettingsPage() {
         <div className="bg-white border border-[#E5E7EB] rounded-2xl p-8 shadow-sm space-y-6">
           <h2 className="text-lg font-bold text-[#1F2933] flex items-center gap-2 mb-4">
             <Palette size={20} className="text-[#E76F51]" />
-            Identidad Visual
+            Identidad Visual {isMainBranch ? '' : '(Solo editable desde sucursal principal)'}
           </h2>
+          {/* restaurant name */}
+          <div>
+            <label className="text-sm font-medium text-[#1F2933] mb-1.5 flex items-center gap-2">
+              <Store size={14} className="text-[#6B7280]" />
+              Nombre del restaurante
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              disabled={!isMainBranch}
+              className="w-full border border-[#E5E7EB] rounded-xl px-4 py-3 text-[#1F2933] focus:outline-none focus:ring-2 focus:ring-[#E76F51]/30 focus:border-[#E76F51] transition-colors disabled:bg-gray-100"
+              placeholder="Nombre de tu restaurante"
+            />
+          </div>
+
+          {/* description */}
+          <div>
+            <label className="text-sm font-medium text-[#1F2933] mb-1.5 flex items-center gap-2">
+              <FileText size={14} className="text-[#6B7280]" />
+              Descripción
+            </label>
+            <textarea
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              disabled={!isMainBranch}
+              rows={3}
+              className="w-full border border-[#E5E7EB] rounded-xl px-4 py-3 text-[#1F2933] focus:outline-none focus:ring-2 focus:ring-[#E76F51]/30 focus:border-[#E76F51] transition-colors resize-none disabled:bg-gray-100"
+              placeholder="Describe tu restaurante..."
+            />
+          </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Logo */}
@@ -239,6 +287,7 @@ export default function SettingsPage() {
                     }}
                     className="hidden"
                     id="logo-upload"
+                    disabled={!isMainBranch}
                   />
                   <label
                     htmlFor="logo-upload"
@@ -284,6 +333,7 @@ export default function SettingsPage() {
                     }}
                     className="hidden"
                     id="cover-upload"
+                    disabled={!isMainBranch}
                   />
                   <label
                     htmlFor="cover-upload"
@@ -306,6 +356,7 @@ export default function SettingsPage() {
               <div className="flex items-center gap-3 mt-2">
                 <input
                   type="color"
+                  disabled={!isMainBranch}
                   value={brandColor}
                   onChange={e => setBrandColor(e.target.value)}
                   className="w-12 h-12 rounded-lg cursor-pointer border-0 p-0"
@@ -313,6 +364,7 @@ export default function SettingsPage() {
                 />
                 <input
                   type="text"
+                  disabled={!isMainBranch}
                   value={brandColor}
                   onChange={e => setBrandColor(e.target.value)}
                   className="w-32 border border-[#E5E7EB] rounded-xl px-3 py-2 text-[#1F2933] focus:outline-none focus:ring-2 focus:ring-[#E76F51]/30 uppercase font-mono text-sm"
@@ -326,37 +378,9 @@ export default function SettingsPage() {
         <div className="bg-white border border-[#E5E7EB] rounded-2xl p-8 shadow-sm space-y-6">
           <h2 className="text-lg font-bold text-[#1F2933] flex items-center gap-2 mb-4">
             <Store size={20} className="text-[#E76F51]" />
-            Información General
+            Información de la Sucursal
           </h2>
-          {/* restaurant name */}
-          <div>
-            <label className="text-sm font-medium text-[#1F2933] mb-1.5 flex items-center gap-2">
-              <Store size={14} className="text-[#6B7280]" />
-              Nombre del restaurante
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={e => setName(e.target.value)}
-              className="w-full border border-[#E5E7EB] rounded-xl px-4 py-3 text-[#1F2933] focus:outline-none focus:ring-2 focus:ring-[#E76F51]/30 focus:border-[#E76F51] transition-colors"
-              placeholder="Nombre de tu restaurante"
-            />
-          </div>
-
-          {/* description */}
-          <div>
-            <label className="text-sm font-medium text-[#1F2933] mb-1.5 flex items-center gap-2">
-              <FileText size={14} className="text-[#6B7280]" />
-              Descripción
-            </label>
-            <textarea
-              value={description}
-              onChange={e => setDescription(e.target.value)}
-              rows={3}
-              className="w-full border border-[#E5E7EB] rounded-xl px-4 py-3 text-[#1F2933] focus:outline-none focus:ring-2 focus:ring-[#E76F51]/30 focus:border-[#E76F51] transition-colors resize-none"
-              placeholder="Describe tu restaurante..."
-            />
-          </div>
+          
 
           {/* phone + city row */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
