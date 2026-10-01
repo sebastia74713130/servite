@@ -25,6 +25,7 @@ import {
   Palette,
   Trash2,
   Pencil,
+  Lock
 } from 'lucide-react';
 import {
   DndContext,
@@ -276,6 +277,7 @@ export default function MenuPage() {
           stations={stations}
           restaurantId={restaurant?.id}
           branchId={branch?.id}
+          subscriptionPlan={restaurant?.subscription_plan}
           onClose={() => { setShowProdModal(false); setEditingProduct(null); }}
           onSaved={() => { setShowProdModal(false); setEditingProduct(null); refetchProds(); }}
         />
@@ -571,6 +573,7 @@ function ProductModal({
   stations,
   restaurantId,
   branchId,
+  subscriptionPlan,
   onClose,
   onSaved,
 }: {
@@ -579,6 +582,7 @@ function ProductModal({
   stations: KitchenStation[];
   restaurantId: string;
   branchId: string;
+  subscriptionPlan?: string;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -749,7 +753,8 @@ function ProductModal({
               if (product) setActiveTab('recipe');
             }}
           >
-            Receta {(!product) && '(Guarda para añadir)'}
+            Receta {(!product) ? '(Guarda para añadir)' : ''}
+            {(subscriptionPlan || '').toUpperCase() === 'BASIC' && product && <Lock size={12} className="inline-block ml-1 opacity-70" />}
           </button>
         </div>
 
@@ -935,9 +940,26 @@ function ProductModal({
         </div>
         </>
         ) : activeTab === 'recipe' && product ? (
+          (subscriptionPlan || '').toUpperCase() === 'BASIC' ? (
+
+          <div className="flex-1 overflow-hidden flex flex-col bg-white rounded-b-2xl items-center justify-center p-8 text-center min-h-[300px]">
+            <div className="w-16 h-16 bg-orange-50 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Lock size={24} className="text-[#E76F51]" />
+            </div>
+            <h2 className="text-xl font-bold text-[#1F2933] mb-2">Módulo Premium</h2>
+            <p className="text-gray-500 mb-6 max-w-sm">
+              La gestión de recetas, vinculación con el inventario y cálculo de Food Cost está disponible a partir del plan Pro.
+            </p>
+            <a href="mailto:ventas@servido.com" className="bg-[#1F2933] hover:bg-[#111827] text-white px-6 py-2.5 rounded-xl font-bold transition-colors">
+              Mejorar a Pro
+            </a>
+          </div>
+
+          ) : (
           <div className="flex-1 overflow-hidden flex flex-col bg-gray-50 rounded-b-2xl">
             <ProductRecipeTab product={product} restaurantId={restaurantId} />
           </div>
+          )
         ) : null}
       </div>
     </div>

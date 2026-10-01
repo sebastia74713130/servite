@@ -17,7 +17,8 @@ import {
   Trash2,
   Upload,
   Palette,
-  Image as ImageIcon
+  Image as ImageIcon,
+  AlertCircle
 } from 'lucide-react';
 import { useKitchenStations } from '@/hooks/useKitchenStations';
 import { compressImage } from '@/lib/imageUtils';
@@ -161,7 +162,6 @@ export default function SettingsPage() {
     const limit = ((currentPlan || '').toUpperCase() === 'BASIC' || (currentPlan || '').toUpperCase() === 'PRO') ? 1 : 5;
     
     if (stations.length >= limit) {
-      alert(`Tu plan ${currentPlan} permite un máximo de ${limit} estación(es) de cocina. Contacta soporte para mejorar tu plan.`);
       return;
     }
 
@@ -523,7 +523,18 @@ export default function SettingsPage() {
           </p>
         </div>
 
-        <form onSubmit={handleAddStation} className="flex items-end gap-4 mt-6">
+        {stations.length >= (((restaurant?.subscription_plan || 'BASIC').toUpperCase() === 'BASIC' || (restaurant?.subscription_plan || 'BASIC').toUpperCase() === 'PRO') ? 1 : 5) ? (
+          <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 text-orange-800 text-sm mt-6 flex flex-col gap-2">
+            <div className="flex items-center gap-2 font-bold">
+              <AlertCircle size={18} className="text-[#E76F51]" />
+              Límite de estaciones alcanzado
+            </div>
+            <p>
+              Tu plan actual permite un máximo de {(((restaurant?.subscription_plan || 'BASIC').toUpperCase() === 'BASIC' || (restaurant?.subscription_plan || 'BASIC').toUpperCase() === 'PRO') ? 1 : 5)} pantalla(s) de cocina. Para crear más, <a href="mailto:ventas@servido.com" className="font-bold underline ml-1 text-[#E76F51]">contacta a soporte para mejorar tu plan</a>.
+            </p>
+          </div>
+        ) : (
+          <form onSubmit={handleAddStation} className="flex items-end gap-4 mt-6">
           <div className="flex-1">
             <label className="block text-sm font-medium text-[#1F2933] mb-1.5">
               Nueva estación
@@ -546,7 +557,7 @@ export default function SettingsPage() {
             Añadir
           </button>
         </form>
-
+        )}
         <div className="mt-6 space-y-3">
           {stations.length === 0 ? (
             <div className="text-center py-6 bg-[#F9FAFB] rounded-xl border border-dashed border-[#E5E7EB]">
