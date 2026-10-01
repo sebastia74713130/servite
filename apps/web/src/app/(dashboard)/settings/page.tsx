@@ -33,6 +33,8 @@ export default function SettingsPage() {
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [city, setCity] = useState('');
+  const [googleMapsUrl, setGoogleMapsUrl] = useState('');
+  const [operatingHours, setOperatingHours] = useState({ monday: { isOpen: true, open: '09:00', close: '22:00' }, tuesday: { isOpen: true, open: '09:00', close: '22:00' }, wednesday: { isOpen: true, open: '09:00', close: '22:00' }, thursday: { isOpen: true, open: '09:00', close: '22:00' }, friday: { isOpen: true, open: '09:00', close: '23:00' }, saturday: { isOpen: true, open: '09:00', close: '23:00' }, sunday: { isOpen: true, open: '09:00', close: '16:00' } });
   const [isActive, setIsActive] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -399,6 +401,7 @@ export default function SettingsPage() {
           </div>
 
           {/* address */}
+          {/* address */}
           <div>
             <label className="text-sm font-medium text-[#1F2933] mb-1.5 flex items-center gap-2">
               <MapPin size={14} className="text-[#6B7280]" />
@@ -408,45 +411,64 @@ export default function SettingsPage() {
               type="text"
               value={address}
               onChange={e => setAddress(e.target.value)}
-              className="w-full border border-[#E5E7EB] rounded-xl px-4 py-3 text-[#1F2933] focus:outline-none focus:ring-2 focus:ring-[#E76F51]/30 focus:border-[#E76F51] transition-colors"
+              className="w-full border border-[#E5E7EB] rounded-xl px-4 py-3 text-[#1F2933] focus:outline-none focus:ring-2 focus:ring-[#E76F51]/30 focus:border-[#E76F51] transition-colors mb-4"
               placeholder="Calle, carrera, número..."
+            />
+            
+            <label className="text-sm font-medium text-[#1F2933] mb-1.5 flex items-center gap-2">
+              <MapPin size={14} className="text-[#6B7280]" />
+              Enlace de Google Maps
+            </label>
+            <input
+              type="url"
+              value={googleMapsUrl}
+              onChange={e => setGoogleMapsUrl(e.target.value)}
+              className="w-full border border-[#E5E7EB] rounded-xl px-4 py-3 text-[#1F2933] focus:outline-none focus:ring-2 focus:ring-[#E76F51]/30 focus:border-[#E76F51] transition-colors"
+              placeholder="https://maps.app.goo.gl/..."
             />
           </div>
 
-          {/* ─── open / closed toggle ─────────────────────────────── */}
+          {/* Schedule */}
           <div className="border-t border-[#E5E7EB] pt-6 mt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium text-[#1F2933]">Estado del restaurante</p>
-                <p className="text-xs text-[#6B7280] mt-1">
-                  Controla si los clientes pueden realizar pedidos
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsActive(!isActive)}
-                className={`w-14 h-7 rounded-full transition-colors relative flex-shrink-0 ${
-                  isActive ? 'bg-green-500' : 'bg-gray-300'
-                }`}
-              >
-                <div className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-sm transition-transform ${
-                  isActive ? 'translate-x-7' : 'translate-x-0.5'
-                }`} />
-              </button>
-            </div>
-
-            <div className="mt-3">
-              {isActive ? (
-                <span className="inline-flex items-center gap-1.5 bg-green-100 text-green-700 rounded-full px-4 py-1.5 text-sm font-medium">
-                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                  Abierto — Recibiendo pedidos
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1.5 bg-red-100 text-red-700 rounded-full px-4 py-1.5 text-sm font-medium">
-                  <span className="w-2 h-2 bg-red-500 rounded-full" />
-                  Cerrado — No se reciben pedidos
-                </span>
-              )}
+            <h3 className="font-medium text-[#1F2933] mb-4">Horarios de Atención</h3>
+            <div className="space-y-4">
+              {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map((day) => {
+                const daysEs = { monday: 'Lunes', tuesday: 'Martes', wednesday: 'Miércoles', thursday: 'Jueves', friday: 'Viernes', saturday: 'Sábado', sunday: 'Domingo' };
+                const schedule = operatingHours[day as keyof typeof operatingHours];
+                return (
+                  <div key={day} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg border border-gray-100">
+                    <div className="flex items-center gap-3 w-1/3">
+                      <button
+                        type="button"
+                        onClick={() => setOperatingHours({...operatingHours, [day]: {...schedule, isOpen: !schedule.isOpen}})}
+                        className={`w-12 h-6 rounded-full transition-colors relative ${schedule.isOpen ? 'bg-[#00D084]' : 'bg-gray-300'}`}
+                      >
+                        <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-transform ${schedule.isOpen ? 'left-7' : 'left-1'}`} />
+                      </button>
+                      <span className="font-medium text-sm text-gray-700">{daysEs[day as keyof typeof daysEs]}</span>
+                    </div>
+                    {schedule.isOpen ? (
+                      <div className="flex items-center gap-2 w-2/3 justify-end">
+                        <input
+                          type="time"
+                          value={schedule.open}
+                          onChange={(e) => setOperatingHours({...operatingHours, [day]: {...schedule, open: e.target.value}})}
+                          className="border border-gray-200 rounded-md px-2 py-1 text-sm bg-white"
+                        />
+                        <span className="text-gray-400 text-sm">a</span>
+                        <input
+                          type="time"
+                          value={schedule.close}
+                          onChange={(e) => setOperatingHours({...operatingHours, [day]: {...schedule, close: e.target.value}})}
+                          className="border border-gray-200 rounded-md px-2 py-1 text-sm bg-white"
+                        />
+                      </div>
+                    ) : (
+                      <div className="text-sm text-gray-400 w-2/3 text-right pr-4">Cerrado</div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>

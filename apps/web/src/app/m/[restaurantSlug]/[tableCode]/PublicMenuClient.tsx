@@ -50,7 +50,7 @@ export default function PublicMenuClient({
       
       const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
       const currentDay = days[boliviaTime.getDay()];
-      const schedule = restaurant.operating_hours[currentDay];
+      const schedule = restaurant.operating_hours[currentDay as keyof typeof restaurant.operating_hours];
 
       if (!schedule || !schedule.isOpen) {
         setRestaurantStatus('closed');
