@@ -28,8 +28,8 @@ let globalUtterance: SpeechSynthesisUtterance | null = null;
 export function Sidebar({ isOpen = true, setIsOpen }: { isOpen?: boolean, setIsOpen?: (v: boolean) => void }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { restaurant, role } = useRestaurantSession();
-  const { stats } = useDashboardStats(restaurant?.id);
+  const { restaurant, branch, role } = useRestaurantSession();
+  const { stats } = useDashboardStats(restaurant?.id, branch?.id);
   const [callingTablesCount, setCallingTablesCount] = useState(0);
   const [pendingReservationsCount, setPendingReservationsCount] = useState(0);
   const [hasInteracted, setHasInteracted] = useState(false);
@@ -93,10 +93,12 @@ export function Sidebar({ isOpen = true, setIsOpen }: { isOpen?: boolean, setIsO
     if (!restaurant?.id) return;
 
     const fetchCalling = async () => {
-      const { data } = await supabase
+      let query = supabase
         .from('tables')
         .select('service_status')
         .eq('restaurant_id', restaurant.id);
+      if (branch?.id) query = query.eq('branch_id', branch.id);
+      const { data } = await query;
       
       const count = data?.filter(t => t.service_status !== null).length || 0;
       setCallingTablesCount(count);
@@ -159,12 +161,14 @@ export function Sidebar({ isOpen = true, setIsOpen }: { isOpen?: boolean, setIsO
     // Fetch pending reservations count
     const fetchPendingReservations = async () => {
       const today = new Date().toISOString().split('T')[0];
-      const { data } = await supabase
+      let query = supabase
         .from('reservations')
         .select('id')
         .eq('restaurant_id', restaurant.id)
         .eq('status', 'pending')
         .gte('reservation_date', today);
+      if (branch?.id) query = query.eq('branch_id', branch.id);
+      const { data } = await query;
       
       setPendingReservationsCount(data?.length || 0);
     };
@@ -227,7 +231,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: { isOpen?: boolean, setIsO
   return (
     <>
       {!hasInteracted && (
-        <div className="fixed top-0 left-0 w-full z-[100] bg-red-500 text-white text-center py-2 font-bold cursor-pointer animate-pulse shadow-lg" onClick={() => setHasInteracted(true)}>
+        <div className="fixed top-0 left-0 w-full z-[100] bg-orange-500 text-white text-center py-2 font-bold cursor-pointer animate-pulse shadow-lg" onClick={() => setHasInteracted(true)}>
           ⚠️ Presiona aquí para activar los sonidos y notificaciones de voz en este navegador ⚠️
         </div>
       )}
@@ -280,8 +284,8 @@ export function Sidebar({ isOpen = true, setIsOpen }: { isOpen?: boolean, setIsO
               
               {badgeCount > 0 && (
                 <div className="relative flex items-center justify-center">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                  <span className="relative inline-flex items-center justify-center bg-red-500 text-white text-xs font-bold h-5 min-w-[20px] px-1.5 rounded-full shadow-md">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+                  <span className="relative inline-flex items-center justify-center bg-orange-500 text-white text-xs font-bold h-5 min-w-[20px] px-1.5 rounded-full shadow-md">
                     {badgeCount}
                   </span>
                 </div>

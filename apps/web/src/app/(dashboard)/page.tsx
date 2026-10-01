@@ -11,18 +11,20 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
 export default function DashboardPage() {
-  const { restaurant, loading: sessionLoading } = useRestaurantSession();
-  const { stats, loading: statsLoading } = useDashboardStats(restaurant?.id);
+  const { restaurant, branch, loading: sessionLoading } = useRestaurantSession();
+  const { stats, loading: statsLoading } = useDashboardStats(restaurant?.id, branch?.id);
   const [callingTablesCount, setCallingTablesCount] = useState(0);
 
   useEffect(() => {
     if (!restaurant?.id) return;
 
     const fetchCalling = async () => {
-      const { data } = await supabase
+      let query = supabase
         .from('tables')
         .select('service_status')
         .eq('restaurant_id', restaurant.id);
+      if (branch?.id) query = query.eq('branch_id', branch.id);
+      const { data } = await query;
       
       const count = data?.filter(t => t.service_status !== null).length || 0;
       setCallingTablesCount(count);
@@ -89,8 +91,8 @@ export default function DashboardPage() {
           <Link href="/orders" className="bg-white border border-[#E5E7EB] rounded-2xl p-6 flex flex-col items-center justify-center space-y-4 hover:bg-[#F9FAFB] transition-colors cursor-pointer group shadow-sm relative">
             {stats.nuevos > 0 && (
               <div className="absolute top-4 right-4 flex items-center justify-center">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                <span className="relative inline-flex items-center justify-center bg-red-500 text-white text-xs font-bold h-6 min-w-[24px] px-2 rounded-full shadow-md">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+                <span className="relative inline-flex items-center justify-center bg-orange-500 text-white text-xs font-bold h-6 min-w-[24px] px-2 rounded-full shadow-md">
                   {stats.nuevos}
                 </span>
               </div>
@@ -120,8 +122,8 @@ export default function DashboardPage() {
           <Link href="/accounts" className="bg-white border border-[#E5E7EB] rounded-2xl p-6 flex flex-col items-center justify-center space-y-4 hover:bg-[#F9FAFB] transition-colors cursor-pointer group shadow-sm relative">
             {callingTablesCount > 0 && (
               <div className="absolute top-4 right-4 flex items-center justify-center">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                <span className="relative inline-flex items-center justify-center bg-red-500 text-white text-xs font-bold h-6 min-w-[24px] px-2 rounded-full shadow-md">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+                <span className="relative inline-flex items-center justify-center bg-orange-500 text-white text-xs font-bold h-6 min-w-[24px] px-2 rounded-full shadow-md">
                   {callingTablesCount}
                 </span>
               </div>

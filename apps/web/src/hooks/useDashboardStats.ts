@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Order } from "@shared/types";
 
-export function useDashboardStats(restaurantId: string | undefined) {
+export function useDashboardStats(restaurantId: string | undefined, branchId?: string) {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     nuevos: 0,
@@ -23,11 +23,13 @@ export function useDashboardStats(restaurantId: string | undefined) {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      const { data: orders } = await supabase
+      let query = supabase
         .from("orders")
         .select("status, total, created_at, is_paid, table_id, customer_session_id")
         .eq("restaurant_id", restaurantId)
         .gte("created_at", today.toISOString());
+      if (branchId) query = query.eq("branch_id", branchId);
+      const { data: orders } = await query;
 
       if (orders) {
         const nuevos = new Set<string>();
@@ -79,7 +81,7 @@ export function useDashboardStats(restaurantId: string | undefined) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [restaurantId]);
+  }, [restaurantId, branchId]);
 
   return { stats, loading };
 }

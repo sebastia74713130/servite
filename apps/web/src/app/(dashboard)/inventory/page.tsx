@@ -31,7 +31,7 @@ export default function InventoryPage() {
     if (restaurant?.id) {
       fetchInventory();
     }
-  }, [restaurant?.id]);
+  }, [restaurant?.id, branch?.id]);
 
   const fetchInventory = async () => {
     if (!restaurant) return;
@@ -105,7 +105,7 @@ export default function InventoryPage() {
           <ShoppingCart size={18} />
           Lista de Compras
           {lowStockItems.length > 0 && (
-            <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full ml-1">
+            <span className="bg-orange-500 text-white text-xs font-bold px-2 py-0.5 rounded-full ml-1">
               {lowStockItems.length}
             </span>
           )}
