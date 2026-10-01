@@ -35,6 +35,58 @@ export default function PublicMenuClient({
 }) {
   const [selectedCatId, setSelectedCatId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Determine if restaurant is currently open based on operating_hours
+  const [restaurantStatus, setRestaurantStatus] = useState<'open' | 'closed' | 'closing_soon'>('open');
+  const [closingMessage, setClosingMessage] = useState('');
+
+  useEffect(() => {
+    if (!restaurant?.operating_hours) return;
+
+    const checkStatus = () => {
+      // Get current time in Bolivia (UTC-4)
+      const now = new Date();
+      const boliviaTime = new Date(now.toLocaleString("en-US", {timeZone: "America/La_Paz"}));
+      
+      const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+      const currentDay = days[boliviaTime.getDay()];
+      const schedule = restaurant.operating_hours[currentDay];
+
+      if (!schedule || !schedule.isOpen) {
+        setRestaurantStatus('closed');
+        setClosingMessage('El restaurante se encuentra cerrado el día de hoy.');
+        return;
+      }
+
+      const [openHour, openMin] = schedule.open.split(':').map(Number);
+      const [closeHour, closeMin] = schedule.close.split(':').map(Number);
+      
+      const currentMins = boliviaTime.getHours() * 60 + boliviaTime.getMinutes();
+      const openMins = openHour * 60 + openMin;
+      let closeMins = closeHour * 60 + closeMin;
+      
+      // Handle cases where close time is after midnight (e.g. 02:00 AM)
+      if (closeMins <= openMins) {
+        closeMins += 24 * 60;
+      }
+
+      if (currentMins < openMins || currentMins >= closeMins) {
+        setRestaurantStatus('closed');
+        setClosingMessage(`El restaurante está cerrado. Nuestro horario hoy es de ${schedule.open} a ${schedule.close}.`);
+      } else if (closeMins - currentMins <= 30) {
+        setRestaurantStatus('closing_soon');
+        setClosingMessage(`¡Apresúrate! El restaurante cierra en ${closeMins - currentMins} minutos (${schedule.close}).`);
+      } else {
+        setRestaurantStatus('open');
+        setClosingMessage('');
+      }
+    };
+
+    checkStatus();
+    const interval = setInterval(checkStatus, 60000); // check every minute
+    return () => clearInterval(interval);
+  }, [restaurant?.operating_hours]);
+
   const [deviceSessionId, setDeviceSessionId] = useState<string | null>(null);
   const [foodCourtSessionId, setFoodCourtSessionId] = useState<string | null>(null);
   const [sessionEnded, setSessionEnded] = useState(false);

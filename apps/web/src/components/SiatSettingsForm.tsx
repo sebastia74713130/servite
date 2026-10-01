@@ -391,32 +391,7 @@ export function SiatSettingsForm({ restaurantId }: SiatSettingsFormProps) {
             </div>
           </div>
           
-          <div className="flex flex-col md:flex-row gap-3 pt-3 mt-3 border-t border-[#E5E7EB]">
-            <button
-              type="button"
-              onClick={handleObtenerCuis}
-              disabled={syncingCuis || !nit || saving}
-              className="flex-1 py-2 bg-white border border-[#E5E7EB] hover:bg-gray-50 text-[#4B5563] font-medium rounded-lg transition-colors disabled:opacity-50 text-xs flex items-center justify-center gap-1"
-            >
-              {syncingCuis ? 'Conectando...' : '1. Solicitar CUIS'}
-            </button>
-            <button
-              type="button"
-              onClick={handleObtenerCufd}
-              disabled={syncingCufd || !cuis || saving}
-              className="flex-1 py-2 bg-white border border-[#E5E7EB] hover:bg-gray-50 text-[#4B5563] font-medium rounded-lg transition-colors disabled:opacity-50 text-xs flex items-center justify-center gap-1"
-            >
-              {syncingCufd ? 'Generando...' : '2. Generar CUFD'}
-            </button>
-            <button
-              type="button"
-              onClick={handleSincronizar}
-              disabled={syncingCatalogos || !cuis || saving}
-              className="flex-1 py-2 bg-[#E76F51]/10 text-[#E76F51] hover:bg-[#E76F51]/20 font-medium rounded-lg transition-colors disabled:opacity-50 text-xs flex items-center justify-center gap-1"
-            >
-              {syncingCatalogos ? 'Sincronizando...' : '3. Sincronizar'}
-            </button>
-          </div>
+          
         </div>
 
         {/* save button */}

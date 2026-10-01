@@ -103,6 +103,26 @@ export default function FinancesPage() {
       setActiveRegister(result.data);
       setShowOpenModal(false);
       setOpeningBalance('');
+
+      // Auto-generate CUFD in background
+      fetch('/api/siat/cufd', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ restaurantId: restaurant.id })
+      }).then(res => res.json()).then(data => {
+        if (data.success) {
+           console.log('CUFD generado automáticamente:', data.cufd);
+        } else {
+           console.warn('Advertencia SIAT (CUFD):', data.error || data.message);
+        }
+      }).catch(err => console.error('Error generando CUFD:', err));
+
+      // Auto-sync catalogs in background
+      fetch('/api/siat/sincronizar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ restaurantId: restaurant.id })
+      }).catch(err => console.error('Error sincronizando catálogos:', err));
     } catch (err: any) {
       console.error(err);
       alert(`Error al abrir la caja: ${err?.message || JSON.stringify(err)}`);

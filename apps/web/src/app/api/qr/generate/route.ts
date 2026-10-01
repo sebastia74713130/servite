@@ -7,12 +7,17 @@ const BANECO_USER = process.env.BANECO_USER;
 const BANECO_PASSWORD_ENC = process.env.BANECO_PASSWORD_ENC;
 const BANECO_AES_KEY = process.env.BANECO_AES_KEY;
 
-function encryptAesEcb(text: string, keyString: string) {
+function encryptAes(text: string, keyString: string) {
+  // AES-256-CBC: key must be 32 bytes (which is length of keyString since it is 32 chars)
   const key = Buffer.from(keyString, 'utf8');
-  const cipher = crypto.createCipheriv('aes-256-ecb', key, null);
-  let encrypted = cipher.update(text, 'utf8', 'base64');
-  encrypted += cipher.final('base64');
-  return encrypted;
+  // Generate random 16-byte IV
+  const iv = crypto.randomBytes(16);
+  const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
+  
+  const encrypted = Buffer.concat([cipher.update(text, 'utf8'), cipher.final()]);
+  
+  // Concatenate IV + Ciphertext and encode to Base64
+  return Buffer.concat([iv, encrypted]).toString('base64');
 }
 
 async function getAuthToken() {
@@ -61,8 +66,8 @@ export async function POST(request: Request) {
        return NextResponse.json({ error: 'Número de cuenta inválido.' }, { status: 400 });
     }
 
-    // 2. Encriptar el número de cuenta usando la llave AES maestra
-    const encryptedAccount = encryptAesEcb(restaurantAccount, BANECO_AES_KEY);
+    // 2. Encriptar el número de cuenta usando la llave AES maestra (CBC con IV prepended)
+    const encryptedAccount = encryptAes(restaurantAccount, BANECO_AES_KEY);
 
     // 3. Obtener Token
     const token = await getAuthToken();

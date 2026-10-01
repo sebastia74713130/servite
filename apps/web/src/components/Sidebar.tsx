@@ -243,13 +243,16 @@ export function Sidebar({ isOpen = true, setIsOpen }: { isOpen?: boolean, setIsO
       <div className={`w-64 bg-[#2F4F3E] shadow-[20px_0_40px_rgba(0,0,0,0.05)] flex flex-col h-screen fixed left-0 top-0 text-white z-50 transition-transform duration-300 ease-in-out ${
         isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
       }`}>
-        <div className="p-6">
+        <div className="p-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold">
           Servido<span className="text-[#E76F51]">.</span>
         </h1>
+        <button onClick={() => setIsOpen?.(false)} className="lg:hidden text-white/70 hover:text-white">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
       </div>
 
-      <nav className="flex-1 px-4 space-y-2 mt-4">
+      <nav className="flex-1 px-4 space-y-2 mt-4 overflow-y-auto pb-4 custom-scrollbar">
         {links.map((link) => {
           const Icon = link.icon;
           const isActive = pathname === link.href;

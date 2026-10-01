@@ -368,7 +368,10 @@ export default function SettingsPage() {
                 value={phone}
                 onChange={e => setPhone(e.target.value)}
                 className="w-full border border-[#E5E7EB] rounded-xl px-4 py-3 text-[#1F2933] focus:outline-none focus:ring-2 focus:ring-[#E76F51]/30 focus:border-[#E76F51] transition-colors"
-                placeholder="+57 300 123 4567"
+                placeholder="+591 71234567"
+                onBlur={() => {
+                  if (phone && !phone.startsWith("+591")) setPhone("+591 " + phone);
+                }}
               />
             </div>
             <div>
@@ -376,13 +379,22 @@ export default function SettingsPage() {
                 <Building2 size={14} className="text-[#6B7280]" />
                 Ciudad
               </label>
-              <input
-                type="text"
+              <select
                 value={city}
                 onChange={e => setCity(e.target.value)}
-                className="w-full border border-[#E5E7EB] rounded-xl px-4 py-3 text-[#1F2933] focus:outline-none focus:ring-2 focus:ring-[#E76F51]/30 focus:border-[#E76F51] transition-colors"
-                placeholder="Bogotá, Medellín..."
-              />
+                className="w-full border border-[#E5E7EB] rounded-xl px-4 py-3 text-[#1F2933] bg-white focus:outline-none focus:ring-2 focus:ring-[#E76F51]/30 focus:border-[#E76F51] transition-colors"
+              >
+                <option value="">Selecciona un departamento</option>
+                <option value="Santa Cruz">Santa Cruz</option>
+                <option value="La Paz">La Paz</option>
+                <option value="Cochabamba">Cochabamba</option>
+                <option value="Oruro">Oruro</option>
+                <option value="Potosí">Potosí</option>
+                <option value="Chuquisaca">Chuquisaca</option>
+                <option value="Tarija">Tarija</option>
+                <option value="Beni">Beni</option>
+                <option value="Pando">Pando</option>
+              </select>
             </div>
           </div>
 
