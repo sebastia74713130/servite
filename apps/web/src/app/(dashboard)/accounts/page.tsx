@@ -54,11 +54,16 @@ export default function AccountsPage() {
   const fetchTables = async () => {
     if (!restaurant) return;
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('tables')
         .select('*')
-        .eq('restaurant_id', restaurant.id)
-        .order('table_number');
+        .eq('restaurant_id', restaurant.id);
+        
+      if (branch) {
+        query = query.eq('branch_id', branch.id);
+      }
+      
+      const { data, error } = await query.order('table_number');
       if (error) throw error;
       setTables(data || []);
     } catch (err) {

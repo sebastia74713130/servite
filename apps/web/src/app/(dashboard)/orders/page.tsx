@@ -13,7 +13,7 @@ import { ORDER_STATUS_SEQUENCE } from "@shared/constants";
 export default function OrdersPage() {
   const { restaurant, branch, loading: sessionLoading } = useRestaurantSession();
   const { orders, loading: ordersLoading } = useOrders(restaurant?.id, branch?.id);
-  const { stations, loading: stationsLoading } = useKitchenStations(restaurant?.id);
+  const { stations, loading: stationsLoading } = useKitchenStations(restaurant?.id, branch?.id);
 
   // Allow kitchen to manually dismiss delivered orders
   const [hiddenKeys, setHiddenKeys] = useState<string[]>([]);

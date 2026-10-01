@@ -52,7 +52,7 @@ export default function SettingsPage() {
   const [showCropper, setShowCropper] = useState(false);
 
   // Kitchen Stations state
-  const { stations, refetch: refetchStations } = useKitchenStations(restaurant?.id);
+  const { stations, refetch: refetchStations } = useKitchenStations(restaurant?.id, branch?.id);
   const [newStationName, setNewStationName] = useState('');
   const [addingStation, setAddingStation] = useState(false);
 
