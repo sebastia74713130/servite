@@ -72,6 +72,7 @@ export default function MenuPage() {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [managingSubsectionsFor, setManagingSubsectionsFor] = useState<Category | null>(null);
   const [showScanModal, setShowScanModal] = useState(false);
+  const [copying, setCopying] = useState(false);
 
   // auto-select first category
   useEffect(() => {
@@ -136,8 +137,6 @@ export default function MenuPage() {
     setShowCatModal(true);
   };
 
-  const [copying, setCopying] = useState(false);
-  
   const handleCopyMenu = async () => {
     if (!restaurant?.id || !branch?.id) return;
     if (!confirm("¿Seguro que deseas copiar el menú de la sucursal principal? Esto reemplazará tu menú actual en esta sucursal.")) return;

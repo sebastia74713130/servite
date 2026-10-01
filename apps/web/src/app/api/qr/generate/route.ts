@@ -8,15 +8,11 @@ const BANECO_PASSWORD_ENC = process.env.BANECO_PASSWORD_ENC;
 const BANECO_AES_KEY = process.env.BANECO_AES_KEY;
 
 function encryptAes(text: string, keyString: string) {
-  // AES-256-CBC: key must be 32 bytes (which is length of keyString since it is 32 chars)
   const key = Buffer.from(keyString, 'utf8');
-  // Generate random 16-byte IV
   const iv = crypto.randomBytes(16);
   const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
-  
   const encrypted = Buffer.concat([cipher.update(text, 'utf8'), cipher.final()]);
   
-  // Concatenate IV + Ciphertext and encode to Base64
   return Buffer.concat([iv, encrypted]).toString('base64');
 }
 
