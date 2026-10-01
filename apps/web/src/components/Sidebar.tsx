@@ -231,7 +231,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: { isOpen?: boolean, setIsO
   return (
     <>
       {!hasInteracted && (
-        <div className="fixed top-0 left-0 w-full z-[100] bg-orange-500 text-white text-center py-2 font-bold cursor-pointer animate-pulse shadow-lg" onClick={() => setHasInteracted(true)}>
+        <div className="fixed top-0 left-0 w-full z-[100] bg-[#E76F51] text-white text-center py-2 font-bold cursor-pointer animate-pulse shadow-lg" onClick={() => setHasInteracted(true)}>
           ⚠️ Presiona aquí para activar los sonidos y notificaciones de voz en este navegador ⚠️
         </div>
       )}
@@ -284,8 +284,8 @@ export function Sidebar({ isOpen = true, setIsOpen }: { isOpen?: boolean, setIsO
               
               {badgeCount > 0 && (
                 <div className="relative flex items-center justify-center">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
-                  <span className="relative inline-flex items-center justify-center bg-orange-500 text-white text-xs font-bold h-5 min-w-[20px] px-1.5 rounded-full shadow-md">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#E76F51]/80 opacity-75"></span>
+                  <span className="relative inline-flex items-center justify-center bg-[#E76F51] text-white text-xs font-bold h-5 min-w-[20px] px-1.5 rounded-full shadow-md">
                     {badgeCount}
                   </span>
                 </div>
