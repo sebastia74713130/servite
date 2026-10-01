@@ -214,14 +214,14 @@ export function Sidebar({ isOpen = true, setIsOpen }: { isOpen?: boolean, setIsO
     { name: "Inventario", href: "/inventory", icon: Package },
     { name: "Menú", href: "/menu", icon: UtensilsCrossed, allowedRoles: ['kitchen', 'waitstaff'] },
     { name: "Mesas", href: "/tables", icon: LayoutGrid, allowedRoles: ['waitstaff'] },
-    { name: "Reservas", href: "/reservations", icon: CalendarClock, minPlan: 'PRO' },
+    { name: "Reservas", href: "/reservations", icon: CalendarClock },
     { name: "Sucursales", href: "/branches", icon: Store },
     { name: "Configuración", href: "/settings", icon: Settings },
   ];
 
   const links = allLinks.filter(link => {
-    if (link.minPlan === 'PRO' && currentPlan === 'BASIC') return false;
-    if (link.minPlan === 'FULL' && (currentPlan === 'BASIC' || currentPlan === 'PRO')) return false;
+    
+    
 
     if (role === 'owner' || role === 'admin') return true;
     if (link.allowedRoles?.includes(role as string)) return true;
