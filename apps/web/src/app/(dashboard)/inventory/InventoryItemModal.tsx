@@ -18,7 +18,7 @@ export function InventoryItemModal({ item, restaurantId, branchId, subscriptionP
   
   // These are kept to preserve their existing values on DB update
   const currentStock = parseFloat(item?.current_stock?.toString() || '0');
-  const [minStock, setMinStock] = useState(parseFloat(item?.min_stock?.toString() || '0'));
+  const [minStock, setMinStock] = useState<string | number>(item?.min_stock ?? '');
   const costPerUnit = parseFloat(item?.cost_per_unit?.toString() || '0');
   const isCompound = item?.is_compound || false;
   
@@ -42,7 +42,7 @@ export function InventoryItemModal({ item, restaurantId, branchId, subscriptionP
         name: name.trim(),
         unit,
         current_stock: currentStock,
-        min_stock: minStock,
+        min_stock: parseFloat(minStock.toString()) || 0,
         cost_per_unit: costPerUnit,
         is_compound: isCompound,
       };
@@ -144,7 +144,7 @@ export function InventoryItemModal({ item, restaurantId, branchId, subscriptionP
                   min="0"
                   step="0.01"
                   value={minStock}
-                  onChange={e => setMinStock(parseFloat(e.target.value) || 0)}
+                  onChange={e => setMinStock(e.target.value)}
                   disabled={(subscriptionPlan || '').toUpperCase() === 'PRO'}
                   className={`w-full border rounded-xl px-4 py-3 text-[#1F2933] focus:outline-none focus:ring-2 transition-colors ${
                     (subscriptionPlan || '').toUpperCase() === 'PRO' 
