@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { ShoppingCart, X, Plus, Minus, FileText, LayoutGrid, ChevronLeft, Search, CheckCircle, AlertCircle, ChevronRight } from 'lucide-react';
+import { RefreshCw, ShoppingCart, X, Plus, Minus, FileText, LayoutGrid, ChevronLeft, Search, CheckCircle, AlertCircle, ChevronRight } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -667,6 +667,46 @@ export default function PublicMenuClient({
       alert("Error al cargar la cuenta");
     } finally {
       setIsFetchingBill(false);
+    }
+  };
+
+
+  const handleRepeatOrder = (order: any) => {
+    const newCartItems: CartItem[] = [];
+    order.order_items.forEach((item: any) => {
+      const originalProduct = products.find((p: any) => p.id === item.product_id);
+      if (originalProduct) {
+        newCartItems.push({
+          id: Math.random().toString(36).substring(2, 9),
+          product: originalProduct,
+          quantity: item.quantity,
+          notes: item.notes || ''
+        });
+      }
+    });
+    
+    if (newCartItems.length > 0) {
+      setCartItems((prev: any) => [...prev, ...newCartItems]);
+      setShowCart(true);
+      setShowBill(false);
+    } else {
+      alert("No se pudieron cargar los productos de esta orden. Es posible que ya no estén disponibles en el menú.");
+    }
+  };
+
+  const handleClearHistory = () => {
+    if (confirm("¿Seguro que deseas limpiar tu historial de pedidos?")) {
+      setBillOrders([]);
+      if (foodCourtSessionId) {
+        localStorage.removeItem('food_court_session_id');
+        setFoodCourtSessionId(null);
+      }
+      if (deviceSessionId) {
+        localStorage.removeItem('device_session_id');
+        setDeviceSessionId(null);
+      }
+      localStorage.removeItem(`device_session_id_${table.id}`);
+      setSessionEnded(true);
     }
   };
 
@@ -1469,15 +1509,26 @@ export default function PublicMenuClient({
                             <span>Subtotal</span>
                             <span>Bs {order.total.toLocaleString('es-BO')}</span>
                           </div>
-                          {order.invoices && order.invoices.length > 0 && (
-                            <div className="mt-3 pt-3 border-t border-dashed border-gray-200">
-                              <button 
-                                onClick={() => window.open(`/api/siat/factura/print?cuf=${order.invoices[0].cuf}`, '_blank')}
-                                className="w-full py-2 bg-gray-50 text-gray-700 text-sm font-bold rounded-lg flex items-center justify-center gap-2 border border-gray-200 active:bg-gray-100"
-                              >
-                                <FileText size={16} />
-                                Descargar Factura (PDF)
-                              </button>
+                          {(order.invoices && order.invoices.length > 0 || table.type === 'takeaway') && (
+                            <div className="mt-3 pt-3 border-t border-dashed border-gray-200 flex flex-col gap-2">
+                              {order.invoices && order.invoices.length > 0 && (
+                                <button 
+                                  onClick={() => window.open(`/api/siat/factura/print?cuf=${order.invoices[0].cuf}`, '_blank')}
+                                  className="w-full py-2 bg-gray-50 text-gray-700 text-sm font-bold rounded-lg flex items-center justify-center gap-2 border border-gray-200 active:bg-gray-100"
+                                >
+                                  <FileText size={16} />
+                                  Descargar Factura (PDF)
+                                </button>
+                              )}
+                              {table.type === 'takeaway' && (
+                                <button 
+                                  onClick={() => handleRepeatOrder(order)}
+                                  className="w-full py-2 bg-blue-50 text-blue-700 text-sm font-bold rounded-lg flex items-center justify-center gap-2 border border-blue-200 active:bg-blue-100"
+                                >
+                                  <RefreshCw size={16} />
+                                  Repetir orden
+                                </button>
+                              )}
                             </div>
                           )}
                         </div>
@@ -1496,12 +1547,14 @@ export default function PublicMenuClient({
           </div>
           
           <div className="p-6 pb-[70px] bg-white border-t border-gray-200">
-            <div className="flex justify-between items-center mb-6">
-              <span className="text-xl font-bold text-gray-900">Total a pagar</span>
-              <span className="text-2xl font-bold" style={{ color: brandColor }}>
-                Bs {totalBill.toLocaleString('es-BO')}
-              </span>
-            </div>
+            {table.type !== 'takeaway' && (
+              <div className="flex justify-between items-center mb-6">
+                <span className="text-xl font-bold text-gray-900">Total a pagar</span>
+                <span className="text-2xl font-bold" style={{ color: brandColor }}>
+                  Bs {totalBill.toLocaleString('es-BO')}
+                </span>
+              </div>
+            )}
             
             {table.type === 'takeaway' ? (
               <div className="flex flex-col items-center">
@@ -1510,12 +1563,19 @@ export default function PublicMenuClient({
                     <p className="text-xs text-gray-500 text-center font-medium bg-gray-100 p-2 rounded-lg w-full mb-2">
                       Sigue el estado de tu pedido aquí.
                     </p>
-                    <div className="bg-blue-50 border border-blue-100 p-3 rounded-xl text-left">
+                    <div className="bg-blue-50 border border-blue-100 p-3 rounded-xl text-left mb-4">
                       <p className="text-xs text-blue-800 font-medium flex items-start gap-2">
                         <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
                         <span>Mantén esta pantalla abierta. Si utilizas otras apps multimedia, la alarma de 'pedido listo' no sonará.</span>
                       </p>
                     </div>
+                    <button 
+                      onClick={handleClearHistory}
+                      className="w-full py-3 rounded-xl font-bold text-red-600 bg-red-50 border border-red-100 active:scale-95 transition-transform flex items-center justify-center gap-2"
+                    >
+                      <X size={18} />
+                      Limpiar historial de pedidos
+                    </button>
                   </>
                 ) : (
                   <p className="text-sm text-gray-500 text-center font-medium">Agrega productos y haz un pedido para poder ver su estado aquí.</p>
