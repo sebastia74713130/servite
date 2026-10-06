@@ -2,7 +2,7 @@ const crypto = require('crypto');
 
 const url = 'https://apimkt.baneco.com.bo/apiGateway/api/authentication/authenticate';
 const user = 'A125834320';
-const passwordPlain = 'Trupuadd541';
+const passwordPlain = 'ProdAlba11';
 const aesKeyString = '8B473BF5A7684F16BB00719D9C57D837';
 
 const key = Buffer.from(aesKeyString, 'utf8');

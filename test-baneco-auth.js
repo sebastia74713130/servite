@@ -1,7 +1,6 @@
-require('dotenv').config({ path: 'apps/web/.env.local' });
 const crypto = require('crypto');
 
-const BANECO_API_URL = process.env.BANECO_API_URL || "https://bancadigital.bancoeconomico.com.bo"; // Adjust if different
+const BANECO_API_URL = (process.env.BANECO_API_URL || "https://bancadigital.bancoeconomico.com.bo").replace(/\/$/, "");
 const BANECO_USER = process.env.BANECO_USER;
 const BANECO_PASSWORD_ENC = process.env.BANECO_PASSWORD_ENC;
 const BANECO_AES_KEY = process.env.BANECO_AES_KEY;
