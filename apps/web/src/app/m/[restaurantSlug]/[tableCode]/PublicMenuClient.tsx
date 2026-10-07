@@ -90,6 +90,7 @@ export default function PublicMenuClient({
   const [deviceSessionId, setDeviceSessionId] = useState<string | null>(null);
   const [foodCourtSessionId, setFoodCourtSessionId] = useState<string | null>(null);
   const [sessionEnded, setSessionEnded] = useState(false);
+  const [tableStatus, setTableStatus] = useState<string | null>(table.service_status || null);
 
   // Customer data for takeaway orders (name for calling, NIT for invoicing)
   const [customerName, setCustomerName] = useState('');
@@ -126,7 +127,19 @@ export default function PublicMenuClient({
         if (savedName) setCustomerName(savedName);
         if (savedNit) setCustomerNit(savedNit);
       } else {
-        const isEnded = sessionStorage.getItem(`session_ended_${table.id}`) === 'true';
+        const endedTimestampStr = localStorage.getItem(`session_ended_timestamp_${table.id}`);
+        let isEnded = false;
+        if (endedTimestampStr) {
+          const endedTime = parseInt(endedTimestampStr, 10);
+          const TEN_MINUTES = 10 * 60 * 1000;
+          if (Date.now() - endedTime < TEN_MINUTES) {
+            isEnded = true;
+          } else {
+            localStorage.removeItem(`session_ended_timestamp_${table.id}`);
+            sessionStorage.removeItem(`has_ordered_${table.id}`); // Clear so it doesn't trigger checkUnpaid again
+          }
+        }
+        
         if (isEnded) {
           setSessionEnded(true);
         } else if (sessionStorage.getItem(`has_ordered_${table.id}`) === 'true') {
@@ -141,7 +154,7 @@ export default function PublicMenuClient({
               
               if (!error && data && data.length === 0) {
                 setSessionEnded(true);
-                sessionStorage.setItem(`session_ended_${table.id}`, 'true');
+                localStorage.setItem(`session_ended_timestamp_${table.id}`, Date.now().toString());
               }
             } catch (e) {}
           };
@@ -161,6 +174,28 @@ export default function PublicMenuClient({
   const [serviceRequestLoading, setServiceRequestLoading] = useState(false);
   const [serviceMessage, setServiceMessage] = useState<string | null>(null);
   const [isAlarmRinging, setIsAlarmRinging] = useState(false);
+
+  useEffect(() => {
+    if (table.type === 'takeaway') return;
+
+    const channel = supabase
+      .channel(`public:tables:${table.id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'tables',
+        filter: `id=eq.${table.id}`
+      }, (payload) => {
+        if (payload.new && payload.new.service_status !== undefined) {
+          setTableStatus(payload.new.service_status);
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [table.id, table.type]);
 
   useEffect(() => {
     if (table.type === 'takeaway' && foodCourtSessionId) {
@@ -393,6 +428,22 @@ export default function PublicMenuClient({
 
   const handleSubmitOrder = async (isPaid: boolean = false) => {
     if (cartItems.length === 0) return;
+    
+    // Validar si la mesa ha sido bloqueada por otro comensal (dine_in)
+    if (table.type !== 'takeaway') {
+      const { data: currentTable } = await supabase
+        .from('tables')
+        .select('service_status')
+        .eq('id', table.id)
+        .single();
+      
+      if (currentTable?.service_status === 'requesting_bill') {
+        alert("La cuenta ya ha sido solicitada por otro comensal. No se pueden agregar más pedidos a esta mesa.");
+        setTableStatus('requesting_bill');
+        setIsSubmitting(false);
+        return;
+      }
+    }
     
     // INICIAR AUDIO SILENCIOSO DE FORMA SÍNCRONA
     // Esto es vital para iOS, si se hace después de un 'await', iOS lo bloquea
@@ -658,7 +709,7 @@ export default function PublicMenuClient({
 
       if (table.type !== 'takeaway' && isRefresh && billOrders.length > 0 && (!data || data.length === 0)) {
         setSessionEnded(true);
-        sessionStorage.setItem(`session_ended_${table.id}`, 'true');
+        localStorage.setItem(`session_ended_timestamp_${table.id}`, Date.now().toString());
       }
 
       setBillOrders(data || []);
@@ -765,6 +816,7 @@ export default function PublicMenuClient({
         .eq('id', table.id);
       if (error) throw error;
       
+      setTableStatus('requesting_bill');
       setServiceMessage("¡Cuenta solicitada! Enseguida te la llevarán.");
       setShowBill(false);
       setShowBillRequestModal(false);
@@ -1212,17 +1264,22 @@ export default function PublicMenuClient({
             </div>
 
             <div className="p-6 bg-white border-t border-gray-100 flex-shrink-0" style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))' }}>
-              <button 
-                onClick={handleAddToCart}
-                disabled={!selectedProduct.is_available}
-                className="w-full text-white font-bold text-lg py-4 rounded-2xl shadow-lg disabled:opacity-50 transition-transform active:scale-[0.98]"
-                style={{ backgroundColor: brandColor }}
-              >
-                {selectedProduct.is_available 
-                  ? `Agregar al pedido · Bs ${(selectedProduct.price * quantity).toLocaleString('es-BO')}`
-                  : 'Producto agotado'
-                }
-              </button>
+              {tableStatus !== 'requesting_bill' ? (
+                  <button
+                    onClick={handleAddToCart}
+                    className="w-full text-white py-3 rounded-lg font-medium shadow-md transition-opacity hover:opacity-90 active:scale-95"
+                    style={{ backgroundColor: brandColor }}
+                  >
+                    Agregar {quantity} al pedido • {restaurant?.currency || 'Bs.'} {(selectedProduct.price * quantity).toFixed(2)}
+                  </button>
+                ) : (
+                  <button
+                    disabled
+                    className="w-full bg-gray-400 text-white py-3 rounded-lg font-medium shadow-md cursor-not-allowed"
+                  >
+                    Mesa bloqueada
+                  </button>
+                )}
             </div>
           </div>
         </div>
@@ -1582,23 +1639,29 @@ export default function PublicMenuClient({
                 )}
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  disabled={serviceRequestLoading}
-                  onClick={() => handleServiceRequest('calling_waiter')}
-                  className="py-3 rounded-xl font-bold text-gray-700 bg-gray-100 border border-gray-200 active:scale-95 transition-transform"
-                >
-                  Llamar al mesero
-                </button>
-                <button
-                  disabled={serviceRequestLoading || billOrders.length === 0}
-                  onClick={() => setShowBillRequestModal(true)}
-                  className="py-3 rounded-xl font-bold text-white active:scale-95 transition-transform disabled:opacity-50"
-                  style={{ backgroundColor: brandColor }}
-                >
-                  Pedir la cuenta
-                </button>
-              </div>
+              tableStatus === 'requesting_bill' ? (
+                <div className="text-center p-3 rounded-xl font-bold text-gray-500 bg-gray-100 border border-gray-200">
+                  Mesa bloqueada: Cuenta solicitada
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    disabled={serviceRequestLoading}
+                    onClick={() => handleServiceRequest('calling_waiter')}
+                    className="py-3 rounded-xl font-bold text-gray-700 bg-gray-100 border border-gray-200 active:scale-95 transition-transform"
+                  >
+                    Llamar al mesero
+                  </button>
+                  <button
+                    disabled={serviceRequestLoading || billOrders.length === 0}
+                    onClick={() => setShowBillRequestModal(true)}
+                    className="py-3 rounded-xl font-bold text-white active:scale-95 transition-transform disabled:opacity-50"
+                    style={{ backgroundColor: brandColor }}
+                  >
+                    Pedir la cuenta
+                  </button>
+                </div>
+              )
             )}
           </div>
         </div>
