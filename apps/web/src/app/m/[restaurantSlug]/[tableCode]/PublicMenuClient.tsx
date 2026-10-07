@@ -318,7 +318,66 @@ export default function PublicMenuClient({
   const [generatedQrBase64, setGeneratedQrBase64] = useState<string | null>(null);
   const [qrLoading, setQrLoading] = useState(false);
   const [qrError, setQrError] = useState('');
+  const [generatedQrId, setGeneratedQrId] = useState<string | null>(null);
+  const [qrTimer, setQrTimer] = useState<number>(0);
+  const [qrStatus, setQrStatus] = useState<'pending' | 'paid' | 'cancelled' | 'expired'>('pending');
   const [autoEmittedCuf, setAutoEmittedCuf] = useState<string | null>(null);
+
+  useEffect(() => {
+    let pollInterval: NodeJS.Timeout;
+    let countdownInterval: NodeJS.Timeout;
+
+    if (generatedQrId && qrStatus === 'pending') {
+      countdownInterval = setInterval(() => {
+        setQrTimer((prev) => {
+          if (prev <= 1) {
+            clearInterval(countdownInterval);
+            clearInterval(pollInterval);
+            handleExpireQr(generatedQrId);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      pollInterval = setInterval(async () => {
+        try {
+          const res = await fetch(`/api/qr/status?qrId=${generatedQrId}`);
+          const data = await res.json();
+          if (data.success && data.statusQRCode === 1) {
+            setQrStatus('paid');
+            clearInterval(pollInterval);
+            clearInterval(countdownInterval);
+            handleSubmitOrder(true); // Process order automatically
+          } else if (data.success && data.statusQRCode === 9) {
+            setQrStatus('cancelled');
+            clearInterval(pollInterval);
+            clearInterval(countdownInterval);
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      }, 5000);
+    }
+
+    return () => {
+      if (pollInterval) clearInterval(pollInterval);
+      if (countdownInterval) clearInterval(countdownInterval);
+    };
+  }, [generatedQrId, qrStatus]);
+
+  const handleExpireQr = async (qrId: string) => {
+    setQrStatus('expired');
+    try {
+      await fetch('/api/qr/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ qrId })
+      });
+    } catch (err) {
+      console.error('Failed to cancel QR on backend', err);
+    }
+  };
 
   const handleGenerateQR = async () => {
     setQrLoading(true);
@@ -338,6 +397,9 @@ export default function PublicMenuClient({
       if (!res.ok) throw new Error(data.error || 'Error generando QR');
       
       setGeneratedQrBase64(data.qrImage);
+      setGeneratedQrId(data.qrId);
+      setQrStatus('pending');
+      setQrTimer(600); // 10 minutes
     } catch (err: any) {
       setQrError(err.message);
     } finally {
