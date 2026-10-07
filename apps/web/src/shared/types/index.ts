@@ -1,7 +1,7 @@
 // === Enums ===
 export type OrderStatus = 'sent' | 'received' | 'preparing' | 'ready' | 'delivered' | 'cancelled';
 export type UserRole = 'owner' | 'admin' | 'kitchen';
-export type SubscriptionPlan = 'BASIC' | 'PRO' | 'FULL';
+export type SubscriptionPlan = 'TEST' | 'BASIC' | 'PRO' | 'FULL';
 export type OrderChannel = 'dine_in' | 'own_delivery' | 'third_party';
 export type MacroCategory = 'food' | 'beverage' | 'dessert' | 'other';
 
@@ -20,6 +20,8 @@ export interface Restaurant {
   slug: string;
   logo_url: string | null;
   subscription_plan?: SubscriptionPlan;
+  subscription_status?: 'active' | 'inactive' | 'expired';
+  subscription_expires_at?: string | null;
   brand_color?: string | null;
   cover_url?: string | null;
   menu_background_color?: string | null;

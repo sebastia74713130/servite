@@ -366,6 +366,29 @@ export default function PublicMenuClient({
     };
   }, [generatedQrId, qrStatus]);
 
+  const handleManualVerify = async () => {
+    if (!generatedQrId) return;
+    setQrLoading(true); // Re-use loading state to disable button
+    try {
+      const res = await fetch(`/api/qr/status?qrId=${generatedQrId}`);
+      const data = await res.json();
+      if (data.success && data.statusQRCode === 1) {
+        setQrStatus('paid');
+        handleSubmitOrder(true);
+      } else if (data.success && data.statusQRCode === 9) {
+        setQrStatus('cancelled');
+        alert("El QR ha sido anulado o expirado.");
+      } else {
+        alert("Aún no detectamos el pago. Por favor, asegúrate de haber completado la transferencia o espera unos segundos y vuelve a intentar.");
+      }
+    } catch (err) {
+      console.error('Error in manual verify:', err);
+      alert("Hubo un error al verificar. Intenta nuevamente.");
+    } finally {
+      setQrLoading(false);
+    }
+  };
+
   const handleExpireQr = async (qrId: string) => {
     setQrStatus('expired');
     try {
