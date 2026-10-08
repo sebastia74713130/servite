@@ -735,6 +735,7 @@ export default function PublicMenuClient({
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               restaurantId: restaurant.id,
+              branchId: table.branch_id,
               orderId: firstOrderId,
               facturaParams
             })
@@ -1550,12 +1551,12 @@ export default function PublicMenuClient({
                 </div>
                 <button
                   disabled={isSubmitting || qrLoading || !!qrError}
-                  onClick={() => handleSubmitOrder(true)}
+                  onClick={handleManualVerify}
                   className="w-full py-3 rounded-xl font-bold text-white flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-50"
                   style={{ backgroundColor: brandColor }}
                 >
-                  <CheckCircle size={20} />
-                  {isSubmitting ? 'Procesando pedido...' : 'Ya realicé el pago'}
+                  <RefreshCw size={20} className={qrLoading ? "animate-spin" : ""} />
+                  {isSubmitting || qrLoading ? 'Verificando pago...' : 'Ya realicé el pago'}
                 </button>
               </div>
             ) : (
@@ -1651,7 +1652,7 @@ export default function PublicMenuClient({
                         <span className="text-sm">NIT: {displayNit}</span>
                       </div>
                     )}
-                    {(!displayName && !displayNit) && (
+                    {(!displayName && !displayNit) && table?.type === 'takeaway' && (
                       <p className="text-xs text-gray-400 mt-1">Muestra este código en la barra al recoger tu pedido.</p>
                     )}
                   </div>
@@ -1678,7 +1679,7 @@ export default function PublicMenuClient({
                               order.status === 'ready' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
                             }`}>
                               {order.status === 'delivered' ? 'Entregado' : 
-                               order.status === 'ready' ? '¡Listo! Pasa a recoger' : 'En preparación'}
+                               order.status === 'ready' ? (table?.type === 'takeaway' ? '¡Listo! Pasa a recoger' : '¡Pedido listo!') : 'En preparación'}
                             </span>
                           </div>
                           {order.order_items?.map((item: any) => (

@@ -207,6 +207,7 @@ export default function AccountsPage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               restaurantId: restaurant?.id,
+              branchId: selectedTable.branch_id,
               orderId: orderIds[0],
               facturaParams
             })

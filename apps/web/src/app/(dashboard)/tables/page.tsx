@@ -400,7 +400,11 @@ function NewTableModal({
       });
 
     if (err) {
-      setError(err.message);
+      if (err.message.includes('tables_table_code_key') || err.message.includes('duplicate key')) {
+        setError('El número o identificador de mesa ya está en uso. Por favor, elige otro.');
+      } else {
+        setError(err.message);
+      }
       setSaving(false);
       return;
     }
