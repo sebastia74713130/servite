@@ -310,7 +310,7 @@ export default function ReservationFlow({ restaurant, branches }: { restaurant: 
                     style={selectedBranchId === branch.id ? {
                       backgroundColor: brandColor,
                       borderColor: brandColor,
-                      boxShadow: \`0 10px 25px -5px \${brandColor}60\`
+                      boxShadow: `0 10px 25px -5px ${brandColor}60`
                     } : undefined}
                   >
                     <span className="font-bold">{branch.name}</span>
@@ -390,7 +390,7 @@ export default function ReservationFlow({ restaurant, branches }: { restaurant: 
                       `}
                       style={selected ? {
                         backgroundColor: brandColor,
-                        boxShadow: \`0 4px 15px \${brandColor}60\`
+                        boxShadow: `0 4px 15px ${brandColor}60`
                       } : undefined}
                     >
                       {format(date, 'd')}
@@ -424,7 +424,7 @@ export default function ReservationFlow({ restaurant, branches }: { restaurant: 
                       style={isSelected ? {
                         backgroundColor: brandColor,
                         borderColor: brandColor,
-                        boxShadow: \`0 4px 15px \${brandColor}60\`
+                        boxShadow: `0 4px 15px ${brandColor}60`
                       } : undefined}
                     >
                       {time}
@@ -472,7 +472,7 @@ export default function ReservationFlow({ restaurant, branches }: { restaurant: 
                   value={form.firstName}
                   onChange={e => setForm({...form, firstName: e.target.value})}
                   className="w-full bg-[#111111]/80 border border-white/10 rounded-xl pl-12 pr-4 py-3.5 text-white focus:outline-none transition-all"
-                  style={{ '--tw-ring-color': brandColor, '--tw-ring-shadow': \`var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color)\` } as any}
+                  style={{ '--tw-ring-color': brandColor, '--tw-ring-shadow': `var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color)` } as any}
                   onFocus={(e) => e.target.style.borderColor = brandColor}
                   onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
                 />
@@ -523,9 +523,9 @@ export default function ReservationFlow({ restaurant, branches }: { restaurant: 
                   }
                 }}
                 onFocus={(e) => e.target.style.borderColor = phoneError ? 'rgb(239, 68, 68)' : brandColor}
-                className={\`w-full bg-[#111111]/80 border rounded-xl pl-12 pr-4 py-3.5 text-white focus:outline-none transition-all \${
+                className={`w-full bg-[#111111]/80 border rounded-xl pl-12 pr-4 py-3.5 text-white focus:outline-none transition-all ${
                   phoneError ? 'border-red-500' : 'border-white/10'
-                }\`}
+                }`}
               />
             </div>
             {phoneError && (
@@ -555,7 +555,7 @@ export default function ReservationFlow({ restaurant, branches }: { restaurant: 
               type="submit"
               disabled={loading}
               className="w-full text-white font-bold text-lg py-4 rounded-2xl transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:hover:scale-100 shadow-lg"
-              style={{ backgroundColor: brandColor, boxShadow: \`0 4px 20px \${brandColor}40\` }}
+              style={{ backgroundColor: brandColor, boxShadow: `0 4px 20px ${brandColor}40` }}
             >
               {loading ? "Confirmando..." : "Confirmar Reserva"}
             </button>
