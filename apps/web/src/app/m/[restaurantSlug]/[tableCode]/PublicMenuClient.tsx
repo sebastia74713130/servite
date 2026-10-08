@@ -940,7 +940,7 @@ export default function PublicMenuClient({
     }
   };
 
-  const totalBill = billOrders.reduce((acc, o) => acc + o.total, 0);
+  const totalBill = billOrders.reduce((acc, o) => acc + (o.order_items?.reduce((sum: number, item: any) => sum + item.total_price, 0) || o.total), 0);
 
   const cufToDownload = autoEmittedCuf || billOrders.flatMap(o => o.invoices || []).sort((a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())[0]?.cuf;
 

@@ -174,7 +174,7 @@ export default function AccountsPage() {
             ? 'CONTROL TRIBUTARIO' 
             : ((selectedTable.siat_customer_name === 'S/N' || !selectedTable.siat_customer_name) ? 'S/N' : selectedTable.siat_customer_name);
 
-          const totalAmount = tableOrders.reduce((acc, o) => acc + o.total, 0);
+          const totalAmount = tableOrders.reduce((acc, o) => acc + (o.order_items?.reduce((sum: number, item: any) => sum + item.total_price, 0) || o.total), 0);
           const facturaParams: any = {
             cabecera: {
               fechaEmision: new Date().toISOString(),
@@ -354,7 +354,7 @@ export default function AccountsPage() {
       `)
     ).join("");
 
-    const total = tableOrders.reduce((acc, o) => acc + o.total, 0);
+    const total = tableOrders.reduce((acc, o) => acc + (o.order_items?.reduce((sum: number, item: any) => sum + item.total_price, 0) || o.total), 0);
 
     const html = `
       <html>
@@ -563,7 +563,7 @@ export default function AccountsPage() {
               <div className="flex justify-between items-center mb-6">
                 <span className="text-lg text-gray-600">Total a cobrar:</span>
                 <span className="text-3xl font-bold text-gray-900">
-                  Bs {tableOrders.reduce((acc, o) => acc + o.total, 0).toLocaleString('es-BO')}
+                  Bs {tableOrders.reduce((acc, o) => acc + (o.order_items?.reduce((sum: number, item: any) => sum + item.total_price, 0) || o.total), 0).toLocaleString('es-BO')}
                 </span>
               </div>
               
