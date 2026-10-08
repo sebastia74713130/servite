@@ -208,7 +208,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: { isOpen?: boolean, setIsO
     { name: "Dashboard", href: "/", icon: Home },
     { name: "Pedidos", href: "/orders", icon: ClipboardList, allowedRoles: ['kitchen', 'waitstaff'] },
     { name: "Cocina", href: "/kitchen", icon: ChefHat, allowedRoles: ['kitchen'] },
-    { name: "Cuentas", href: "/accounts", icon: Receipt },
+    { name: "Cuentas", href: "/accounts", icon: Receipt, allowedRoles: ['waitstaff'] },
     { name: "Facturas", href: "/invoices", icon: FileText },
     { name: "Finanzas", href: "/finances", icon: Wallet },
     { name: "Inventario", href: "/inventory", icon: Package },

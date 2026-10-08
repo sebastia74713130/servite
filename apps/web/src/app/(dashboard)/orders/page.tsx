@@ -58,33 +58,41 @@ export default function OrdersPage() {
           />
         </div>
       ) : (
-        <div className="flex-1 flex space-x-4 overflow-x-auto pb-4">
-          {columns.map(col => {
-            let columnOrders = orders.filter(o => {
-              if (col.id === "received") return o.status === "sent" || o.status === "received";
-              return o.status === col.id;
-            });
-            
-            const groupedMap = columnOrders.reduce((acc, order) => {
-              // Group by session ID if it exists, otherwise fallback to table_id
-              // This ensures takeaway orders from different customers aren't merged into one giant card
-              const key = order.customer_session_id ? `session_${order.customer_session_id}` : `table_${order.table_id}`;
-              if (!acc[key]) acc[key] = [];
-              acc[key].push(order);
-              return acc;
-            }, {} as Record<string, typeof orders>);
+        <div className="flex flex-col flex-1 h-full overflow-hidden">
+          {/* Mobile swipe hint */}
+          <div className="md:hidden flex items-center justify-center gap-2 text-[11px] text-orange-600 bg-orange-50/80 border border-orange-100 py-2 rounded-xl mb-3 font-semibold">
+            <span>←</span>
+            <span>Desliza lateralmente para ver más estados</span>
+            <span>→</span>
+          </div>
 
-            let groupedOrders = Object.entries(groupedMap)
-              .filter(([key]) => !hiddenKeys.includes(key))
-              .map(([, groupOrders]) => groupOrders);
-            
-            // Limit delivered cards so they don't pile up infinitely and slow down the browser
-            if (col.id === "delivered") {
-              groupedOrders = groupedOrders.slice(0, 15);
-            }
+          <div className="flex-1 flex space-x-4 overflow-x-auto pb-4 snap-x snap-mandatory">
+            {columns.map(col => {
+              let columnOrders = orders.filter(o => {
+                if (col.id === "received") return o.status === "sent" || o.status === "received";
+                return o.status === col.id;
+              });
+              
+              const groupedMap = columnOrders.reduce((acc, order) => {
+                // Group by session ID if it exists, otherwise fallback to table_id
+                // This ensures takeaway orders from different customers aren't merged into one giant card
+                const key = order.customer_session_id ? `session_${order.customer_session_id}` : `table_${order.table_id}`;
+                if (!acc[key]) acc[key] = [];
+                acc[key].push(order);
+                return acc;
+              }, {} as Record<string, typeof orders>);
 
-            return (
-              <div key={col.id} className="w-80 flex-shrink-0 flex flex-col bg-[#F9FAFB] rounded-2xl p-4">
+              let groupedOrders = Object.entries(groupedMap)
+                .filter(([key]) => !hiddenKeys.includes(key))
+                .map(([, groupOrders]) => groupOrders);
+              
+              // Limit delivered cards so they don't pile up infinitely and slow down the browser
+              if (col.id === "delivered") {
+                groupedOrders = groupedOrders.slice(0, 15);
+              }
+
+              return (
+                <div key={col.id} className="w-[85vw] sm:w-80 flex-shrink-0 flex flex-col bg-[#F9FAFB] rounded-2xl p-4 snap-center">
                 <div className="flex items-center space-x-2 mb-4">
                   <h2 className="font-bold text-[#1F2933]">{col.name}</h2>
                   <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${col.badgeClass}`}>
@@ -109,6 +117,7 @@ export default function OrdersPage() {
               </div>
             );
           })}
+          </div>
         </div>
       )}
     </div>
