@@ -13,28 +13,45 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Faltan parámetros requeridos" }, { status: 400 });
     }
 
-    // 1. Obtener la configuración del SIAT del restaurante
     const { data: siatSettings, error: dbError } = await supabaseAdmin
       .from('restaurant_siat_settings')
       .select('*')
       .eq('restaurant_id', restaurantId)
       .single();
 
-    const { data: branchData, error: branchError } = await supabaseAdmin
-      .from('branches')
-      .select('siat_codigo_sucursal, siat_codigo_punto_venta, siat_cuis, siat_cufd, siat_codigo_control_cufd')
-      .eq('id', branchId)
-      .single();
-
-    if (branchError || !branchData) {
-      return NextResponse.json({ error: "No se encontró la configuración de la sucursal" }, { status: 404 });
-    }
-
     if (dbError || !siatSettings) {
       return NextResponse.json({ error: "El restaurante no tiene configurado el SIAT" }, { status: 404 });
     }
 
-    if (!branchData.siat_cuis || !branchData.siat_cufd) {
+    let cuis = siatSettings.siat_cuis;
+    let cufd = siatSettings.siat_cufd;
+    let codigoControl = siatSettings.siat_codigo_control_cufd;
+    
+    // Default to global settings if they exist, otherwise fallback to "0"
+    let sucursal = siatSettings.siat_codigo_sucursal ? String(siatSettings.siat_codigo_sucursal) : "0";
+    let puntoVenta = siatSettings.siat_codigo_punto_venta ? String(siatSettings.siat_codigo_punto_venta) : "0";
+
+    if (branchId) {
+      const { data: branchData, error: branchError } = await supabaseAdmin
+        .from('branches')
+        .select('siat_codigo_sucursal, siat_codigo_punto_venta, siat_cuis, siat_cufd, siat_codigo_control_cufd')
+        .eq('id', branchId)
+        .single();
+
+      if (!branchError && branchData) {
+        cuis = branchData.siat_cuis || cuis;
+        cufd = branchData.siat_cufd || cufd;
+        codigoControl = branchData.siat_codigo_control_cufd || codigoControl;
+        sucursal = branchData.siat_codigo_sucursal !== null && branchData.siat_codigo_sucursal !== undefined 
+          ? String(branchData.siat_codigo_sucursal) 
+          : sucursal;
+        puntoVenta = branchData.siat_codigo_punto_venta !== null && branchData.siat_codigo_punto_venta !== undefined 
+          ? String(branchData.siat_codigo_punto_venta) 
+          : puntoVenta;
+      }
+    }
+
+    if (!cuis || !cufd) {
       return NextResponse.json({ error: "CUIS o CUFD faltantes. Por favor sincronice." }, { status: 400 });
     }
 
@@ -67,14 +84,14 @@ export async function POST(req: Request) {
     const cufParams = {
       nit: siatSettings.siat_nit,
       fechaEmision: siatDate,
-      sucursal: branchData.siat_codigo_sucursal,
+      sucursal: parseInt(sucursal),
       modalidad: 1, // Electrónica en Línea
       tipoEmision: 1, // Online
       tipoFactura: 1, // Con derecho a crédito fiscal
       tipoDocumentoSector: facturaParams.cabecera.codigoDocumentoSector || 1,
       numeroFactura: facturaParams.cabecera.numeroFactura,
-      puntoVenta: branchData.siat_codigo_punto_venta,
-      codigoControlCufd: branchData.siat_codigo_control_cufd || branchData.siat_cufd.slice(-16) // Fallback solo si no hay control
+      puntoVenta: parseInt(puntoVenta),
+      codigoControlCufd: codigoControl || cufd.slice(-16) // Fallback solo si no hay control
     };
     
     // Inyectar datos faltantes a la cabecera
@@ -83,9 +100,9 @@ export async function POST(req: Request) {
     facturaParams.cabecera.razonSocialEmisor = "Tendai S.R.L.";
     facturaParams.cabecera.municipio = "La Paz";
     facturaParams.cabecera.telefono = "60000000";
-    facturaParams.cabecera.codigoSucursal = parseInt(branchData.siat_codigo_sucursal);
+    facturaParams.cabecera.codigoSucursal = parseInt(sucursal);
     facturaParams.cabecera.direccion = "Av. Principal 123";
-    facturaParams.cabecera.codigoPuntoVenta = facturaParams.cabecera.codigoPuntoVenta !== undefined ? facturaParams.cabecera.codigoPuntoVenta : parseInt(branchData.siat_codigo_punto_venta);
+    facturaParams.cabecera.codigoPuntoVenta = facturaParams.cabecera.codigoPuntoVenta !== undefined ? facturaParams.cabecera.codigoPuntoVenta : parseInt(puntoVenta);
     if (!facturaParams.cabecera.numeroDocumento || facturaParams.cabecera.numeroDocumento === '0') {
       facturaParams.cabecera.numeroDocumento = '99002'; // NIT/CI genérico para S/N
     }
@@ -125,7 +142,7 @@ export async function POST(req: Request) {
     // El cuf de facturaParams será sobreescrito por el generado para asegurar integridad
     const cuf = generarCUF(cufParams);
     facturaParams.cabecera.cuf = cuf;
-    facturaParams.cabecera.cufd = branchData.siat_cufd;
+    facturaParams.cabecera.cufd = cufd;
 
     // 5. Construir y firmar el XML
     const xmlBase = buildFacturaXml(facturaParams);

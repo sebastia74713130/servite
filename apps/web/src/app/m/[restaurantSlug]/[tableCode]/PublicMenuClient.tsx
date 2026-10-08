@@ -1862,9 +1862,9 @@ export default function PublicMenuClient({
                   <select 
                     value={requestedPaymentMethod}
                     onChange={(e) => setRequestedPaymentMethod(e.target.value)}
-                    className="w-full px-4 py-3 bg-white border-2 rounded-xl focus:outline-none font-medium shadow-sm transition-colors"
+                    className="w-full px-4 py-4 bg-orange-50 border-4 rounded-xl focus:outline-none font-bold text-lg shadow-sm transition-colors text-gray-800"
                     style={{ 
-                      borderColor: `${brandColor}60`, 
+                      borderColor: brandColor, 
                       '--tw-ring-color': brandColor,
                     } as React.CSSProperties}
                   >

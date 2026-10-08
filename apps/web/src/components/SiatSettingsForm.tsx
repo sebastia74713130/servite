@@ -52,22 +52,43 @@ export function SiatSettingsForm({ restaurantId, branchId, isMainBranch }: { res
           .eq('restaurant_id', restaurantId)
           .single();
 
-        if (error && error.code !== 'PGRST116') { // PGRST116 is not found, which is fine
+        if (error && error.code !== 'PGRST116') {
           console.error("Error loading SIAT settings:", error);
           return;
         }
 
+        let bData = null;
+        if (branchId) {
+          const { data: branchInfo, error: branchErr } = await supabase
+            .from('branches')
+            .select('*')
+            .eq('id', branchId)
+            .single();
+          if (branchInfo) {
+            bData = branchInfo;
+          }
+        }
+
         if (data) {
           setNit(data.siat_nit || '');
-          setSucursal(data.siat_codigo_sucursal?.toString() || '0');
-          setPuntoVenta(data.siat_codigo_punto_venta?.toString() || '0');
           setCertPassword(data.siat_cert_password || '');
           setCafc(data.siat_cafc || '');
-          setCuis(data.siat_cuis);
-          setCufd(data.siat_cufd);
-          setCufdFecha(data.cufd_fecha_vigencia);
           setActividad(data.siat_actividad_economica);
           setProducto(data.siat_codigo_producto_sin?.toString());
+          
+          if (bData) {
+            setSucursal(bData.siat_codigo_sucursal?.toString() || '0');
+            setPuntoVenta(bData.siat_codigo_punto_venta?.toString() || '0');
+            setCuis(bData.siat_cuis);
+            setCufd(bData.siat_cufd);
+            setCufdFecha(bData.cufd_fecha_vigencia);
+          } else {
+            setSucursal(data.siat_codigo_sucursal?.toString() || '0');
+            setPuntoVenta(data.siat_codigo_punto_venta?.toString() || '0');
+            setCuis(data.siat_cuis);
+            setCufd(data.siat_cufd);
+            setCufdFecha(data.cufd_fecha_vigencia);
+          }
         }
       } catch (err) {
         console.error("Exception loading settings:", err);
@@ -77,7 +98,7 @@ export function SiatSettingsForm({ restaurantId, branchId, isMainBranch }: { res
     }
 
     loadSettings();
-  }, [restaurantId]);
+  }, [restaurantId, branchId]);
 
   const saveSettings = async () => {
     if (!restaurantId) return false;
@@ -97,18 +118,37 @@ export function SiatSettingsForm({ restaurantId, branchId, isMainBranch }: { res
         }
       }
 
-      const { error: dbError } = await supabase
-        .from('restaurant_siat_settings')
-        .upsert({
-          restaurant_id: restaurantId,
-          siat_nit: nit,
+      const baseSettings = {
+        restaurant_id: restaurantId,
+        siat_nit: nit,
+        siat_cert_password: certPassword,
+        siat_cafc: cafc,
+      };
+
+      if (!branchId) {
+        Object.assign(baseSettings, {
           siat_codigo_sucursal: parseInt(sucursal) || 0,
           siat_codigo_punto_venta: parseInt(puntoVenta) || 0,
-          siat_cert_password: certPassword,
-          siat_cafc: cafc,
-        }, { onConflict: 'restaurant_id' });
+        });
+      }
+
+      const { error: dbError } = await supabase
+        .from('restaurant_siat_settings')
+        .upsert(baseSettings, { onConflict: 'restaurant_id' });
 
       if (dbError) throw dbError;
+
+      if (branchId) {
+        const { error: branchError } = await supabase
+          .from('branches')
+          .update({
+            siat_codigo_sucursal: parseInt(sucursal) || 0,
+            siat_codigo_punto_venta: parseInt(puntoVenta) || 0,
+          })
+          .eq('id', branchId);
+          
+        if (branchError) throw branchError;
+      }
       
       setCertFile(null); // Reset file input
       return true;
@@ -142,7 +182,7 @@ export function SiatSettingsForm({ restaurantId, branchId, isMainBranch }: { res
       const res = await fetch('/api/siat/cuis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ restaurantId })
+        body: JSON.stringify({ restaurantId, branchId })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error obteniendo CUIS');
@@ -169,7 +209,7 @@ export function SiatSettingsForm({ restaurantId, branchId, isMainBranch }: { res
       const res = await fetch('/api/siat/cufd', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ restaurantId })
+        body: JSON.stringify({ restaurantId, branchId })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error obteniendo CUFD');
@@ -197,7 +237,7 @@ export function SiatSettingsForm({ restaurantId, branchId, isMainBranch }: { res
       const res = await fetch('/api/siat/sincronizar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ restaurantId })
+        body: JSON.stringify({ restaurantId, branchId })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error sincronizando catálogos');
@@ -391,7 +431,32 @@ export function SiatSettingsForm({ restaurantId, branchId, isMainBranch }: { res
             </div>
           </div>
           
-          
+          <div className="flex flex-col md:flex-row gap-3 pt-3 mt-3 border-t border-[#E5E7EB]">
+            <button
+              type="button"
+              onClick={handleObtenerCuis}
+              disabled={syncingCuis || !nit || saving}
+              className="flex-1 py-2 bg-white border border-[#E5E7EB] hover:bg-gray-50 text-[#4B5563] font-medium rounded-lg transition-colors disabled:opacity-50 text-xs flex items-center justify-center gap-1"
+            >
+              {syncingCuis ? 'Conectando...' : '1. Solicitar CUIS'}
+            </button>
+            <button
+              type="button"
+              onClick={handleObtenerCufd}
+              disabled={syncingCufd || !cuis || saving}
+              className="flex-1 py-2 bg-white border border-[#E5E7EB] hover:bg-gray-50 text-[#4B5563] font-medium rounded-lg transition-colors disabled:opacity-50 text-xs flex items-center justify-center gap-1"
+            >
+              {syncingCufd ? 'Generando...' : '2. Generar CUFD'}
+            </button>
+            <button
+              type="button"
+              onClick={handleSincronizar}
+              disabled={syncingCatalogos || !cuis || saving}
+              className="flex-1 py-2 bg-[#E76F51]/10 text-[#E76F51] hover:bg-[#E76F51]/20 font-medium rounded-lg transition-colors disabled:opacity-50 text-xs flex items-center justify-center gap-1"
+            >
+              {syncingCatalogos ? 'Sincronizando...' : '3. Sincronizar'}
+            </button>
+          </div>
         </div>
 
         {/* save button */}
