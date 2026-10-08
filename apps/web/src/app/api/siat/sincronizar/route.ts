@@ -6,7 +6,8 @@ import { siatConfig } from "@/lib/siat/config";
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { restaurantId, branchId } = body;
+    const { restaurantId } = body;
+    const branchId = body.branchId || restaurantId;
 
     if (!restaurantId) {
       return NextResponse.json({ error: "Falta el ID del restaurante" }, { status: 400 });

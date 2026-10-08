@@ -22,6 +22,7 @@ export default function FinancesPage() {
   const [showOpenModal, setShowOpenModal] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [showExpenseModal, setShowExpenseModal] = useState(false);
+  const [isOpening, setIsOpening] = useState(false);
 
   // Form states
   const [openingBalance, setOpeningBalance] = useState('');
@@ -93,6 +94,7 @@ export default function FinancesPage() {
     if (!restaurant) return;
     
     try {
+      setIsOpening(true);
       const result = await openCashRegister({
         restaurant_id: restaurant.id,
         branch_id: branch?.id || restaurant.id,
@@ -101,31 +103,41 @@ export default function FinancesPage() {
       });
         
       setActiveRegister(result.data);
-      setShowOpenModal(false);
       setOpeningBalance('');
 
-      // Auto-generate CUFD in background
-      fetch('/api/siat/cufd', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ restaurantId: restaurant.id, branchId: branch?.id })
-      }).then(res => res.json()).then(data => {
-        if (data.success) {
-           console.log('CUFD generado automáticamente:', data.cufd);
+      try {
+        // Auto-generate CUFD
+        const cufdRes = await fetch('/api/siat/cufd', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ restaurantId: restaurant.id, branchId: branch?.id || restaurant.id })
+        });
+        const cufdData = await cufdRes.json();
+        
+        if (cufdData.success) {
+           console.log('CUFD generado automáticamente:', cufdData.cufd);
         } else {
-           console.warn('Advertencia SIAT (CUFD):', data.error || data.message);
+           console.warn('Advertencia SIAT (CUFD):', cufdData.error || cufdData.message);
+           alert(`La caja se abrió, pero hubo un problema al generar el CUFD: ${cufdData.error || cufdData.message}`);
         }
-      }).catch(err => console.error('Error generando CUFD:', err));
+      } catch (err) {
+        console.error('Error generando CUFD:', err);
+        alert('La caja se abrió, pero hubo un error de conexión al generar el CUFD.');
+      }
 
-      // Auto-sync catalogs in background
+      // Auto-sync catalogs in background (doesn't need to block UI)
       fetch('/api/siat/sincronizar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ restaurantId: restaurant.id })
       }).catch(err => console.error('Error sincronizando catálogos:', err));
+      
+      setShowOpenModal(false);
     } catch (err: any) {
       console.error(err);
       alert(`Error al abrir la caja: ${err?.message || JSON.stringify(err)}`);
+    } finally {
+      setIsOpening(false);
     }
   };
 
@@ -421,8 +433,12 @@ export default function FinancesPage() {
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E76F51]/20 focus:border-[#E76F51] mb-6 text-lg font-bold"
                 placeholder="Ej. 100"
               />
-              <button type="submit" className="w-full py-3 bg-[#2F4F3E] text-white rounded-xl font-bold hover:bg-[#233A2E] transition-colors">
-                Abrir Turno
+              <button 
+                type="submit" 
+                disabled={isOpening}
+                className={`w-full py-3 text-white rounded-xl font-bold transition-colors ${isOpening ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#2F4F3E] hover:bg-[#233A2E]'}`}
+              >
+                {isOpening ? 'Abriendo y generando CUFD...' : 'Abrir Turno'}
               </button>
             </form>
           </div>
