@@ -942,6 +942,8 @@ export default function PublicMenuClient({
 
   const totalBill = billOrders.reduce((acc, o) => acc + o.total, 0);
 
+  const cufToDownload = autoEmittedCuf || billOrders.flatMap(o => o.invoices || []).sort((a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())[0]?.cuf;
+
   if (sessionEnded) {
     return (
       <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-500">
@@ -953,7 +955,17 @@ export default function PublicMenuClient({
           </div>
         )}
         <h2 className="text-3xl font-bold text-gray-900 mb-3">¡Gracias por venir!</h2>
-        <p className="text-gray-500 text-lg max-w-sm">Esperamos que hayas disfrutado tu experiencia en {restaurant?.name || 'nuestro restaurante'}. ¡Vuelve pronto!</p>
+        <p className="text-gray-500 text-lg max-w-sm mb-8">Esperamos que hayas disfrutado tu experiencia en {restaurant?.name || 'nuestro restaurante'}. ¡Vuelve pronto!</p>
+        
+        {cufToDownload && (
+          <button
+            onClick={() => window.open('/api/siat/factura/print?cuf=' + cufToDownload, '_blank')}
+            className="flex items-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-full font-medium active:scale-95 transition-transform"
+          >
+            <FileText size={20} />
+            Descargar Factura (PDF)
+          </button>
+        )}
       </div>
     );
   }
