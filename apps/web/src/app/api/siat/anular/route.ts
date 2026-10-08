@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import * as soap from "soap";
+import { resolveBranchId } from "@/lib/siat/branchHelper";
 import { siatConfig } from "@/lib/siat/config";
 
 const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
@@ -24,6 +25,10 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Faltan parámetros: restaurantId y cuf" }, { status: 400 });
         }
 
+        
+        const { data: invoice } = await supabaseAdmin.from('invoices').select('branch_id').eq('cuf', cuf).single();
+        const branchId = await resolveBranchId(restaurantId, invoice?.branch_id);
+
         const { data: siatSettings } = await supabaseAdmin
             .from('restaurant_siat_settings')
             .select('*')
@@ -37,7 +42,23 @@ export async function POST(req: Request) {
         const compraVentaClient = await createClientWithRetry(siatConfig.wsdlCompraVenta);
         compraVentaClient.addHttpHeader("apikey", `TokenApi ${siatSettings.siat_token_delegado}`);
 
-        const pv = parseInt(siatSettings.siat_codigo_punto_venta) || 0;
+        
+        let cuis = siatSettings.siat_cuis;
+        let cufd = siatSettings.siat_cufd;
+        let sucursal = siatSettings.siat_codigo_sucursal ? String(siatSettings.siat_codigo_sucursal) : "0";
+        let puntoVenta = siatSettings.siat_codigo_punto_venta ? String(siatSettings.siat_codigo_punto_venta) : "0";
+
+        if (branchId) {
+            const { data: branchData } = await supabaseAdmin.from('branches').select('*').eq('id', branchId).single();
+            if (branchData) {
+                cuis = branchData.siat_cuis || cuis;
+                cufd = branchData.siat_cufd || cufd;
+                sucursal = branchData.siat_codigo_sucursal !== null ? String(branchData.siat_codigo_sucursal) : sucursal;
+                puntoVenta = branchData.siat_codigo_punto_venta !== null ? String(branchData.siat_codigo_punto_venta) : puntoVenta;
+            }
+        }
+
+        const pv = parseInt(puntoVenta) || 0;
         const motivo = codigoMotivoAnulacion || 1; // 1 = FACTURA MAL EMITIDA
 
         const [result] = await compraVentaClient.anulacionFacturaAsync({
@@ -48,9 +69,9 @@ export async function POST(req: Request) {
                 codigoModalidad: 1, // Electronica en linea
                 codigoPuntoVenta: pv,
                 codigoSistema: siatSettings.siat_codigo_sistema,
-                codigoSucursal: parseInt(siatSettings.siat_codigo_sucursal) || 0,
-                cufd: siatSettings.siat_cufd,
-                cuis: siatSettings.siat_cuis,
+                codigoSucursal: parseInt(sucursal) || 0,
+                cufd: cufd,
+                cuis: cuis,
                 nit: parseInt(siatSettings.siat_nit, 10),
                 tipoFacturaDocumento: 1, // Factura con derecho a credito fiscal
                 cuf: cuf,

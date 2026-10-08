@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { sincronizarCatalogosSIAT } from "@/lib/siat/services/sincronizarCatalogos";
+import { resolveBranchId } from "@/lib/siat/branchHelper";
 import { siatConfig } from "@/lib/siat/config";
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
     const { restaurantId } = body;
-    const branchId = body.branchId || restaurantId;
+    const branchId = await resolveBranchId(restaurantId, body.branchId);
 
     if (!restaurantId) {
       return NextResponse.json({ error: "Falta el ID del restaurante" }, { status: 400 });

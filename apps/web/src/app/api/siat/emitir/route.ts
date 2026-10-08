@@ -7,7 +7,8 @@ import { emitirFacturaSIAT } from "@/lib/siat/services/emitirFactura";
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { restaurantId, orderId, branchId, facturaParams } = body;
+    const { restaurantId, orderId, facturaParams } = body;
+    const branchId = await resolveBranchId(restaurantId, body.branchId);
 
     if (!restaurantId || !facturaParams) {
       return NextResponse.json({ error: "Faltan parámetros requeridos" }, { status: 400 });
