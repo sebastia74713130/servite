@@ -30,7 +30,8 @@ export async function getUserRestaurant(userId: string) {
   let branchQuery = supabaseAdmin
     .from('branches')
     .select('*')
-    .eq('restaurant_id', restaurant.id);
+    .eq('restaurant_id', restaurant.id)
+    .order('created_at', { ascending: true });
     
   if (userBranchId) {
     branchQuery = branchQuery.eq('id', userBranchId);

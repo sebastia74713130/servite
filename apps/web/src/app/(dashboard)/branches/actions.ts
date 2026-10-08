@@ -109,3 +109,15 @@ export async function deleteBranchUser(userId: string) {
   return { success: true };
 }
 
+export async function switchBranch(userId: string, targetBranchId: string | null) {
+  const { error } = await supabaseAdmin
+    .from('restaurant_users')
+    .update({ branch_id: targetBranchId })
+    .eq('user_id', userId);
+
+  if (error) {
+    return { error: error.message };
+  }
+  return { success: true };
+}
+

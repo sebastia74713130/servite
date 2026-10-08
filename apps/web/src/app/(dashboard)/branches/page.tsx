@@ -5,10 +5,10 @@ import { useRestaurantSession } from "@/hooks/useRestaurantSession";
 import { LoadingState } from "@/components/LoadingState";
 import { supabase } from "@/lib/supabase";
 import { Store, UserPlus, Users, X, Plus, Trash2 } from "lucide-react";
-import { createBranch, createBranchUser, deleteBranchUser, getBranchUsers } from "./actions";
+import { createBranch, createBranchUser, deleteBranchUser, getBranchUsers, switchBranch } from "./actions";
 
 export default function BranchesPage() {
-  const { restaurant, loading: sessionLoading } = useRestaurantSession();
+  const { restaurant, role, branch: currentBranch, loading: sessionLoading } = useRestaurantSession();
   
   const [branches, setBranches] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
@@ -127,6 +127,20 @@ export default function BranchesPage() {
     setUserToDelete(null);
   };
 
+  const handleSwitchBranch = async (targetBranchId: string | null) => {
+    setActionLoading(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    
+    const res = await switchBranch(user.id, targetBranchId);
+    if (res.error) {
+      alert("Error cambiando de sucursal: " + res.error);
+      setActionLoading(false);
+    } else {
+      window.location.href = '/branches';
+    }
+  };
+
   if (sessionLoading || loadingData) return <LoadingState />;
 
   return (
@@ -158,7 +172,22 @@ export default function BranchesPage() {
               </div>
               <p className="text-sm text-[#6B7280] mt-2">{b.address || "Sin dirección especificada"}</p>
             </div>
-            <div className="mt-6 pt-4 border-t border-[#E5E7EB]">
+            <div className="mt-6 pt-4 border-t border-[#E5E7EB] flex flex-col gap-2">
+              {role === 'owner' && (
+                currentBranch?.id === b.id ? (
+                  <div className="w-full text-center px-4 py-2 bg-green-50 text-green-700 text-sm font-medium rounded-xl border border-green-200">
+                    Sucursal Actual
+                  </div>
+                ) : (
+                  <button
+                    disabled={actionLoading}
+                    onClick={() => handleSwitchBranch(b.id)}
+                    className="w-full text-center px-4 py-2 bg-[#FDF0EC] hover:bg-[#FCE1D9] text-[#E76F51] text-sm font-medium rounded-xl transition-colors disabled:opacity-50"
+                  >
+                    {actionLoading ? 'Cambiando...' : 'Cambiar a esta sucursal'}
+                  </button>
+                )
+              )}
               <button
                 onClick={() => {
                   setSelectedBranchId(b.id);
