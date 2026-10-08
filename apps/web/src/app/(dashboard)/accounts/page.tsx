@@ -97,6 +97,9 @@ export default function AccountsPage() {
   };
 
   const handleClearService = async (tableId: string) => {
+    // Save previous state for rollback
+    const prevTable = tables.find(t => t.id === tableId);
+    
     // Actualización inmediata en la UI (Optimistic update)
     setTables(prev => prev.map(t => t.id === tableId ? { ...t, service_status: null } : t));
     if (selectedTable?.id === tableId) {
@@ -104,9 +107,17 @@ export default function AccountsPage() {
     }
     
     try {
-      await supabase.from('tables').update({ service_status: null }).eq('id', tableId);
+      const { error } = await supabase.from('tables').update({ service_status: null }).eq('id', tableId);
+      if (error) throw error;
     } catch (err) {
       console.error(err);
+      // Rollback optimistic update
+      if (prevTable) {
+        setTables(prev => prev.map(t => t.id === tableId ? prevTable : t));
+        if (selectedTable?.id === tableId) {
+          setSelectedTable(prevTable);
+        }
+      }
     }
   };
 
@@ -149,9 +160,6 @@ export default function AccountsPage() {
   const handleCloseBill = async () => {
     if (!selectedTable) return;
     setIsClosingBill(true);
-    
-    // Actualización inmediata en la UI
-    setTables(prev => prev.map(t => t.id === selectedTable.id ? { ...t, service_status: null } : t));
     
     try {
       const orderIds = tableOrders.map(o => o.id);
@@ -204,7 +212,13 @@ export default function AccountsPage() {
             })
           });
 
-          const result = await response.json();
+          let result;
+          try {
+            result = await response.json();
+          } catch (jsonErr) {
+            throw new Error(`Error del servidor HTTP ${response.status}`);
+          }
+
           if (result.success) {
             generatedCuf = result.cuf;
             
@@ -269,6 +283,8 @@ export default function AccountsPage() {
               title: 'Error al emitir factura',
               message: result.error + (detailMsg ? `\n${detailMsg}` : '')
             });
+            setIsClosingBill(false);
+            return; // EXIT EARLY to prevent table closing!
           }
         } catch (e: any) {
           console.error("Excepción en emisión SIAT:", e);
@@ -277,12 +293,14 @@ export default function AccountsPage() {
             title: 'Excepción en emisión SIAT',
             message: e.message || 'Error desconocido'
           });
+          setIsClosingBill(false);
+          return; // EXIT EARLY to prevent table closing!
         }
       }
 
       // 2. Mark all active orders for this table as paid (if any)
       if (orderIds.length > 0) {
-        await supabase
+        const { error: updateError } = await supabase
           .from('orders')
           .update({ 
             is_paid: true,
@@ -292,10 +310,12 @@ export default function AccountsPage() {
             // Nota: Guardar el CUF en la BD requeriría una columna 'siat_cuf' en 'orders'
           })
           .in('id', orderIds);
+          
+        if (updateError) throw updateError;
       }
       
       // 3. Clear table service status and temporary SIAT data
-      await supabase
+      const { error: tableError } = await supabase
         .from('tables')
         .update({ 
           service_status: null,
@@ -304,6 +324,8 @@ export default function AccountsPage() {
           siat_customer_email: null
         })
         .eq('id', selectedTable.id);
+        
+      if (tableError) throw tableError;
 
       setSelectedTable(null);
       setTableOrders([]);
