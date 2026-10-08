@@ -1,3 +1,4 @@
+import { resolveBranchId } from "@/lib/siat/branchHelper";
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { buildFacturaXml, FacturaParams } from "@/lib/siat/xml/invoiceBuilder";
