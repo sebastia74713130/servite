@@ -460,7 +460,7 @@ export default function PublicMenuClient({
   // Bill Request SIAT Data & Payment Method
   const [showBillRequestModal, setShowBillRequestModal] = useState(false);
   const [customerEmail, setCustomerEmail] = useState('');
-  const [requestedPaymentMethod, setRequestedPaymentMethod] = useState('Efectivo');
+  const [requestedPaymentMethod, setRequestedPaymentMethod] = useState('Pago QR');
 
 
   // Cart state
@@ -1850,17 +1850,26 @@ export default function PublicMenuClient({
                   />
                 </div>
                 
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Método de Pago</label>
+                <div 
+                  className="p-4 rounded-xl border-2 shadow-sm mb-4 relative overflow-hidden"
+                  style={{ borderColor: `${brandColor}40`, backgroundColor: `${brandColor}10` }}
+                >
+                  <label className="block text-sm font-bold text-gray-800 mb-2 flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ backgroundColor: brandColor }}></span>
+                    Método de Pago Preferido
+                  </label>
                   <select 
                     value={requestedPaymentMethod}
                     onChange={(e) => setRequestedPaymentMethod(e.target.value)}
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2"
-                    style={{ '--tw-ring-color': brandColor } as React.CSSProperties}
+                    className="w-full px-4 py-3 bg-white border-2 rounded-xl focus:outline-none font-medium shadow-sm transition-colors"
+                    style={{ 
+                      borderColor: `${brandColor}60`, 
+                      '--tw-ring-color': brandColor,
+                    } as React.CSSProperties}
                   >
+                    <option value="Pago QR">Pago QR</option>
                     <option value="Efectivo">Efectivo</option>
                     <option value="Tarjeta">Tarjeta</option>
-                    <option value="QR / Transferencia">QR / Transferencia</option>
                   </select>
                 </div>
               </div>

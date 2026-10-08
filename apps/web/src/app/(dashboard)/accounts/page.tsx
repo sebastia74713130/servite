@@ -110,7 +110,7 @@ export default function AccountsPage() {
     }
   };
 
-  const [paymentMethod, setPaymentMethod] = useState('Efectivo');
+  const [paymentMethod, setPaymentMethod] = useState('Pago QR');
   const [cardNumber, setCardNumber] = useState('');
   const [siatPuntoVenta, setSiatPuntoVenta] = useState('0');
   const [activeRegister, setActiveRegister] = useState<any>(null);
@@ -119,7 +119,7 @@ export default function AccountsPage() {
     if (selectedTable?.requested_payment_method) {
       setPaymentMethod(selectedTable.requested_payment_method);
     } else {
-      setPaymentMethod('Efectivo');
+      setPaymentMethod('QR / Transferencia');
     }
   }, [selectedTable]);
 
@@ -307,7 +307,7 @@ export default function AccountsPage() {
 
       setSelectedTable(null);
       setTableOrders([]);
-      setPaymentMethod('Efectivo'); // reset
+      setPaymentMethod('QR / Transferencia'); // reset
     } catch (err) {
       console.error(err);
       alert('Error al cerrar la cuenta');
@@ -555,9 +555,9 @@ export default function AccountsPage() {
                   onChange={e => setPaymentMethod(e.target.value)}
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32]"
                 >
+                  <option value="Pago QR">Pago QR</option>
                   <option value="Efectivo">Efectivo</option>
                   <option value="Tarjeta">Tarjeta</option>
-                  <option value="QR / Transferencia">QR / Transferencia</option>
                 </select>
 
                 {paymentMethod === 'Tarjeta' && (
