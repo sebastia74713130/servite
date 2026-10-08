@@ -176,7 +176,7 @@ export default function FinancesPage() {
     }
   };
 
-  const [viewTab, setViewTab] = useState<'caja' | 'stats'>('stats');
+  const [viewTab, setViewTab] = useState<'caja' | 'stats'>('caja');
 
   if (sessionLoading || loading) return <LoadingState />;
 

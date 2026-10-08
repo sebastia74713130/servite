@@ -17,6 +17,7 @@ import {
   QrCode,
   AlertCircle,
   Check,
+  Link,
 } from 'lucide-react';
 
 export default function TablesPage() {
@@ -293,6 +294,11 @@ function QrModal({ table, restaurantSlug, onClose }: { table: RestaurantTable; r
     printWindow.print();
   };
 
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(qrValue);
+    alert('Enlace copiado al portapapeles');
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white rounded-2xl w-full max-w-md p-8 shadow-xl relative" onClick={e => e.stopPropagation()}>
@@ -304,7 +310,9 @@ function QrModal({ table, restaurantSlug, onClose }: { table: RestaurantTable; r
         </button>
 
         <div className="text-center">
-          <h2 className="text-xl font-bold text-[#1F2933] mb-1">Mesa {table.table_number}</h2>
+          <h2 className="text-xl font-bold text-[#1F2933] mb-1">
+            {table.type === 'takeaway' ? 'Mostrador' : 'Mesa'} {table.table_number}
+          </h2>
           <p className="text-sm text-[#6B7280] font-mono mb-6">{table.table_code}</p>
 
           <div ref={qrRef} className="inline-flex p-6 bg-white border border-[#E5E7EB] rounded-2xl shadow-sm mb-6">
@@ -317,7 +325,9 @@ function QrModal({ table, restaurantSlug, onClose }: { table: RestaurantTable; r
           </div>
 
           <p className="text-xs text-[#6B7280] mb-6">
-            Escanea este código para acceder al menú digital
+            {table.type === 'takeaway' 
+              ? 'Escanea o comparte este enlace para tomar pedidos'
+              : 'Escanea este código para acceder al menú digital'}
           </p>
 
           <div className="flex gap-3">
@@ -328,13 +338,23 @@ function QrModal({ table, restaurantSlug, onClose }: { table: RestaurantTable; r
               <Download size={16} />
               Descargar
             </button>
-            <button
-              onClick={handlePrint}
-              className="flex-1 flex items-center justify-center gap-2 border border-[#E5E7EB] text-[#1F2933] rounded-xl px-4 py-3 font-medium hover:bg-[#F9FAFB] transition-colors"
-            >
-              <Printer size={16} />
-              Imprimir
-            </button>
+            {table.type === 'takeaway' ? (
+              <button
+                onClick={handleCopyLink}
+                className="flex-1 flex items-center justify-center gap-2 border border-[#E5E7EB] text-[#1F2933] rounded-xl px-4 py-3 font-medium hover:bg-[#F9FAFB] transition-colors"
+              >
+                <Link size={16} />
+                Copiar Enlace
+              </button>
+            ) : (
+              <button
+                onClick={handlePrint}
+                className="flex-1 flex items-center justify-center gap-2 border border-[#E5E7EB] text-[#1F2933] rounded-xl px-4 py-3 font-medium hover:bg-[#F9FAFB] transition-colors"
+              >
+                <Printer size={16} />
+                Imprimir
+              </button>
+            )}
           </div>
         </div>
       </div>

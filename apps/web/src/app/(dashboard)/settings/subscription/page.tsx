@@ -6,6 +6,12 @@ import { Check, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 const PLAN_FEATURES = {
+  TEST: [
+    'Todo lo del plan FULL',
+    'Prueba gratuita',
+    'Todas las funcionalidades',
+    'Sin compromiso'
+  ],
   BASIC: [
     'Hasta 1 Sucursal',
     'Menú Digital QR',
@@ -32,6 +38,7 @@ const PLAN_FEATURES = {
 };
 
 const PLAN_PRICES = {
+  TEST: 0,
   BASIC: 500,
   PRO: 1300,
   FULL: 1800
@@ -55,7 +62,7 @@ export default function SubscriptionPage() {
     }
   }, [timeLeft, qrId]);
 
-  const handleSelectPlan = async (plan: 'BASIC' | 'PRO' | 'FULL') => {
+  const handleSelectPlan = async (plan: 'TEST' | 'BASIC' | 'PRO' | 'FULL') => {
     if (!restaurant) return;
     setGenerating(true);
     setSelectedPlan(plan);
@@ -64,6 +71,23 @@ export default function SubscriptionPage() {
     if (pollingInterval) clearInterval(pollingInterval);
 
     try {
+      if (plan === 'TEST') {
+        // Activación directa para el plan TEST
+        const res = await fetch('/api/qr/subscription/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ restaurantId: restaurant.id, plan: 'TEST', isTest: true })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error activando plan de prueba');
+        
+        alert('¡Plan de prueba activado con éxito!');
+        setTimeout(() => {
+          window.location.href = '/dashboard';
+        }, 1000);
+        return;
+      }
+
       const res = await fetch('/api/qr/subscription/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -155,7 +179,36 @@ export default function SubscriptionPage() {
         )}
       </div>
 
-      <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+      <div className="grid lg:grid-cols-4 md:grid-cols-2 gap-8 max-w-7xl mx-auto">
+        {/* TEST */}
+        <div className="bg-gradient-to-b from-gray-50 to-white rounded-3xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow flex flex-col">
+          <div className="p-8">
+            <h3 className="text-2xl font-bold text-gray-900">Test / Demo</h3>
+            <div className="mt-4 flex items-baseline text-4xl font-extrabold text-gray-900">
+              0Bs
+              <span className="ml-1 text-xl font-medium text-gray-500">/14 días</span>
+            </div>
+            <p className="mt-4 text-gray-500">Prueba gratuita con acceso total para explorar la plataforma.</p>
+          </div>
+          <div className="px-8 pb-8 flex-1 flex flex-col">
+            <ul className="space-y-4 flex-1">
+              {PLAN_FEATURES.TEST.map((feature, i) => (
+                <li key={i} className="flex items-start">
+                  <Check className="h-5 w-5 text-gray-400 shrink-0 mr-3" />
+                  <span className="text-gray-600">{feature}</span>
+                </li>
+              ))}
+            </ul>
+            <button
+              onClick={() => handleSelectPlan('TEST')}
+              disabled={generating || (isActive && restaurant.subscription_plan === 'TEST')}
+              className="mt-8 w-full bg-white border-2 border-gray-900 text-gray-900 rounded-xl py-3 font-semibold hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isActive && restaurant.subscription_plan === 'TEST' ? 'Plan Actual' : 'Comenzar Prueba'}
+            </button>
+          </div>
+        </div>
+
         {/* BASIC */}
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow flex flex-col">
           <div className="p-8">

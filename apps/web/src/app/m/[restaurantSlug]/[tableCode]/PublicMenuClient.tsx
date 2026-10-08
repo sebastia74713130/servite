@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { RefreshCw, ShoppingCart, X, Plus, Minus, FileText, LayoutGrid, ChevronLeft, Search, CheckCircle, AlertCircle, ChevronRight } from 'lucide-react';
+import { RefreshCw, ShoppingCart, X, Plus, Minus, FileText, LayoutGrid, ChevronLeft, Search, CheckCircle, AlertCircle, ChevronRight, Download } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -313,6 +313,33 @@ export default function PublicMenuClient({
 
   // Form state for selected product
   const [quantity, setQuantity] = useState(1);
+  
+  // Swipe to close product modal logic
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+  const modalScrollRef = useRef<HTMLDivElement>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientY);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientY);
+  };
+
+  const handleTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    const distance = touchStart - touchEnd;
+    const isDownSwipe = distance < -60; // 60px swipe required
+    
+    // Check if scroll container is at the top
+    const isAtTop = modalScrollRef.current ? modalScrollRef.current.scrollTop <= 0 : true;
+
+    if (isDownSwipe && isAtTop) {
+      setSelectedProduct(null);
+    }
+  };
   const [notes, setNotes] = useState('');
   const [showTakeawayPaymentQR, setShowTakeawayPaymentQR] = useState(false);
   const [generatedQrBase64, setGeneratedQrBase64] = useState<string | null>(null);
@@ -1285,6 +1312,9 @@ export default function PublicMenuClient({
           <div 
             className="bg-white w-full sm:w-[480px] sm:rounded-3xl rounded-t-3xl overflow-hidden flex flex-col max-h-[90dvh]"
             onClick={e => e.stopPropagation()}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
           >
             <div className="relative h-48 sm:h-64 max-h-[30dvh] bg-gray-100 flex-shrink-0 transition-all duration-300">
               {selectedProduct.image_url ? (
@@ -1300,7 +1330,7 @@ export default function PublicMenuClient({
               </button>
             </div>
             
-            <div className="p-6 overflow-y-auto flex-1">
+            <div className="p-6 overflow-y-auto flex-1" ref={modalScrollRef}>
               <div className="flex justify-between items-start gap-4 mb-2">
                 <h2 className="text-2xl font-bold text-gray-900">{selectedProduct.name}</h2>
                 <p className="text-xl font-bold" style={{ color: brandColor }}>Bs {selectedProduct.price}</p>
@@ -1502,7 +1532,20 @@ export default function PublicMenuClient({
                       <button onClick={handleGenerateQR} className="mt-2 text-xs font-bold underline">Reintentar</button>
                     </div>
                   ) : generatedQrBase64 ? (
-                    <img src={`data:image/png;base64,${generatedQrBase64}`} alt="QR de Pago" className="w-[200px] h-[200px] object-contain" />
+                    <div className="flex flex-col items-center gap-3 w-full">
+                      <img src={`data:image/png;base64,${generatedQrBase64}`} alt="QR de Pago" className="w-[200px] h-[200px] object-contain" />
+                      <a 
+                        href={`data:image/png;base64,${generatedQrBase64}`}
+                        download="pago_servido_qr.png"
+                        className="flex items-center gap-2 text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-lg transition-colors w-full justify-center"
+                      >
+                        <Download size={16} />
+                        Descargar QR
+                      </a>
+                      <p className="text-[11px] leading-tight text-orange-800 text-center w-full bg-orange-50 py-2 px-3 rounded-md border border-orange-100">
+                        💡 <b>Sugerencia:</b> Puedes descargar la imagen o tomar una captura de pantalla si estás navegando desde tu celular para escanearlo en tu App bancaria.
+                      </p>
+                    </div>
                   ) : null}
                 </div>
                 <button

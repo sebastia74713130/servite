@@ -24,10 +24,32 @@ async function getAuthToken() {
 
 export async function POST(request: Request) {
   try {
-    const { qrId, restaurantId, plan } = await request.json();
+    const { qrId, restaurantId, plan, isTest } = await request.json();
 
-    if (!qrId || !restaurantId || !plan) {
-      return NextResponse.json({ error: 'Faltan parámetros: qrId, restaurantId o plan' }, { status: 400 });
+    if (!restaurantId || !plan) {
+      return NextResponse.json({ error: 'Faltan parámetros: restaurantId o plan' }, { status: 400 });
+    }
+
+    if (isTest && plan === 'TEST') {
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 14); // 14 días de prueba
+
+      const { error: dbError } = await supabaseAdmin
+        .from('restaurants')
+        .update({
+          subscription_plan: 'TEST',
+          subscription_status: 'active',
+          subscription_expires_at: expiresAt.toISOString()
+        })
+        .eq('id', restaurantId);
+
+      if (dbError) throw new Error('Error activando el plan de prueba');
+
+      return NextResponse.json({ success: true, paid: true, statusQRCode: 1 });
+    }
+
+    if (!qrId) {
+      return NextResponse.json({ error: 'Falta qrId' }, { status: 400 });
     }
 
     const token = await getAuthToken();
