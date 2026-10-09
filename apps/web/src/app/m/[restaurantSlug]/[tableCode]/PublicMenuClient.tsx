@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { RefreshCw, ShoppingCart, X, Plus, Minus, FileText, LayoutGrid, ChevronLeft, Search, CheckCircle, AlertCircle, ChevronRight, Download, Trash2, Clock, AlertTriangle, QrCode, Banknote, CreditCard, ArrowRight, ArrowLeft, Check } from 'lucide-react';
+import { RefreshCw, ShoppingCart, X, Plus, Minus, FileText, LayoutGrid, ChevronLeft, Search, CheckCircle, CheckCircle2, AlertCircle, ChevronRight, Download, Trash2, Clock, AlertTriangle, QrCode, Banknote, CreditCard, ArrowRight, ArrowLeft, Check, Bell, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -90,6 +90,8 @@ export default function PublicMenuClient({
   const [deviceSessionId, setDeviceSessionId] = useState<string | null>(null);
   const [foodCourtSessionId, setFoodCourtSessionId] = useState<string | null>(null);
   const [sessionEnded, setSessionEnded] = useState(false);
+  const isDineInPayingRef = useRef(false);
+  const dineInPaymentCompletedRef = useRef(false);
   const [tableStatus, setTableStatus] = useState<string | null>(table.service_status || null);
 
   // Customer data for takeaway orders (name for calling, NIT for invoicing)
@@ -153,8 +155,10 @@ export default function PublicMenuClient({
                 .neq('status', 'cancelled');
               
               if (!error && data && data.length === 0) {
-                setSessionEnded(true);
-                localStorage.setItem(`session_ended_timestamp_${table.id}`, Date.now().toString());
+                if (!isDineInPayingRef.current && !dineInPaymentCompletedRef.current) {
+                  setSessionEnded(true);
+                  localStorage.setItem(`session_ended_timestamp_${table.id}`, Date.now().toString());
+                }
               }
             } catch (e) {}
           };
@@ -205,8 +209,10 @@ export default function PublicMenuClient({
                   .neq('status', 'cancelled');
 
                 if (!unpaid || unpaid.length === 0) {
-                  setSessionEnded(true);
-                  localStorage.setItem(`session_ended_timestamp_${table.id}`, Date.now().toString());
+                  if (!isDineInPayingRef.current && !dineInPaymentCompletedRef.current) {
+                    setSessionEnded(true);
+                    localStorage.setItem(`session_ended_timestamp_${table.id}`, Date.now().toString());
+                  }
                 }
               } catch (e) {}
             }
@@ -234,8 +240,10 @@ export default function PublicMenuClient({
               .neq('status', 'cancelled');
 
             if (!unpaid || unpaid.length === 0) {
-              setSessionEnded(true);
-              localStorage.setItem(`session_ended_timestamp_${table.id}`, Date.now().toString());
+              if (!isDineInPayingRef.current && !dineInPaymentCompletedRef.current) {
+                setSessionEnded(true);
+                localStorage.setItem(`session_ended_timestamp_${table.id}`, Date.now().toString());
+              }
             }
           } catch (e) {}
         }
@@ -547,10 +555,19 @@ export default function PublicMenuClient({
 
   // Bill Request SIAT Data & Payment Method
   const [showBillRequestModal, setShowBillRequestModal] = useState(false);
-  const [billRequestStep, setBillRequestStep] = useState<1 | 2>(1);
+  const [billRequestStep, setBillRequestStep] = useState<1 | 2 | 3>(1);
   const [omitInvoiceData, setOmitInvoiceData] = useState(false);
   const [customerEmail, setCustomerEmail] = useState('');
   const [requestedPaymentMethod, setRequestedPaymentMethod] = useState<'Pago QR' | 'Efectivo' | 'Tarjeta'>('Pago QR');
+
+  // Dine-in Dynamic QR states
+  const [dineInQrBase64, setDineInQrBase64] = useState<string | null>(null);
+  const [dineInQrId, setDineInQrId] = useState<string | null>(null);
+  const [dineInQrLoading, setDineInQrLoading] = useState(false);
+  const [dineInQrError, setDineInQrError] = useState('');
+  const [dineInQrTimer, setDineInQrTimer] = useState<number>(0);
+  const [dineInQrStatus, setDineInQrStatus] = useState<'pending' | 'paid' | 'cancelled' | 'expired'>('pending');
+  const [dineInPaymentCompleted, setDineInPaymentCompleted] = useState(false);
 
 
   // Cart state
@@ -1117,6 +1134,231 @@ export default function PublicMenuClient({
   const totalBill = billOrders.reduce((acc, o) => acc + (o.order_items && o.order_items.length > 0 ? o.order_items.reduce((sum: number, item: any) => sum + Number(item.total_price || 0), 0) : o.total), 0);
 
   const cufToDownload = autoEmittedCuf || billOrders.flatMap(o => o.invoices || []).sort((a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())[0]?.cuf;
+
+  const handleGenerateDineInQR = async () => {
+    setDineInQrLoading(true);
+    setDineInQrError('');
+    try {
+      isDineInPayingRef.current = true;
+      const res = await fetch('/api/qr/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          restaurantId: restaurant.id,
+          amount: totalBill,
+          transactionId: Math.floor(Math.random() * 1000000000).toString(),
+          description: `Mesa ${table.table_code} - ${restaurant.name}`
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'No se pudo generar el código QR');
+      }
+      setDineInQrBase64(data.qrImage);
+      setDineInQrId(data.qrId);
+      setDineInQrStatus('pending');
+      setDineInQrTimer(600); // 10 minutes
+    } catch (err: any) {
+      console.error('Error generating dine-in QR:', err);
+      setDineInQrError(err.message || 'Error al comunicarse con el banco');
+    } finally {
+      setDineInQrLoading(false);
+    }
+  };
+
+  const handleCompleteDineInPayment = async () => {
+    try {
+      dineInPaymentCompletedRef.current = true;
+      isDineInPayingRef.current = true;
+      setDineInQrStatus('paid');
+
+      const activeOrderIds = billOrders.map((o: any) => o.id);
+      if (activeOrderIds.length > 0) {
+        await supabase
+          .from('orders')
+          .update({
+            is_paid: true,
+            payment_method: 'Pago QR',
+            paid_at: new Date().toISOString()
+          })
+          .in('id', activeOrderIds);
+      }
+
+      // Emisión de factura digital SIAT si aplica
+      if (activeOrderIds.length > 0) {
+        try {
+          const nitCi = (omitInvoiceData || !customerNit.trim() || customerNit.trim() === '0') ? '99002' : customerNit.trim();
+          const rznSocial = nitCi === '99002' 
+            ? 'CONTROL TRIBUTARIO' 
+            : (!customerName.trim() ? 'S/N' : customerName.trim());
+
+          const rawItems = billOrders.flatMap((o: any) => o.order_items || []);
+          const groupedDetalle: Record<string, any> = {};
+          rawItems.forEach((item: any) => {
+            const code = item.product_id ? item.product_id.substring(0, 8) : '00000000';
+            const name = item.product_name || item.product?.name || 'Producto';
+            const key = `${code}-${name}`;
+            if (!groupedDetalle[key]) {
+              groupedDetalle[key] = {
+                codigoProducto: code,
+                descripcion: name,
+                cantidad: 0,
+                precioUnitario: Number(item.unit_price || (item.quantity ? item.total_price / item.quantity : 0)),
+                montoDescuento: 0,
+                subTotal: 0
+              };
+            }
+            groupedDetalle[key].cantidad += Number(item.quantity || 1);
+            groupedDetalle[key].subTotal += Number(item.total_price || 0);
+          });
+
+          const facturaParams = {
+            cabecera: {
+              fechaEmision: new Date().toISOString(),
+              numeroFactura: Math.floor(Math.random() * 10000) + 1,
+              montoTotal: totalBill,
+              montoTotalSujetoIva: totalBill,
+              nombreRazonSocial: rznSocial,
+              numeroDocumento: nitCi,
+              codigoMetodoPago: 7
+            },
+            detalle: Object.values(groupedDetalle)
+          };
+
+          const emitRes = await fetch('/api/siat/emitir', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              restaurantId: restaurant.id,
+              branchId: table.branch_id,
+              orderId: activeOrderIds[0],
+              facturaParams
+            })
+          });
+          const emitResult = await emitRes.json();
+          if (emitResult.success && emitResult.cuf) {
+            setAutoEmittedCuf(emitResult.cuf);
+          }
+        } catch (siatErr) {
+          console.error("Error auto-emitting SIAT invoice in dine-in:", siatErr);
+        }
+      }
+
+      // Liberar mesa en Supabase
+      await supabase
+        .from('tables')
+        .update({
+          service_status: null,
+          siat_customer_nit: null,
+          siat_customer_name: null,
+          siat_customer_email: null,
+          requested_payment_method: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', table.id);
+
+      // Bloqueo de 10 minutos
+      localStorage.setItem(`session_ended_timestamp_${table.id}`, Date.now().toString());
+
+      // Limpiar carrito local
+      setCartItems([]);
+      localStorage.removeItem(`cart_${table.table_code}`);
+
+      setDineInPaymentCompleted(true);
+    } catch (err: any) {
+      console.error('Error completing dine-in payment:', err);
+    }
+  };
+
+  const handleManualVerifyDineIn = async () => {
+    if (!dineInQrId) return;
+
+    if (keepAwakeAudioRef.current) {
+      keepAwakeAudioRef.current.play().catch(() => {});
+    }
+    if (alarmAudioRef.current) {
+      alarmAudioRef.current.play().then(() => alarmAudioRef.current!.pause()).catch(() => {});
+    }
+
+    setIsVerifyingPayment(true);
+    try {
+      const res = await fetch(`/api/qr/status?qrId=${dineInQrId}`);
+      const data = await res.json();
+      const isPaid = Boolean(data.paid);
+      const isCancelled = Boolean(data.isCancelled) || Number(data?.statusQrCode) === 9;
+
+      if (isPaid) {
+        await handleCompleteDineInPayment();
+      } else if (isCancelled) {
+        setDineInQrStatus('cancelled');
+        setQrAlertModal({
+          type: 'cancelled',
+          title: 'Código QR expirado',
+          message: 'El código QR ha sido anulado o expiró su tiempo de validez. Por favor, genera un nuevo código QR o elige otro método de pago.'
+        });
+      } else {
+        setQrAlertModal({
+          type: 'pending',
+          title: 'Pago en verificación',
+          message: 'El banco aún registra el código QR como pendiente de acreditación (código 0: activo pendiente). Si acabas de realizar la transferencia desde tu banca móvil, por favor espera unos segundos mientras la red bancaria lo procesa y vuelve a presionar "Ya realicé el pago".'
+        });
+      }
+    } catch (err) {
+      console.error('Error in manual verify dine-in:', err);
+      setQrAlertModal({
+        type: 'error',
+        title: 'Error de verificación',
+        message: 'Hubo un inconveniente consultando al banco. Por favor intenta nuevamente en unos momentos.'
+      });
+    } finally {
+      setIsVerifyingPayment(false);
+    }
+  };
+
+  useEffect(() => {
+    let pollInterval: NodeJS.Timeout;
+    let countdownInterval: NodeJS.Timeout;
+
+    if (dineInQrId && dineInQrStatus === 'pending' && !dineInPaymentCompleted) {
+      countdownInterval = setInterval(() => {
+        setDineInQrTimer((prev) => {
+          if (prev <= 1) {
+            clearInterval(countdownInterval);
+            clearInterval(pollInterval);
+            setDineInQrStatus('expired');
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      pollInterval = setInterval(async () => {
+        try {
+          const res = await fetch(`/api/qr/status?qrId=${dineInQrId}`);
+          const data = await res.json();
+          const isPaid = Boolean(data.paid);
+          const isCancelled = Boolean(data.isCancelled) || Number(data?.statusQrCode) === 9;
+
+          if (isPaid) {
+            clearInterval(pollInterval);
+            clearInterval(countdownInterval);
+            await handleCompleteDineInPayment();
+          } else if (isCancelled) {
+            setDineInQrStatus('cancelled');
+            clearInterval(pollInterval);
+            clearInterval(countdownInterval);
+          }
+        } catch (err) {
+          console.error('Error polling dine-in QR status:', err);
+        }
+      }, 4000);
+    }
+
+    return () => {
+      if (pollInterval) clearInterval(pollInterval);
+      if (countdownInterval) clearInterval(countdownInterval);
+    };
+  }, [dineInQrId, dineInQrStatus, dineInPaymentCompleted, billOrders, totalBill, omitInvoiceData, customerNit, customerName]);
 
   if (sessionEnded) {
     return (
@@ -1970,6 +2212,13 @@ export default function PublicMenuClient({
                   <button
                     disabled={serviceRequestLoading || billOrders.length === 0}
                     onClick={() => {
+                      setDineInPaymentCompleted(false);
+                      dineInPaymentCompletedRef.current = false;
+                      isDineInPayingRef.current = false;
+                      setDineInQrBase64(null);
+                      setDineInQrId(null);
+                      setDineInQrError('');
+                      setDineInQrStatus('pending');
                       setBillRequestStep(1);
                       setOmitInvoiceData(false);
                       setShowBillRequestModal(true);
@@ -1986,11 +2235,16 @@ export default function PublicMenuClient({
         </div>
       )}
 
-      {/* SIAT Bill Request Modal (2 Steps: Invoice Data -> Payment Method) */}
+      {/* SIAT Bill Request Modal (Steps: Invoice Data -> Payment Method -> Optional Dynamic QR -> Success) */}
       {showBillRequestModal && (
         <div 
           className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
-          onClick={() => setShowBillRequestModal(false)}
+          onClick={() => {
+            if (!dineInPaymentCompleted) {
+              isDineInPayingRef.current = false;
+              setShowBillRequestModal(false);
+            }
+          }}
         >
           <div 
             className="bg-white w-full max-w-sm rounded-3xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-200"
@@ -1999,31 +2253,49 @@ export default function PublicMenuClient({
             {/* Header */}
             <div className="p-5 pb-3 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
               <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span 
-                    className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider"
-                    style={{ backgroundColor: `${brandColor}15`, color: brandColor }}
-                  >
-                    Paso {billRequestStep} de 2
-                  </span>
-                  <span className="text-xs text-gray-400 font-medium">
-                    {billRequestStep === 1 ? 'Facturación' : 'Método de Pago'}
-                  </span>
-                </div>
-                <h3 className="text-lg font-bold text-gray-900">
-                  {billRequestStep === 1 ? 'Datos para tu Factura' : 'Método de Pago'}
-                </h3>
+                {!dineInPaymentCompleted ? (
+                  <>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span 
+                        className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider"
+                        style={{ backgroundColor: `${brandColor}15`, color: brandColor }}
+                      >
+                        Paso {billRequestStep} de {requestedPaymentMethod === 'Pago QR' ? 3 : 2}
+                      </span>
+                      <span className="text-xs text-gray-400 font-medium">
+                        {billRequestStep === 1 ? 'Facturación' : billRequestStep === 2 ? 'Método de Pago' : 'Pago con QR'}
+                      </span>
+                    </div>
+                    <h3 className="text-lg font-bold text-gray-900">
+                      {billRequestStep === 1 ? 'Datos para tu Factura' : billRequestStep === 2 ? 'Método de Pago' : 'Pago con Código QR'}
+                    </h3>
+                  </>
+                ) : (
+                  <div>
+                    <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider bg-green-100 text-green-700">
+                      Cuenta Pagada
+                    </span>
+                    <h3 className="text-lg font-bold text-gray-900 mt-1">
+                      ¡Pago Confirmado!
+                    </h3>
+                  </div>
+                )}
               </div>
-              <button 
-                onClick={() => setShowBillRequestModal(false)}
-                className="w-8 h-8 rounded-full bg-gray-100 text-gray-400 hover:text-gray-600 flex items-center justify-center transition-colors"
-              >
-                <X size={18} />
-              </button>
+              {!dineInPaymentCompleted && (
+                <button 
+                  onClick={() => {
+                    isDineInPayingRef.current = false;
+                    setShowBillRequestModal(false);
+                  }}
+                  className="w-8 h-8 rounded-full bg-gray-100 text-gray-400 hover:text-gray-600 flex items-center justify-center transition-colors"
+                >
+                  <X size={18} />
+                </button>
+              )}
             </div>
 
             {/* Step 1: Invoice Data */}
-            {billRequestStep === 1 && (
+            {billRequestStep === 1 && !dineInPaymentCompleted && (
               <>
                 <div className="p-5 flex-1 overflow-y-auto space-y-3.5">
                   <p className="text-xs text-gray-500 leading-relaxed">
@@ -2098,7 +2370,10 @@ export default function PublicMenuClient({
                     Omitir datos (Factura Sin Nombre)
                   </button>
                   <button 
-                    onClick={() => setShowBillRequestModal(false)}
+                    onClick={() => {
+                      isDineInPayingRef.current = false;
+                      setShowBillRequestModal(false);
+                    }}
                     className="w-full py-1 text-xs text-gray-400 font-medium hover:text-gray-600 transition-colors"
                   >
                     Cancelar
@@ -2108,7 +2383,7 @@ export default function PublicMenuClient({
             )}
 
             {/* Step 2: Payment Method */}
-            {billRequestStep === 2 && (
+            {billRequestStep === 2 && !dineInPaymentCompleted && (
               <>
                 <div className="p-5 flex-1 overflow-y-auto space-y-4">
                   {/* Resumen Factura / Total */}
@@ -2182,21 +2457,36 @@ export default function PublicMenuClient({
                 </div>
 
                 <div className="p-4 bg-gray-50 border-t border-gray-100 flex flex-col gap-2 flex-shrink-0">
-                  <button 
-                    onClick={() => handleRequestBillWithData(omitInvoiceData)}
-                    disabled={serviceRequestLoading}
-                    className="w-full py-3.5 rounded-xl font-bold text-white transition-all active:scale-95 text-sm flex items-center justify-center gap-2 shadow-md disabled:opacity-50"
-                    style={{ backgroundColor: brandColor }}
-                  >
-                    {serviceRequestLoading ? (
-                      <span>Solicitando cuenta...</span>
-                    ) : (
-                      <>
-                        <Check size={18} />
-                        <span>Confirmar y Pedir la Cuenta</span>
-                      </>
-                    )}
-                  </button>
+                  {requestedPaymentMethod === 'Pago QR' ? (
+                    <button 
+                      onClick={() => {
+                        setBillRequestStep(3);
+                        handleGenerateDineInQR();
+                      }}
+                      disabled={serviceRequestLoading}
+                      className="w-full py-3.5 rounded-xl font-bold text-white transition-all active:scale-95 text-sm flex items-center justify-center gap-2 shadow-md disabled:opacity-50"
+                      style={{ backgroundColor: brandColor }}
+                    >
+                      <span>Continuar al Pago QR</span>
+                      <ArrowRight size={18} />
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={() => handleRequestBillWithData(omitInvoiceData)}
+                      disabled={serviceRequestLoading}
+                      className="w-full py-3.5 rounded-xl font-bold text-white transition-all active:scale-95 text-sm flex items-center justify-center gap-2 shadow-md disabled:opacity-50"
+                      style={{ backgroundColor: brandColor }}
+                    >
+                      {serviceRequestLoading ? (
+                        <span>Solicitando cuenta...</span>
+                      ) : (
+                        <>
+                          <Check size={18} />
+                          <span>Confirmar y Pedir la Cuenta</span>
+                        </>
+                      )}
+                    </button>
+                  )}
                   
                   <button 
                     onClick={() => setBillRequestStep(1)}
@@ -2208,10 +2498,253 @@ export default function PublicMenuClient({
                   </button>
 
                   <button 
-                    onClick={() => setShowBillRequestModal(false)}
+                    onClick={() => {
+                      isDineInPayingRef.current = false;
+                      setShowBillRequestModal(false);
+                    }}
                     className="w-full py-1 text-xs text-gray-400 font-medium hover:text-gray-600 transition-colors"
                   >
                     Cancelar
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* Step 3: Dynamic QR Payment */}
+            {billRequestStep === 3 && !dineInPaymentCompleted && (
+              <>
+                <div className="p-5 flex-1 overflow-y-auto space-y-4 text-center">
+                  {/* Resumen Total y Factura */}
+                  <div className="p-3.5 bg-gray-50 rounded-2xl border border-gray-200/70 text-left space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-gray-500 font-medium">Total a pagar:</span>
+                      <span className="text-lg font-bold" style={{ color: brandColor }}>
+                        Bs. {totalBill.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center pt-2 border-t border-gray-200/60 text-xs">
+                      <span className="text-gray-500">Factura:</span>
+                      <span className="font-semibold text-gray-800 truncate max-w-[200px]">
+                        {omitInvoiceData ? 'Sin Nombre (Control Tributario)' : `${customerName} (${customerNit})`}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Estado Cargando */}
+                  {dineInQrLoading && (
+                    <div className="py-10 flex flex-col items-center justify-center gap-3">
+                      <Loader2 size={36} className="animate-spin" style={{ color: brandColor }} />
+                      <p className="text-sm font-semibold text-gray-700">Generando código QR con el banco...</p>
+                      <p className="text-xs text-gray-400">Por favor espera un momento</p>
+                    </div>
+                  )}
+
+                  {/* Estado Error */}
+                  {!dineInQrLoading && dineInQrError && (
+                    <div className="py-5 px-4 bg-red-50 border border-red-200 rounded-2xl text-left space-y-3">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={20} />
+                        <div>
+                          <p className="text-sm font-bold text-red-900">
+                            No se pudo generar el código QR
+                          </p>
+                          <p className="text-xs text-red-700 mt-1 leading-relaxed">
+                            {dineInQrError.includes('cuenta bancaria') 
+                              ? 'El restaurante no tiene configurada una cuenta bancaria para cobros por QR en este momento. Por favor, selecciona Efectivo o Tarjeta.' 
+                              : dineInQrError}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="pt-2 flex flex-col gap-2">
+                        <button
+                          onClick={() => setBillRequestStep(2)}
+                          className="w-full py-2.5 rounded-xl text-xs font-bold text-red-700 bg-red-100 hover:bg-red-200 transition-colors flex items-center justify-center gap-1.5"
+                        >
+                          <ArrowLeft size={14} />
+                          <span>Elegir Efectivo o Tarjeta</span>
+                        </button>
+                        <button
+                          onClick={handleGenerateDineInQR}
+                          className="w-full py-2 rounded-xl text-xs font-semibold text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 transition-colors"
+                        >
+                          Reintentar generar QR
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Estado QR Generado */}
+                  {!dineInQrLoading && !dineInQrError && dineInQrBase64 && (
+                    <div className="space-y-3">
+                      {/* Imagen QR */}
+                      <div className="bg-white p-3 rounded-2xl shadow-sm border border-gray-200/80 inline-block">
+                        <img 
+                          src={`data:image/png;base64,${dineInQrBase64}`} 
+                          alt="Código QR de Pago Dine-In" 
+                          className="w-48 h-48 sm:w-52 sm:h-52 object-contain rounded-xl mx-auto"
+                        />
+                      </div>
+
+                      {/* Contador de tiempo */}
+                      {dineInQrTimer > 0 && dineInQrStatus === 'pending' ? (
+                        <div className="flex items-center justify-center gap-1.5 text-xs text-gray-500 font-medium">
+                          <Clock size={14} className="text-gray-400" />
+                          <span>Válido por: <strong className="text-gray-800">{Math.floor(dineInQrTimer / 60)}:{(dineInQrTimer % 60).toString().padStart(2, '0')}</strong> min</span>
+                        </div>
+                      ) : dineInQrStatus === 'expired' ? (
+                        <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
+                          <span>El código QR ha expirado.</span>
+                          <button 
+                            onClick={handleGenerateDineInQR}
+                            className="ml-2 font-bold underline text-amber-900"
+                          >
+                            Generar nuevo
+                          </button>
+                        </div>
+                      ) : null}
+
+                      {/* Botón Descargar QR */}
+                      <div>
+                        <a 
+                          href={`data:image/png;base64,${dineInQrBase64}`} 
+                          download={`QR-Mesa-${table.table_code}.png`}
+                          className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 py-1.5 px-3 rounded-xl transition-colors"
+                        >
+                          <Download size={14} />
+                          Descargar imagen QR
+                        </a>
+                      </div>
+
+                      {/* Tip para celulares */}
+                      <p className="text-[11px] text-gray-400 leading-tight px-2">
+                        💡 Si estás en tu celular, haz una captura de pantalla del QR y ábrelo desde tu banca móvil.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer Paso 3 */}
+                <div className="p-4 bg-gray-50 border-t border-gray-100 flex flex-col gap-2 flex-shrink-0">
+                  <button 
+                    onClick={handleManualVerifyDineIn}
+                    disabled={isVerifyingPayment || dineInQrLoading || !!dineInQrError || dineInQrStatus === 'expired'}
+                    className="w-full py-3.5 rounded-xl font-bold text-white transition-all active:scale-95 text-sm flex items-center justify-center gap-2 shadow-md disabled:opacity-50"
+                    style={{ backgroundColor: brandColor }}
+                  >
+                    {isVerifyingPayment ? (
+                      <>
+                        <Loader2 size={18} className="animate-spin" />
+                        <span>Verificando con el banco...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check size={18} />
+                        <span>Ya realicé el pago</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button 
+                    onClick={() => {
+                      setDineInQrStatus('pending');
+                      setBillRequestStep(2);
+                    }}
+                    disabled={isVerifyingPayment}
+                    className="w-full py-2.5 rounded-xl font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-100 transition-all active:scale-95 text-sm flex items-center justify-center gap-1.5"
+                  >
+                    <ArrowLeft size={16} />
+                    <span>Cambiar método de pago</span>
+                  </button>
+
+                  <button 
+                    onClick={() => {
+                      isDineInPayingRef.current = false;
+                      setShowBillRequestModal(false);
+                    }}
+                    disabled={isVerifyingPayment}
+                    className="w-full py-1 text-xs text-gray-400 font-medium hover:text-gray-600 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* Pantalla de Éxito / Despedida (Pago Completado) */}
+            {dineInPaymentCompleted && (
+              <>
+                <div className="p-6 flex-1 overflow-y-auto text-center space-y-4">
+                  <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto shadow-sm animate-in zoom-in-75 duration-300">
+                    <CheckCircle2 size={36} />
+                  </div>
+
+                  <div>
+                    <h3 className="text-xl font-extrabold text-gray-900">
+                      ¡Pago recibido con éxito!
+                    </h3>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Tu pago de <strong className="text-gray-900">Bs. {totalBill.toFixed(2)}</strong> ha sido verificado y acreditado por el banco.
+                    </p>
+                  </div>
+
+                  {/* Banner informativo de retiro o llamar mesero */}
+                  <div className="bg-emerald-50/90 border border-emerald-200 rounded-2xl p-4 text-emerald-950 text-left space-y-1">
+                    <p className="font-bold text-xs flex items-center gap-1.5 uppercase tracking-wide text-emerald-800">
+                      <span>✨</span> Cuenta saldada
+                    </p>
+                    <p className="text-xs leading-relaxed text-emerald-900">
+                      Puedes retirarte con tranquilidad o llamar al mesero si necesitas asistencia adicional. ¡Muchas gracias por tu visita!
+                    </p>
+                  </div>
+
+                  {/* Detalle de factura emitida */}
+                  {(autoEmittedCuf || cufToDownload) && (
+                    <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 text-left text-xs space-y-1">
+                      <div className="flex items-center justify-between text-gray-500">
+                        <span>Factura emitida:</span>
+                        <span className="font-semibold text-green-700">SIAT En Línea</span>
+                      </div>
+                      <p className="text-gray-800 font-medium truncate">
+                        {omitInvoiceData ? 'Control Tributario' : `${customerName} (${customerNit})`}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer Éxito */}
+                <div className="p-4 bg-gray-50 border-t border-gray-100 flex flex-col gap-2.5 flex-shrink-0">
+                  {(autoEmittedCuf || cufToDownload) && (
+                    <button
+                      onClick={() => window.open(`/api/siat/factura/print?cuf=${autoEmittedCuf || cufToDownload}`, '_blank')}
+                      className="w-full py-3 rounded-xl font-bold text-gray-800 bg-white border border-gray-200 shadow-sm hover:bg-gray-50 transition-all active:scale-95 text-sm flex items-center justify-center gap-2"
+                    >
+                      <FileText size={18} className="text-gray-600" />
+                      <span>Descargar Factura Electrónica</span>
+                    </button>
+                  )}
+
+                  <button
+                    onClick={async () => {
+                      await handleServiceRequest('calling_waiter');
+                      setServiceMessage("¡Mesero llamado! Enseguida se acercará a tu mesa.");
+                    }}
+                    className="w-full py-3 rounded-xl font-bold text-gray-700 bg-white border border-gray-200 hover:bg-gray-100 transition-all active:scale-95 text-sm flex items-center justify-center gap-2"
+                  >
+                    <Bell size={18} className="text-amber-500" />
+                    <span>Llamar al mesero</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setShowBillRequestModal(false);
+                      setSessionEnded(true);
+                      localStorage.setItem(`session_ended_timestamp_${table.id}`, Date.now().toString());
+                    }}
+                    className="w-full py-3.5 rounded-xl font-bold text-white transition-all active:scale-95 text-sm flex items-center justify-center gap-2 shadow-md"
+                    style={{ backgroundColor: brandColor }}
+                  >
+                    <span>Finalizar y salir</span>
+                    <ArrowRight size={18} />
                   </button>
                 </div>
               </>
