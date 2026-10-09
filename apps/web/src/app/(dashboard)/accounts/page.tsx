@@ -121,6 +121,49 @@ export default function AccountsPage() {
     }
   };
 
+  const handleReleaseTable = async (tableId: string) => {
+    setIsClosingBill(true);
+    const prevTable = tables.find(t => t.id === tableId);
+
+    // Actualización inmediata en la UI (Optimistic update)
+    setTables(prev => prev.map(t => t.id === tableId ? {
+      ...t,
+      service_status: null,
+      siat_customer_nit: null,
+      siat_customer_name: null,
+      siat_customer_email: null,
+      requested_payment_method: null
+    } : t));
+
+    if (selectedTable?.id === tableId) {
+      setSelectedTable(null);
+      setTableOrders([]);
+    }
+
+    try {
+      const { error } = await supabase
+        .from('tables')
+        .update({
+          service_status: null,
+          siat_customer_nit: null,
+          siat_customer_name: null,
+          siat_customer_email: null,
+          requested_payment_method: null
+        })
+        .eq('id', tableId);
+
+      if (error) throw error;
+    } catch (err) {
+      console.error(err);
+      alert('Error al liberar la mesa');
+      if (prevTable) {
+        setTables(prev => prev.map(t => t.id === tableId ? prevTable : t));
+      }
+    } finally {
+      setIsClosingBill(false);
+    }
+  };
+
   const [paymentMethod, setPaymentMethod] = useState('Pago QR');
   const [cardNumber, setCardNumber] = useState('');
   const [siatPuntoVenta, setSiatPuntoVenta] = useState('0');
@@ -188,6 +231,26 @@ export default function AccountsPage() {
             : ((cashierName === 'S/N' || !cashierName) ? 'S/N' : cashierName);
 
           const totalAmount = tableOrders.reduce((acc, o) => acc + (o.order_items && o.order_items.length > 0 ? o.order_items.reduce((sum: number, item: any) => sum + Number(item.total_price || 0), 0) : o.total), 0);
+          const rawItems = tableOrders.flatMap(o => o.order_items || []);
+          const groupedDetalle: Record<string, any> = {};
+          rawItems.forEach((item: any) => {
+            const code = item.product_id ? item.product_id.substring(0, 8) : '00000000';
+            // Use description as part of key in case of different products with same shortened ID or missing ID
+            const key = `${code}-${item.product_name}`;
+            if (!groupedDetalle[key]) {
+              groupedDetalle[key] = {
+                codigoProducto: code,
+                descripcion: item.product_name,
+                cantidad: 0,
+                precioUnitario: Number(item.unit_price || 0),
+                montoDescuento: 0,
+                subTotal: 0
+              };
+            }
+            groupedDetalle[key].cantidad += Number(item.quantity || 1);
+            groupedDetalle[key].subTotal += Number(item.total_price || 0);
+          });
+
           const facturaParams: any = {
             cabecera: {
               fechaEmision: new Date().toISOString(),
@@ -198,14 +261,7 @@ export default function AccountsPage() {
               numeroDocumento: nitCi,
               codigoMetodoPago: paymentMethod === 'Tarjeta' ? 2 : (paymentMethod.includes('QR') ? 7 : 1),
             },
-            detalle: tableOrders.flatMap(o => o.order_items || []).map((item: any) => ({
-              codigoProducto: item.product_id ? item.product_id.substring(0, 8) : '00000000',
-              descripcion: item.product_name,
-              cantidad: Number(item.quantity || 1),
-              precioUnitario: Number(item.unit_price || 0),
-              montoDescuento: 0,
-              subTotal: Number(item.total_price || 0)
-            }))
+            detalle: Object.values(groupedDetalle)
           };
 
           if (siatPuntoVenta !== '0') {
@@ -335,7 +391,8 @@ export default function AccountsPage() {
           service_status: null,
           siat_customer_nit: null,
           siat_customer_name: null,
-          siat_customer_email: null
+          siat_customer_email: null,
+          requested_payment_method: null
         })
         .eq('id', selectedTable.id);
         
@@ -523,28 +580,46 @@ export default function AccountsPage() {
               )}
 
               {/* SIAT Billing Data Display */}
-              {selectedTable.service_status === 'requesting_bill' && selectedTable.siat_customer_name && (
+              {selectedTable.service_status === 'requesting_bill' && (
                 <div className="mb-6 bg-blue-50 border border-blue-200 rounded-xl p-4">
-                  <div className="flex items-center gap-3 text-blue-900 mb-3">
-                    <Receipt size={24} />
-                    <h3 className="font-bold">El cliente solicitó Factura (SIAT):</h3>
-                  </div>
-                  <div className="text-sm text-blue-800 grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-4 bg-white/50 p-3 rounded-lg">
-                    <p><span className="font-semibold text-blue-900">NIT/CI:</span> {selectedTable.siat_customer_nit}</p>
-                    <p><span className="font-semibold text-blue-900">Razón Social:</span> {selectedTable.siat_customer_name}</p>
-                    {selectedTable.siat_customer_email && (
-                      <p className="col-span-1 sm:col-span-2"><span className="font-semibold text-blue-900">Correo:</span> {selectedTable.siat_customer_email}</p>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3 text-blue-900">
+                      <Receipt size={24} />
+                      <h3 className="font-bold">
+                        {selectedTable.siat_customer_name ? 'El cliente solicitó Factura (SIAT):' : 'El cliente solicitó la cuenta'}
+                      </h3>
+                    </div>
+                    {tableOrders.length === 0 && (
+                      <button
+                        onClick={() => handleReleaseTable(selectedTable.id)}
+                        disabled={isClosingBill}
+                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs transition-colors"
+                      >
+                        Liberar Mesa
+                      </button>
                     )}
                   </div>
+                  {selectedTable.siat_customer_name && (
+                    <div className="text-sm text-blue-800 grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-4 bg-white/50 p-3 rounded-lg">
+                      <p><span className="font-semibold text-blue-900">NIT/CI:</span> {selectedTable.siat_customer_nit}</p>
+                      <p><span className="font-semibold text-blue-900">Razón Social:</span> {selectedTable.siat_customer_name}</p>
+                      {selectedTable.siat_customer_email && (
+                        <p className="col-span-1 sm:col-span-2"><span className="font-semibold text-blue-900">Correo:</span> {selectedTable.siat_customer_email}</p>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
               {isFetchingBill ? (
                 <div className="text-center py-10 text-gray-500">Cargando cuenta...</div>
               ) : tableOrders.length === 0 ? (
-                <div className="text-center py-10 text-gray-500 flex flex-col items-center">
-                  <CheckCircle size={48} className="mb-4 text-gray-300" />
-                  <p>No hay pedidos pendientes por cobrar en esta mesa.</p>
+                <div className="text-center py-8 text-gray-500 flex flex-col items-center">
+                  <CheckCircle size={48} className="mb-3 text-green-500" />
+                  <p className="font-bold text-gray-800 text-lg">Sin pedidos pendientes por cobrar</p>
+                  <p className="text-sm text-gray-400 mt-1 max-w-xs text-center">
+                    No existen pedidos abiertos para esta mesa. Puedes liberarla para dejarla lista para nuevos clientes.
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -572,111 +647,136 @@ export default function AccountsPage() {
               )}
             </div>
 
-            <div className="p-6 border-t border-gray-100 bg-white rounded-b-3xl">
-              <div className="flex justify-between items-center mb-6">
-                <span className="text-lg text-gray-600">Total a cobrar:</span>
-                <span className="text-3xl font-bold text-gray-900">
-                  Bs {tableOrders.reduce((acc, o) => acc + (o.order_items && o.order_items.length > 0 ? o.order_items.reduce((sum: number, item: any) => sum + Number(item.total_price || 0), 0) : o.total), 0).toLocaleString('es-BO')}
-                </span>
-              </div>
-              
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {selectedTable.requested_payment_method 
-                    ? `Método de pago: ${selectedTable.requested_payment_method}` 
-                    : 'Método de pago:'}
-                </label>
-                <select 
-                  value={paymentMethod}
-                  onChange={e => setPaymentMethod(e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32]"
+            {tableOrders.length === 0 ? (
+              <div className="p-6 border-t border-gray-100 bg-white rounded-b-3xl">
+                <button
+                  disabled={isClosingBill}
+                  onClick={() => handleReleaseTable(selectedTable.id)}
+                  className="w-full py-4 bg-[#2E7D32] hover:bg-[#256629] text-white font-bold rounded-2xl transition-colors disabled:opacity-50 text-lg flex items-center justify-center gap-2 shadow-sm active:scale-[0.99]"
                 >
-                  <option value="Pago QR">Pago QR</option>
-                  <option value="Efectivo">Efectivo</option>
-                  <option value="Tarjeta">Tarjeta</option>
-                </select>
-
-                {paymentMethod === 'Tarjeta' && (
-                  <div className="mt-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Número de Tarjeta (Primeros 4 y últimos 4 ej. 1234000000005678) o Transacción:
-                    </label>
-                    <input 
-                      type="text" 
-                      value={cardNumber}
-                      onChange={e => setCardNumber(e.target.value)}
-                      placeholder="1234000000005678"
-                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32]"
-                    />
-                  </div>
-                )}
-
-                <div className="mt-4 pt-4 border-t border-gray-100">
-                  <label className="flex items-center gap-2 cursor-pointer mb-4">
-                    <input 
-                      type="checkbox" 
-                      checked={generateInvoice}
-                      onChange={e => setGenerateInvoice(e.target.checked)}
-                      className="w-5 h-5 text-[#2E7D32] rounded focus:ring-[#2E7D32]"
-                    />
-                    <span className="font-bold text-gray-800">Generar Factura (SIAT)</span>
+                  <CheckCircle size={22} />
+                  {isClosingBill ? 'Liberando mesa...' : 'Liberar Mesa'}
+                </button>
+              </div>
+            ) : (
+              <div className="p-6 border-t border-gray-100 bg-white rounded-b-3xl">
+                <div className="flex justify-between items-center mb-6">
+                  <span className="text-lg text-gray-600">Total a cobrar:</span>
+                  <span className="text-3xl font-bold text-gray-900">
+                    Bs {tableOrders.reduce((acc, o) => acc + (o.order_items && o.order_items.length > 0 ? o.order_items.reduce((sum: number, item: any) => sum + Number(item.total_price || 0), 0) : o.total), 0).toLocaleString('es-BO')}
+                  </span>
+                </div>
+                
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    {selectedTable.requested_payment_method 
+                      ? `Método de pago: ${selectedTable.requested_payment_method}` 
+                      : 'Método de pago:'}
                   </label>
+                  <select 
+                    value={paymentMethod}
+                    onChange={e => setPaymentMethod(e.target.value)}
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32]"
+                  >
+                    <option value="Pago QR">Pago QR</option>
+                    <option value="Efectivo">Efectivo</option>
+                    <option value="Tarjeta">Tarjeta</option>
+                  </select>
 
-                  {generateInvoice && (
-                    <div className="space-y-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">NIT/CI</label>
-                        <input 
-                          type="text" 
-                          value={cashierNit}
-                          onChange={e => setCashierNit(e.target.value)}
-                          placeholder="Ej. 1234567"
-                          className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32]"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Razón Social</label>
-                        <input 
-                          type="text" 
-                          value={cashierName}
-                          onChange={e => setCashierName(e.target.value)}
-                          placeholder="Nombre del cliente"
-                          className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32]"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Punto de Venta SIAT</label>
-                        <select 
-                          value={siatPuntoVenta}
-                          onChange={e => setSiatPuntoVenta(e.target.value)}
-                          className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32]"
-                        >
-                          <option value="0">Punto de Venta 0 (Por Defecto)</option>
-                          <option value="1">Punto de Venta 1</option>
-                          <option value="2">Punto de Venta 2</option>
-                          <option value="3">Punto de Venta 3</option>
-                        </select>
-                      </div>
+                  {paymentMethod === 'Tarjeta' && (
+                    <div className="mt-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Número de Tarjeta (Primeros 4 y últimos 4 ej. 1234000000005678) o Transacción:
+                      </label>
+                      <input 
+                        type="text" 
+                        value={cardNumber}
+                        onChange={e => setCardNumber(e.target.value)}
+                        placeholder="1234000000005678"
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32]"
+                      />
                     </div>
+                  )}
+
+                  <div className="mt-4 pt-4 border-t border-gray-100">
+                    <label className="flex items-center gap-2 cursor-pointer mb-4">
+                      <input 
+                        type="checkbox" 
+                        checked={generateInvoice}
+                        onChange={e => setGenerateInvoice(e.target.checked)}
+                        className="w-5 h-5 text-[#2E7D32] rounded focus:ring-[#2E7D32]"
+                      />
+                      <span className="font-bold text-gray-800">Generar Factura (SIAT)</span>
+                    </label>
+
+                    {generateInvoice && (
+                      <div className="space-y-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">NIT/CI</label>
+                          <input 
+                            type="text" 
+                            value={cashierNit}
+                            onChange={e => setCashierNit(e.target.value)}
+                            placeholder="Ej. 1234567"
+                            className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Razón Social</label>
+                          <input 
+                            type="text" 
+                            value={cashierName}
+                            onChange={e => setCashierName(e.target.value)}
+                            placeholder="Nombre del cliente"
+                            className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Punto de Venta SIAT</label>
+                          <select 
+                            value={siatPuntoVenta}
+                            onChange={e => setSiatPuntoVenta(e.target.value)}
+                            className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32]"
+                          >
+                            <option value="0">Punto de Venta 0 (Por Defecto)</option>
+                            <option value="1">Punto de Venta 1</option>
+                            <option value="2">Punto de Venta 2</option>
+                            <option value="3">Punto de Venta 3</option>
+                          </select>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {!activeRegister && (
+                    <p className="text-xs text-orange-600 mt-2">
+                      Nota: La caja está cerrada. El pago se marcará pero no se registrará en la caja diaria.
+                    </p>
                   )}
                 </div>
 
-                {!activeRegister && (
-                  <p className="text-xs text-orange-600 mt-2">
-                    Nota: La caja está cerrada. El pago se marcará pero no se registrará en la caja diaria.
-                  </p>
-                )}
-              </div>
+                <button
+                  disabled={isClosingBill}
+                  onClick={handleCloseBill}
+                  className="w-full py-4 bg-[#2E7D32] hover:bg-[#256629] text-white font-bold rounded-2xl transition-colors disabled:opacity-50 text-lg flex items-center justify-center gap-2"
+                >
+                  <Receipt size={24} />
+                  {isClosingBill ? 'Cerrando cuenta...' : 'Cobrar y Liberar Mesa'}
+                </button>
 
-              <button
-                disabled={isClosingBill || tableOrders.length === 0}
-                onClick={handleCloseBill}
-                className="w-full py-4 bg-[#2E7D32] hover:bg-[#256629] text-white font-bold rounded-2xl transition-colors disabled:opacity-50 text-lg flex items-center justify-center gap-2"
-              >
-                <Receipt size={24} />
-                {isClosingBill ? 'Cerrando cuenta...' : 'Cobrar y Liberar Mesa'}
-              </button>
-            </div>
+                <button
+                  disabled={isClosingBill}
+                  onClick={() => {
+                    if (confirm("¿Estás seguro de liberar esta mesa sin registrar cobro?")) {
+                      handleReleaseTable(selectedTable.id);
+                    }
+                  }}
+                  className="w-full mt-2 py-2 text-sm text-gray-500 hover:text-gray-700 font-medium transition-colors"
+                >
+                  Liberar mesa sin cobrar
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

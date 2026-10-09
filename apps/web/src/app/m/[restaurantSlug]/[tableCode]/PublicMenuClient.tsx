@@ -160,8 +160,8 @@ export default function PublicMenuClient({
           };
           checkUnpaid(); // Run once on load
           
-          // Poll every 15 seconds to actively expel devices if the session ends
-          const checkInterval = setInterval(checkUnpaid, 15000);
+          // Poll every 5 seconds to actively expel devices if the session ends
+          const checkInterval = setInterval(checkUnpaid, 5000);
           return () => clearInterval(checkInterval);
         }
       }
@@ -189,15 +189,62 @@ export default function PublicMenuClient({
         schema: 'public',
         table: 'tables',
         filter: `id=eq.${table.id}`
-      }, (payload) => {
+      }, async (payload) => {
         if (payload.new && payload.new.service_status !== undefined) {
           setTableStatus(payload.new.service_status);
+
+          // Si la mesa fue liberada (service_status pasó a ser null)
+          if (payload.new.service_status === null) {
+            if (sessionStorage.getItem(`has_ordered_${table.id}`) === 'true') {
+              try {
+                const { data: unpaid } = await supabase
+                  .from('orders')
+                  .select('id')
+                  .eq('table_id', table.id)
+                  .eq('is_paid', false)
+                  .neq('status', 'cancelled');
+
+                if (!unpaid || unpaid.length === 0) {
+                  setSessionEnded(true);
+                  localStorage.setItem(`session_ended_timestamp_${table.id}`, Date.now().toString());
+                }
+              } catch (e) {}
+            }
+          }
+        }
+      })
+      .subscribe();
+
+    // Escuchar cambios en los pedidos de esta mesa en tiempo real
+    const ordersChannel = supabase
+      .channel(`public:orders:table:${table.id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'orders',
+        filter: `table_id=eq.${table.id}`
+      }, async () => {
+        if (sessionStorage.getItem(`has_ordered_${table.id}`) === 'true') {
+          try {
+            const { data: unpaid } = await supabase
+              .from('orders')
+              .select('id')
+              .eq('table_id', table.id)
+              .eq('is_paid', false)
+              .neq('status', 'cancelled');
+
+            if (!unpaid || unpaid.length === 0) {
+              setSessionEnded(true);
+              localStorage.setItem(`session_ended_timestamp_${table.id}`, Date.now().toString());
+            }
+          } catch (e) {}
         }
       })
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
+      supabase.removeChannel(ordersChannel);
     };
   }, [table.id, table.type]);
 
@@ -715,6 +762,20 @@ export default function PublicMenuClient({
             ? 'CONTROL TRIBUTARIO' 
             : (customerName.trim() === '' ? 'S/N' : customerName.trim());
 
+          const groupedCartItems = cartItems.reduce((acc: any, item) => {
+            const key = `${item.product.id}-${item.product.name}`;
+            if (!acc[key]) {
+              acc[key] = {
+                product: item.product,
+                quantity: 0,
+                subTotal: 0
+              };
+            }
+            acc[key].quantity += item.quantity;
+            acc[key].subTotal += Number(item.product.price) * item.quantity;
+            return acc;
+          }, {});
+
           const facturaParams = {
             cabecera: {
               fechaEmision: new Date().toISOString(),
@@ -724,13 +785,13 @@ export default function PublicMenuClient({
               nombreRazonSocial: rznSocial,
               numeroDocumento: nitCi
             },
-            detalle: cartItems.map(item => ({
+            detalle: Object.values(groupedCartItems).map((item: any) => ({
               codigoProducto: item.product.id ? item.product.id.substring(0, 8) : '00000000',
               descripcion: item.product.name,
               cantidad: item.quantity,
               precioUnitario: item.product.price,
               montoDescuento: 0,
-              subTotal: item.product.price * item.quantity
+              subTotal: item.subTotal
             }))
           };
 
@@ -909,6 +970,17 @@ export default function PublicMenuClient({
           .neq('status', 'cancelled');
           
         if (!activeOrders || activeOrders.length === 0) {
+          await supabase
+            .from('tables')
+            .update({ 
+              service_status: null,
+              siat_customer_nit: null,
+              siat_customer_name: null,
+              siat_customer_email: null,
+              requested_payment_method: null,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', table.id);
           setSessionEnded(true);
           localStorage.setItem(`session_ended_timestamp_${table.id}`, Date.now().toString());
           alert("No tienes pedidos pendientes por cobrar. La mesa ha sido liberada.");
@@ -945,6 +1017,17 @@ export default function PublicMenuClient({
         .neq('status', 'cancelled');
         
       if (!activeOrders || activeOrders.length === 0) {
+        await supabase
+          .from('tables')
+          .update({ 
+            service_status: null,
+            siat_customer_nit: null,
+            siat_customer_name: null,
+            siat_customer_email: null,
+            requested_payment_method: null,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', table.id);
         setSessionEnded(true);
         localStorage.setItem(`session_ended_timestamp_${table.id}`, Date.now().toString());
         setShowBillRequestModal(false);
