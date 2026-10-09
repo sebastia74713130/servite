@@ -422,12 +422,15 @@ export default function PublicMenuClient({
         try {
           const res = await fetch(`/api/qr/status?qrId=${generatedQrId}`);
           const data = await res.json();
-          if (data.success && data.statusQRCode === 1) {
+          const isPaid = data.paid || Number(data.statusQRCode) === 1 || data.statusQRCode === '1' || data.statusQRCode === 1;
+          const isCancelled = data.isCancelled || Number(data.statusQRCode) === 9 || Number(data.statusQRCode) === 3 || Number(data.statusQRCode) === 4;
+
+          if (isPaid) {
             setQrStatus('paid');
             clearInterval(pollInterval);
             clearInterval(countdownInterval);
             handleSubmitOrder(true); // Process order automatically
-          } else if (data.success && data.statusQRCode === 9) {
+          } else if (isCancelled) {
             setQrStatus('cancelled');
             clearInterval(pollInterval);
             clearInterval(countdownInterval);
@@ -445,23 +448,51 @@ export default function PublicMenuClient({
   }, [generatedQrId, qrStatus]);
 
   const handleManualVerify = async () => {
-    if (!generatedQrId) return;
+    if (!generatedQrId) {
+      handleSubmitOrder(true);
+      return;
+    }
+
+    // Despertar / pre-activar audio en iOS de forma síncrona
+    if (keepAwakeAudioRef.current) {
+      keepAwakeAudioRef.current.play().catch(() => {});
+    }
+    if (alarmAudioRef.current) {
+      alarmAudioRef.current.play().then(() => alarmAudioRef.current!.pause()).catch(() => {});
+    }
+
     setQrLoading(true); // Re-use loading state to disable button
     try {
       const res = await fetch(`/api/qr/status?qrId=${generatedQrId}`);
       const data = await res.json();
-      if (data.success && data.statusQRCode === 1) {
+      const isPaid = data.paid || Number(data?.statusQRCode) === 1 || data?.statusQRCode === '1' || data?.statusQRCode === 1;
+      const isCancelled = data.isCancelled || Number(data?.statusQRCode) === 9 || Number(data?.statusQRCode) === 3 || Number(data?.statusQRCode) === 4;
+
+      if (isPaid) {
         setQrStatus('paid');
         handleSubmitOrder(true);
-      } else if (data.success && data.statusQRCode === 9) {
+      } else if (isCancelled) {
         setQrStatus('cancelled');
-        alert("El QR ha sido anulado o expirado.");
+        alert("El QR ha sido anulado o expirado. Por favor, genera un nuevo pedido.");
       } else {
-        alert("Aún no detectamos el pago. Por favor, asegúrate de haber completado la transferencia o espera unos segundos y vuelve a intentar.");
+        // En caso de que el banco aún no haya actualizado por compensación interbancaria (ACH)
+        const proceed = window.confirm(
+          "El sistema bancario aún no ha registrado la confirmación automática (las transferencias entre bancos pueden tardar hasta 1 minuto en procesarse).\n\nSi ya completaste la transferencia exitosamente desde tu aplicación bancaria, ¿deseas confirmar y enviar tu pedido a cocina ahora?"
+        );
+        if (proceed) {
+          setQrStatus('paid');
+          handleSubmitOrder(true);
+        }
       }
     } catch (err) {
       console.error('Error in manual verify:', err);
-      alert("Hubo un error al verificar. Intenta nuevamente.");
+      const proceed = window.confirm(
+        "No pudimos verificar la conexión con el banco en este momento.\n\nSi ya realizaste la transferencia desde tu banca móvil, ¿deseas confirmar y enviar tu pedido a cocina?"
+      );
+      if (proceed) {
+        setQrStatus('paid');
+        handleSubmitOrder(true);
+      }
     } finally {
       setQrLoading(false);
     }
@@ -1688,7 +1719,7 @@ export default function PublicMenuClient({
                   style={{ backgroundColor: brandColor }}
                 >
                   <RefreshCw size={20} className={qrLoading ? "animate-spin" : ""} />
-                  {isSubmitting || qrLoading ? 'Verificando pago...' : 'Ya realicé el pago'}
+                  {isSubmitting ? 'Enviando a cocina...' : qrLoading ? 'Verificando con el banco...' : 'Ya realicé el pago'}
                 </button>
               </div>
             ) : (

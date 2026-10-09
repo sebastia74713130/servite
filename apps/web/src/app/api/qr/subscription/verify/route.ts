@@ -53,22 +53,32 @@ export async function POST(request: Request) {
     }
 
     const token = await getAuthToken();
-    const qrRes = await fetch(`${BANECO_API_URL}/api/qrsimple/v2/statusQR/${qrId}`, {
+    let qrRes = await fetch(`${BANECO_API_URL}/api/qrsimple/v2/statusQR/${qrId}`, {
       method: 'GET',
       headers: { 
         'Authorization': `Bearer ${token}`
       }
     });
 
+    if (!qrRes.ok && (qrRes.status === 404 || qrRes.status === 405)) {
+      qrRes = await fetch(`${BANECO_API_URL}/api/qrsimple/statusQR/${qrId}`, {
+        method: 'GET',
+        headers: { 
+          'Authorization': `Bearer ${token}`
+        }
+      });
+    }
+
     const qrData = await qrRes.json();
-    if (qrData.responseCode !== 0) {
+    const statusQRCode = qrData.statusQRCode;
+    const isPaid = Number(statusQRCode) === 1 || statusQRCode === '1' || statusQRCode === 1;
+
+    if (qrData.responseCode !== 0 && !isPaid) {
       return NextResponse.json({ error: qrData.message || 'Error verificando QR' }, { status: 400 });
     }
 
-    const statusQRCode = qrData.statusQRCode;
-
     // 1 = Pagado, 2 = Generado/Pendiente, 3 = Vencido/Anulado
-    if (statusQRCode === 1) {
+    if (isPaid) {
       // Calcular fecha de expiración: 30 días a partir de ahora
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 30);

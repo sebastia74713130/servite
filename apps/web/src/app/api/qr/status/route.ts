@@ -11,24 +11,57 @@ export async function GET(request: Request) {
     }
 
     const token = await getAuthToken();
-    const qrRes = await fetch(`${BANECO_API_URL}/api/qrsimple/v2/statusQR/${qrId}`, {
+    let qrRes = await fetch(`${BANECO_API_URL}/api/qrsimple/v2/statusQR/${qrId}`, {
       method: 'GET',
       headers: { 
         'Authorization': `Bearer ${token}`
       }
     });
 
-    const qrData = await qrRes.json();
-    if (qrData.responseCode !== 0) {
-      return NextResponse.json({ error: qrData.message || 'Error verificando QR' }, { status: 400 });
+    // Fallback if v2 endpoint is not found or unsupported
+    if (!qrRes.ok && (qrRes.status === 404 || qrRes.status === 405)) {
+      qrRes = await fetch(`${BANECO_API_URL}/api/qrsimple/statusQR/${qrId}`, {
+        method: 'GET',
+        headers: { 
+          'Authorization': `Bearer ${token}`
+        }
+      });
+    }
+
+    let qrData: any = {};
+    try {
+      qrData = await qrRes.json();
+    } catch {
+      return NextResponse.json({ success: false, paid: false, error: 'Error parseando respuesta del banco' }, { status: 200 });
+    }
+
+    console.log('[Baneco QR Status Check]', { qrId, qrData });
+
+    const statusNum = qrData.statusQRCode !== undefined ? Number(qrData.statusQRCode) : null;
+    const isPaid = statusNum === 1 || qrData.statusQRCode === '1' || qrData.statusQRCode === 1;
+    const isCancelled = statusNum === 3 || statusNum === 4 || statusNum === 9 || qrData.statusQRCode === '3' || qrData.statusQRCode === '9';
+
+    if (qrData.responseCode !== 0 && !isPaid) {
+      return NextResponse.json({
+        success: false,
+        paid: false,
+        isCancelled,
+        error: qrData.message || 'Error verificando QR',
+        statusQRCode: qrData.statusQRCode,
+        raw: qrData
+      }, { status: 200 });
     }
 
     return NextResponse.json({
       success: true,
-      statusQRCode: qrData.statusQRCode
+      paid: isPaid,
+      isCancelled,
+      statusQRCode: statusNum !== null && !isNaN(statusNum) ? statusNum : qrData.statusQRCode,
+      raw: qrData
     });
   } catch (error: any) {
     console.error('Error verificando QR:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ success: false, paid: false, error: error.message }, { status: 200 });
   }
 }
+
