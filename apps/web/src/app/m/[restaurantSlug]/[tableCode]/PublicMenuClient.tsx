@@ -557,7 +557,8 @@ export default function PublicMenuClient({
 
   // Load cart from localStorage on mount
   useEffect(() => {
-    const savedCart = localStorage.getItem(`cart_${table.table_code}`);
+    const savedCart = localStorage.getItem(`cart_${table.table_code}`) ||
+      (table.table_code.startsWith('BARRA-') ? localStorage.getItem(`cart_${table.table_code.replace('BARRA-', 'MESA-')}`) : null);
     if (savedCart) {
       try {
         setCartItems(JSON.parse(savedCart));
@@ -569,6 +570,10 @@ export default function PublicMenuClient({
   useEffect(() => {
     localStorage.setItem(`cart_${table.table_code}`, JSON.stringify(cartItems));
   }, [cartItems, table.table_code]);
+
+  const tableDisplayName = table.type === 'takeaway'
+    ? (table.table_number.toLowerCase().startsWith('barra') ? table.table_number : `Barra ${table.table_number}`)
+    : (table.table_number.toLowerCase().startsWith('mesa') ? table.table_number : `Mesa ${table.table_number}`);
 
   const brandColor = restaurant?.brand_color || '#E76F51';
   
@@ -1184,7 +1189,7 @@ export default function PublicMenuClient({
                   </h1>
                 )}
                 <p className="text-sm font-medium opacity-70 mt-1" style={{ color: pageTextColor }}>
-                  {table.table_number}
+                  {tableDisplayName}
                 </p>
               </div>
             </div>
@@ -1587,7 +1592,7 @@ export default function PublicMenuClient({
           </div>
           
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
-            <p className="text-gray-500 font-medium">Mesa {table.table_number}</p>
+            <p className="text-gray-500 font-medium">{tableDisplayName}</p>
             
             {cartItems.length === 0 ? (
               <div className="text-center text-gray-400 py-10">
@@ -2136,7 +2141,7 @@ export default function PublicMenuClient({
               ¿Limpiar historial?
             </h3>
             <p className="text-gray-500 text-sm mb-6 leading-relaxed">
-              ¿Estás seguro de que deseas limpiar tu historial de pedidos en este dispositivo? Esta acción reiniciará tu sesión actual en la mesa.
+              ¿Estás seguro de que deseas limpiar tu historial de pedidos en este dispositivo? Esta acción reiniciará tu sesión actual{table.type === 'takeaway' ? ' en la barra' : ' en la mesa'}.
             </p>
             <div className="flex gap-3">
               <button

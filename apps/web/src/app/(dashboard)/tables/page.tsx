@@ -20,6 +20,17 @@ import {
   Link,
 } from 'lucide-react';
 
+const getTableDisplayName = (table: RestaurantTable) => {
+  if (table.type === 'takeaway') {
+    return table.table_number.toLowerCase().startsWith('barra')
+      ? table.table_number
+      : `Barra ${table.table_number}`;
+  }
+  return table.table_number.toLowerCase().startsWith('mesa')
+    ? table.table_number
+    : `Mesa ${table.table_number}`;
+};
+
 export default function TablesPage() {
   const { restaurant, branch, loading: sessionLoading } = useRestaurantSession();
   const { tables, loading: tablesLoading, refetch } = useTables(restaurant?.id, branch?.id);
@@ -102,11 +113,11 @@ export default function TablesPage() {
                 <div>
                   <div className="flex items-center gap-2">
                     <h2 className="text-xl font-bold text-[#1F2933]">
-                      {table.type === 'takeaway' ? 'Mostrador' : 'Mesa'} {table.table_number}
+                      {getTableDisplayName(table)}
                     </h2>
                     {table.type === 'takeaway' && (
                       <span className="text-[10px] uppercase font-bold bg-[#1F2933] text-white px-2 py-0.5 rounded-md tracking-wider">
-                        Barra
+                        Takeaway
                       </span>
                     )}
                   </div>
@@ -204,9 +215,11 @@ export default function TablesPage() {
               <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mb-4">
                 <Trash2 className="text-red-600" size={24} />
               </div>
-              <h2 className="text-xl font-bold text-gray-900 mb-2">Eliminar Mesa</h2>
+              <h2 className="text-xl font-bold text-gray-900 mb-2">
+                Eliminar {tableToDelete.type === 'takeaway' ? 'Barra' : 'Mesa'}
+              </h2>
               <p className="text-gray-600 mb-6">
-                ¿Estás seguro de que deseas eliminar la <strong>{tableToDelete.table_code}</strong>?<br/>Esta acción no se puede deshacer.
+                ¿Estás seguro de que deseas eliminar {tableToDelete.type === 'takeaway' ? 'la barra' : 'la mesa'} <strong>{tableToDelete.table_code}</strong>?<br/>Esta acción no se puede deshacer.
               </p>
               
               <div className="flex gap-3 w-full">
@@ -263,7 +276,7 @@ function QrModal({ table, restaurantSlug, onClose }: { table: RestaurantTable; r
       ctx.fillRect(0, 0, 600, 600);
       ctx.drawImage(img, 50, 50, 500, 500);
       const link = document.createElement('a');
-      link.download = `Mesa-${table.table_number}-QR.png`;
+      link.download = `${table.type === 'takeaway' ? 'Barra' : 'Mesa'}-${table.table_number}-QR.png`;
       link.href = canvas.toDataURL('image/png');
       link.click();
     };
@@ -278,12 +291,14 @@ function QrModal({ table, restaurantSlug, onClose }: { table: RestaurantTable; r
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
+    const titleText = getTableDisplayName(table);
+
     printWindow.document.write(`
       <!DOCTYPE html>
       <html>
-        <head><title>Mesa ${table.table_number} - QR</title></head>
+        <head><title>${titleText} - QR</title></head>
         <body style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;margin:0;font-family:sans-serif;">
-          <h1 style="margin-bottom:8px;">Mesa ${table.table_number}</h1>
+          <h1 style="margin-bottom:8px;">${titleText}</h1>
           <p style="color:#666;margin-bottom:24px;">${table.table_code}</p>
           ${svgData}
           <p style="margin-top:24px;color:#999;font-size:12px;">Escanea para ver el menú</p>
@@ -311,7 +326,7 @@ function QrModal({ table, restaurantSlug, onClose }: { table: RestaurantTable; r
 
         <div className="text-center">
           <h2 className="text-xl font-bold text-[#1F2933] mb-1">
-            {table.type === 'takeaway' ? 'Mostrador' : 'Mesa'} {table.table_number}
+            {getTableDisplayName(table)}
           </h2>
           <p className="text-sm text-[#6B7280] font-mono mb-6">{table.table_code}</p>
 
@@ -381,12 +396,16 @@ function NewTableModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!tableNumber.trim()) { setError('El número de mesa es obligatorio'); return; }
+    if (!tableNumber.trim()) {
+      setError(type === 'takeaway' ? 'El nombre o número de barra es obligatorio' : 'El número de mesa es obligatorio');
+      return;
+    }
 
     setSaving(true);
     setError('');
 
-    const tableCode = `MESA-${tableNumber.trim()}`;
+    const prefix = type === 'takeaway' ? 'BARRA' : 'MESA';
+    const tableCode = `${prefix}-${tableNumber.trim()}`;
 
     const { error: err } = await supabase
       .from('tables')
@@ -401,7 +420,7 @@ function NewTableModal({
 
     if (err) {
       if (err.message.includes('tables_table_code_key') || err.message.includes('duplicate key')) {
-        setError('El número o identificador de mesa ya está en uso. Por favor, elige otro.');
+        setError(`El código ${tableCode} ya está en uso. Por favor, elige otro.`);
       } else {
         setError(err.message);
       }
@@ -417,7 +436,9 @@ function NewTableModal({
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-xl" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-bold text-[#1F2933]">Nueva mesa</h2>
+          <h2 className="text-lg font-bold text-[#1F2933]">
+            {type === 'takeaway' ? 'Nueva barra' : 'Nueva mesa'}
+          </h2>
           <button onClick={onClose} className="text-[#6B7280] hover:text-[#1F2933] transition-colors">
             <X size={20} />
           </button>
@@ -425,24 +446,7 @@ function NewTableModal({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="text-sm font-medium text-[#1F2933] mb-1.5 block">Número de mesa *</label>
-            <input
-              type="text"
-              value={tableNumber}
-              onChange={e => setTableNumber(e.target.value)}
-              className="w-full border border-[#E5E7EB] rounded-xl px-4 py-3 text-[#1F2933] focus:outline-none focus:ring-2 focus:ring-[#E76F51]/30 focus:border-[#E76F51] transition-colors"
-              placeholder="Ej: 1, 2, 3..."
-              autoFocus
-            />
-            {tableNumber && (
-              <p className="text-xs text-[#6B7280] mt-1.5">
-                Código generado: <span className="font-mono font-medium text-[#1F2933]">MESA-{tableNumber.trim()}</span>
-              </p>
-            )}
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-[#1F2933] mb-1.5 block">Tipo de Mesa</label>
+            <label className="text-sm font-medium text-[#1F2933] mb-1.5 block">Tipo</label>
             <select
               value={type}
               onChange={e => setType(e.target.value as 'dine_in'|'takeaway')}
@@ -451,6 +455,27 @@ function NewTableModal({
               <option value="dine_in">Mesa Normal (Dine-in)</option>
               <option value="takeaway">Pedidos en Barra / Fila (Takeaway)</option>
             </select>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-[#1F2933] mb-1.5 block">
+              {type === 'takeaway' ? 'Nombre o identificador de barra *' : 'Número de mesa *'}
+            </label>
+            <input
+              type="text"
+              value={tableNumber}
+              onChange={e => setTableNumber(e.target.value)}
+              className="w-full border border-[#E5E7EB] rounded-xl px-4 py-3 text-[#1F2933] focus:outline-none focus:ring-2 focus:ring-[#E76F51]/30 focus:border-[#E76F51] transition-colors"
+              placeholder={type === 'takeaway' ? 'Ej: Pedidos, 1, Principal...' : 'Ej: 1, 2, 3...'}
+              autoFocus
+            />
+            {tableNumber && (
+              <p className="text-xs text-[#6B7280] mt-1.5">
+                Código generado: <span className="font-mono font-medium text-[#1F2933]">
+                  {type === 'takeaway' ? 'BARRA' : 'MESA'}-{tableNumber.trim()}
+                </span>
+              </p>
+            )}
           </div>
 
           {error && (
@@ -476,7 +501,7 @@ function NewTableModal({
               {saving ? 'Creando...' : (
                 <>
                   <Check size={16} />
-                  Crear mesa
+                  {type === 'takeaway' ? 'Crear barra' : 'Crear mesa'}
                 </>
               )}
             </button>

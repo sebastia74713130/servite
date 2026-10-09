@@ -53,7 +53,7 @@ export default async function PublicMenuPage({ params }: { params: Promise<{ res
   const restaurant = restaurantData;
 
   // 2. Fetch table info scoped to this restaurant
-  const { data: tableData, error: tableError } = await supabase
+  let { data: tableData, error: tableError } = await supabase
     .from('tables')
     .select('*')
     .eq('table_code', tableCode)
@@ -61,12 +61,36 @@ export default async function PublicMenuPage({ params }: { params: Promise<{ res
     .limit(1)
     .maybeSingle();
 
+  // Fallback para compatibilidad entre MESA- y BARRA-
+  if (!tableData && !tableError) {
+    let alternateCode = '';
+    if (tableCode.startsWith('MESA-')) {
+      alternateCode = tableCode.replace('MESA-', 'BARRA-');
+    } else if (tableCode.startsWith('BARRA-')) {
+      alternateCode = tableCode.replace('BARRA-', 'MESA-');
+    }
+
+    if (alternateCode) {
+      const { data: altTableData, error: altError } = await supabase
+        .from('tables')
+        .select('*')
+        .eq('table_code', alternateCode)
+        .eq('restaurant_id', restaurant.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (!altError && altTableData) {
+        tableData = altTableData;
+      }
+    }
+  }
+
   if (tableError) {
     return <div>Error al cargar la mesa: {tableError.message}</div>;
   }
   
   if (!tableData) {
-    return <div>Esta mesa no existe o fue eliminada. Por favor escanea un código QR válido.</div>;
+    return <div>Esta mesa o barra no existe o fue eliminada. Por favor escanea un código QR válido.</div>;
   }
 
   const branchId = tableData.branch_id;

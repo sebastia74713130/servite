@@ -18,7 +18,18 @@ export function useTables(restaurantId: string | undefined, branchId: string | u
       .eq('branch_id', branchId)
       .order('table_number', { ascending: true });
 
-    if (data) setTables(data as RestaurantTable[]);
+    if (data) {
+      // Auto-migrar mesas tipo takeaway que tengan prefijo antiguo MESA- a BARRA-
+      const takeawayToMigrate = data.filter(t => t.type === 'takeaway' && t.table_code?.startsWith('MESA-'));
+      if (takeawayToMigrate.length > 0) {
+        for (const t of takeawayToMigrate) {
+          const newCode = t.table_code.replace('MESA-', 'BARRA-');
+          await supabase.from('tables').update({ table_code: newCode }).eq('id', t.id);
+          t.table_code = newCode;
+        }
+      }
+      setTables(data as RestaurantTable[]);
+    }
     setLoading(false);
   };
 
