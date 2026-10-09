@@ -19,3 +19,16 @@ export async function getAuthToken() {
   }
   return data.token;
 }
+
+// Registro en memoria de pagos recibidos por webhook (notifyPaymentQR)
+declare global {
+  var __banecoPaidQrs: Map<string, any> | undefined;
+}
+
+export function getPaidQrMap(): Map<string, any> {
+  if (!globalThis.__banecoPaidQrs) {
+    globalThis.__banecoPaidQrs = new Map();
+  }
+  return globalThis.__banecoPaidQrs;
+}
+

@@ -395,6 +395,7 @@ export default function PublicMenuClient({
   const [showTakeawayPaymentQR, setShowTakeawayPaymentQR] = useState(false);
   const [generatedQrBase64, setGeneratedQrBase64] = useState<string | null>(null);
   const [qrLoading, setQrLoading] = useState(false);
+  const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
   const [qrError, setQrError] = useState('');
   const [generatedQrId, setGeneratedQrId] = useState<string | null>(null);
   const [qrTimer, setQrTimer] = useState<number>(0);
@@ -422,8 +423,8 @@ export default function PublicMenuClient({
         try {
           const res = await fetch(`/api/qr/status?qrId=${generatedQrId}`);
           const data = await res.json();
-          const isPaid = data.paid || Number(data.statusQRCode) === 1 || data.statusQRCode === '1' || data.statusQRCode === 1;
-          const isCancelled = data.isCancelled || Number(data.statusQRCode) === 9 || Number(data.statusQRCode) === 3 || Number(data.statusQRCode) === 4;
+          const isPaid = Boolean(data.paid);
+          const isCancelled = Boolean(data.isCancelled) || Number(data.statusQrCode) === 9;
 
           if (isPaid) {
             setQrStatus('paid');
@@ -461,40 +462,27 @@ export default function PublicMenuClient({
       alarmAudioRef.current.play().then(() => alarmAudioRef.current!.pause()).catch(() => {});
     }
 
-    setQrLoading(true); // Re-use loading state to disable button
+    setIsVerifyingPayment(true);
     try {
       const res = await fetch(`/api/qr/status?qrId=${generatedQrId}`);
       const data = await res.json();
-      const isPaid = data.paid || Number(data?.statusQRCode) === 1 || data?.statusQRCode === '1' || data?.statusQRCode === 1;
-      const isCancelled = data.isCancelled || Number(data?.statusQRCode) === 9 || Number(data?.statusQRCode) === 3 || Number(data?.statusQRCode) === 4;
+      const isPaid = Boolean(data.paid);
+      const isCancelled = Boolean(data.isCancelled) || Number(data?.statusQrCode) === 9;
 
       if (isPaid) {
         setQrStatus('paid');
         handleSubmitOrder(true);
       } else if (isCancelled) {
         setQrStatus('cancelled');
-        alert("El QR ha sido anulado o expirado. Por favor, genera un nuevo pedido.");
+        alert("El código QR ha sido anulado o expirado. Por favor, genera un nuevo pedido.");
       } else {
-        // En caso de que el banco aún no haya actualizado por compensación interbancaria (ACH)
-        const proceed = window.confirm(
-          "El sistema bancario aún no ha registrado la confirmación automática (las transferencias entre bancos pueden tardar hasta 1 minuto en procesarse).\n\nSi ya completaste la transferencia exitosamente desde tu aplicación bancaria, ¿deseas confirmar y enviar tu pedido a cocina ahora?"
-        );
-        if (proceed) {
-          setQrStatus('paid');
-          handleSubmitOrder(true);
-        }
+        alert("El banco aún registra el código QR como pendiente de pago (código 0: activo pendiente). Si acabas de transferir, por favor espera unos segundos mientras el banco lo procesa y vuelve a presionar 'Ya realicé el pago'.");
       }
     } catch (err) {
       console.error('Error in manual verify:', err);
-      const proceed = window.confirm(
-        "No pudimos verificar la conexión con el banco en este momento.\n\nSi ya realizaste la transferencia desde tu banca móvil, ¿deseas confirmar y enviar tu pedido a cocina?"
-      );
-      if (proceed) {
-        setQrStatus('paid');
-        handleSubmitOrder(true);
-      }
+      alert("Hubo un inconveniente consultando al banco. Por favor intenta nuevamente en unos momentos.");
     } finally {
-      setQrLoading(false);
+      setIsVerifyingPayment(false);
     }
   };
 
@@ -1713,13 +1701,13 @@ export default function PublicMenuClient({
                   ) : null}
                 </div>
                 <button
-                  disabled={isSubmitting || qrLoading || !!qrError}
+                  disabled={isSubmitting || isVerifyingPayment || !!qrError}
                   onClick={handleManualVerify}
                   className="w-full py-3 rounded-xl font-bold text-white flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-50"
                   style={{ backgroundColor: brandColor }}
                 >
-                  <RefreshCw size={20} className={qrLoading ? "animate-spin" : ""} />
-                  {isSubmitting ? 'Enviando a cocina...' : qrLoading ? 'Verificando con el banco...' : 'Ya realicé el pago'}
+                  <RefreshCw size={20} className={isVerifyingPayment ? "animate-spin" : ""} />
+                  {isSubmitting ? 'Enviando a cocina...' : isVerifyingPayment ? 'Verificando con el banco...' : 'Ya realicé el pago'}
                 </button>
               </div>
             ) : (

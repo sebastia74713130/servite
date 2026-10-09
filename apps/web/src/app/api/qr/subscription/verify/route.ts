@@ -70,8 +70,9 @@ export async function POST(request: Request) {
     }
 
     const qrData = await qrRes.json();
-    const statusQRCode = qrData.statusQRCode;
-    const isPaid = Number(statusQRCode) === 1 || statusQRCode === '1' || statusQRCode === 1;
+    const statusQRCode = qrData.statusQrCode ?? qrData.statusQRCode;
+    const paymentList = Array.isArray(qrData.payment) ? qrData.payment : (qrData.payment ? [qrData.payment] : []);
+    const isPaid = Number(statusQRCode) === 1 || statusQRCode === '1' || statusQRCode === 1 || paymentList.length > 0;
 
     if (qrData.responseCode !== 0 && !isPaid) {
       return NextResponse.json({ error: qrData.message || 'Error verificando QR' }, { status: 400 });
