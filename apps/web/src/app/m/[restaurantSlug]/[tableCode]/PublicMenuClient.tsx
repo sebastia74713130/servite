@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { RefreshCw, ShoppingCart, X, Plus, Minus, FileText, LayoutGrid, ChevronLeft, Search, CheckCircle, AlertCircle, ChevronRight, Download, Trash2, Clock, AlertTriangle } from 'lucide-react';
+import { RefreshCw, ShoppingCart, X, Plus, Minus, FileText, LayoutGrid, ChevronLeft, Search, CheckCircle, AlertCircle, ChevronRight, Download, Trash2, Clock, AlertTriangle, QrCode, Banknote, CreditCard, ArrowRight, ArrowLeft, Check } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -547,8 +547,10 @@ export default function PublicMenuClient({
 
   // Bill Request SIAT Data & Payment Method
   const [showBillRequestModal, setShowBillRequestModal] = useState(false);
+  const [billRequestStep, setBillRequestStep] = useState<1 | 2>(1);
+  const [omitInvoiceData, setOmitInvoiceData] = useState(false);
   const [customerEmail, setCustomerEmail] = useState('');
-  const [requestedPaymentMethod, setRequestedPaymentMethod] = useState('Pago QR');
+  const [requestedPaymentMethod, setRequestedPaymentMethod] = useState<'Pago QR' | 'Efectivo' | 'Tarjeta'>('Pago QR');
 
 
   // Cart state
@@ -1094,10 +1096,17 @@ export default function PublicMenuClient({
         .eq('id', table.id);
       if (error) throw error;
       
+      if (!omit) {
+        if (customerName.trim()) localStorage.setItem('customer_name', customerName.trim());
+        if (customerNit.trim()) localStorage.setItem('customer_nit', customerNit.trim());
+      }
+      
       setTableStatus('requesting_bill');
       setServiceMessage("¡Cuenta solicitada! Enseguida te la llevarán.");
       setShowBill(false);
       setShowBillRequestModal(false);
+      setBillRequestStep(1);
+      setOmitInvoiceData(false);
     } catch (err: any) {
       alert("Error al solicitar la cuenta");
     } finally {
@@ -1960,7 +1969,11 @@ export default function PublicMenuClient({
                   </button>
                   <button
                     disabled={serviceRequestLoading || billOrders.length === 0}
-                    onClick={() => setShowBillRequestModal(true)}
+                    onClick={() => {
+                      setBillRequestStep(1);
+                      setOmitInvoiceData(false);
+                      setShowBillRequestModal(true);
+                    }}
                     className="py-3 rounded-xl font-bold text-white active:scale-95 transition-transform disabled:opacity-50"
                     style={{ backgroundColor: brandColor }}
                   >
@@ -1973,109 +1986,236 @@ export default function PublicMenuClient({
         </div>
       )}
 
-      {/* SIAT Bill Request Modal */}
+      {/* SIAT Bill Request Modal (2 Steps: Invoice Data -> Payment Method) */}
       {showBillRequestModal && (
-        <div className="fixed inset-0 z-[70] bg-black/60 flex items-center justify-center p-6 animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl">
-            <div className="p-6">
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Datos para tu Factura</h3>
-              <p className="text-sm text-gray-500 mb-6">Si deseas una factura electrónica a tu nombre, por favor ingresa los siguientes datos.</p>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">NIT o Carnet de Identidad</label>
-                  <input 
-                    type="text" 
-                    value={customerNit}
-                    onChange={(e) => setCustomerNit(e.target.value)}
-                    onFocus={(e) => {
-                      setTimeout(() => {
-                        e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                      }, 300);
-                    }}
-                    placeholder="Ej. 1234567"
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Razón Social (Nombre)</label>
-                  <input 
-                    type="text" 
-                    value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    onFocus={(e) => {
-                      setTimeout(() => {
-                        e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                      }, 300);
-                    }}
-                    placeholder="Ej. Juan Perez"
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Correo Electrónico (Opcional)</label>
-                  <input 
-                    type="email" 
-                    value={customerEmail}
-                    onChange={(e) => setCustomerEmail(e.target.value)}
-                    onFocus={(e) => {
-                      setTimeout(() => {
-                        e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                      }, 300);
-                    }}
-                    placeholder="correo@ejemplo.com"
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2"
-                  />
-                </div>
-                
-                <div 
-                  className="p-4 rounded-xl border-2 shadow-sm mb-4 relative overflow-hidden"
-                  style={{ borderColor: `${brandColor}40`, backgroundColor: `${brandColor}10` }}
-                >
-                  <label className="block text-sm font-bold text-gray-800 mb-2 flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ backgroundColor: brandColor }}></span>
-                    Método de Pago Preferido
-                  </label>
-                  <select 
-                    value={requestedPaymentMethod}
-                    onChange={(e) => setRequestedPaymentMethod(e.target.value)}
-                    className="w-full px-4 py-4 bg-orange-50 border-4 rounded-xl focus:outline-none font-bold text-lg shadow-sm transition-colors text-gray-800"
-                    style={{ 
-                      borderColor: brandColor, 
-                      '--tw-ring-color': brandColor,
-                    } as React.CSSProperties}
+        <div 
+          className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => setShowBillRequestModal(false)}
+        >
+          <div 
+            className="bg-white w-full max-w-sm rounded-3xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-200"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="p-5 pb-3 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span 
+                    className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider"
+                    style={{ backgroundColor: `${brandColor}15`, color: brandColor }}
                   >
-                    <option value="Pago QR">Pago QR</option>
-                    <option value="Efectivo">Efectivo</option>
-                    <option value="Tarjeta">Tarjeta</option>
-                  </select>
+                    Paso {billRequestStep} de 2
+                  </span>
+                  <span className="text-xs text-gray-400 font-medium">
+                    {billRequestStep === 1 ? 'Facturación' : 'Método de Pago'}
+                  </span>
                 </div>
+                <h3 className="text-lg font-bold text-gray-900">
+                  {billRequestStep === 1 ? 'Datos para tu Factura' : 'Método de Pago'}
+                </h3>
               </div>
-            </div>
-            
-            <div className="p-4 bg-gray-50 flex flex-col gap-3">
-              <button 
-                onClick={() => handleRequestBillWithData(false)}
-                disabled={!customerNit || !customerName || serviceRequestLoading}
-                className="w-full py-3.5 rounded-xl font-bold text-white transition-all active:scale-95 text-md disabled:opacity-50"
-                style={{ backgroundColor: brandColor }}
-              >
-                Solicitar Factura a mi Nombre
-              </button>
-              <button 
-                onClick={() => handleRequestBillWithData(true)}
-                disabled={serviceRequestLoading}
-                className="w-full py-3.5 rounded-xl font-bold text-gray-600 bg-gray-200 hover:bg-gray-300 transition-all active:scale-95 text-md"
-              >
-                Omitir datos (Factura Sin Nombre)
-              </button>
               <button 
                 onClick={() => setShowBillRequestModal(false)}
-                className="w-full py-2 text-sm text-gray-500 font-medium mt-1"
+                className="w-8 h-8 rounded-full bg-gray-100 text-gray-400 hover:text-gray-600 flex items-center justify-center transition-colors"
               >
-                Cancelar
+                <X size={18} />
               </button>
             </div>
+
+            {/* Step 1: Invoice Data */}
+            {billRequestStep === 1 && (
+              <>
+                <div className="p-5 flex-1 overflow-y-auto space-y-3.5">
+                  <p className="text-xs text-gray-500 leading-relaxed">
+                    Si deseas una factura electrónica a tu nombre, ingresa los siguientes datos. De lo contrario, puedes omitirlos.
+                  </p>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                      NIT o Carnet de Identidad
+                    </label>
+                    <input 
+                      type="text" 
+                      value={customerNit}
+                      onChange={(e) => setCustomerNit(e.target.value)}
+                      placeholder="Ej. 1234567"
+                      className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 text-sm"
+                      style={{ '--tw-ring-color': brandColor } as React.CSSProperties}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                      Razón Social (Nombre)
+                    </label>
+                    <input 
+                      type="text" 
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      placeholder="Ej. Juan Pérez"
+                      className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 text-sm"
+                      style={{ '--tw-ring-color': brandColor } as React.CSSProperties}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                      Correo Electrónico <span className="text-gray-400 font-normal lowercase">(opcional)</span>
+                    </label>
+                    <input 
+                      type="email" 
+                      value={customerEmail}
+                      onChange={(e) => setCustomerEmail(e.target.value)}
+                      placeholder="correo@ejemplo.com"
+                      className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 text-sm"
+                      style={{ '--tw-ring-color': brandColor } as React.CSSProperties}
+                    />
+                  </div>
+                </div>
+
+                <div className="p-4 bg-gray-50 border-t border-gray-100 flex flex-col gap-2 flex-shrink-0">
+                  <button 
+                    onClick={() => {
+                      setOmitInvoiceData(false);
+                      if (customerName.trim()) localStorage.setItem('customer_name', customerName.trim());
+                      if (customerNit.trim()) localStorage.setItem('customer_nit', customerNit.trim());
+                      setBillRequestStep(2);
+                    }}
+                    disabled={!customerNit.trim() || !customerName.trim()}
+                    className="w-full py-3 rounded-xl font-bold text-white transition-all active:scale-95 text-sm disabled:opacity-40 flex items-center justify-center gap-2 shadow-sm"
+                    style={{ backgroundColor: brandColor }}
+                  >
+                    <span>Continuar con mis datos</span>
+                    <ArrowRight size={16} />
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setOmitInvoiceData(true);
+                      setBillRequestStep(2);
+                    }}
+                    className="w-full py-2.5 rounded-xl font-medium text-gray-600 bg-white border border-gray-200 hover:bg-gray-100 transition-all active:scale-95 text-sm"
+                  >
+                    Omitir datos (Factura Sin Nombre)
+                  </button>
+                  <button 
+                    onClick={() => setShowBillRequestModal(false)}
+                    className="w-full py-1 text-xs text-gray-400 font-medium hover:text-gray-600 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* Step 2: Payment Method */}
+            {billRequestStep === 2 && (
+              <>
+                <div className="p-5 flex-1 overflow-y-auto space-y-4">
+                  {/* Resumen Factura / Total */}
+                  <div className="p-3.5 bg-gray-50 rounded-2xl border border-gray-200/70 space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-gray-500 font-medium">Total de la cuenta:</span>
+                      <span className="text-lg font-bold" style={{ color: brandColor }}>
+                        Bs. {totalBill.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center pt-2 border-t border-gray-200/60 text-xs">
+                      <span className="text-gray-500">Factura:</span>
+                      <span className="font-semibold text-gray-800 truncate max-w-[200px]">
+                        {omitInvoiceData ? 'Sin Nombre (Control Tributario)' : `${customerName} (${customerNit})`}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                      ¿Cómo deseas realizar el pago?
+                    </label>
+                    
+                    <div className="space-y-2">
+                      {[
+                        { id: 'Pago QR', label: 'Pago QR', desc: 'Transferencia bancaria instantánea', icon: QrCode },
+                        { id: 'Efectivo', label: 'Efectivo', desc: 'Pago al mesero en mesa', icon: Banknote },
+                        { id: 'Tarjeta', label: 'Tarjeta', desc: 'Débito o crédito (POS)', icon: CreditCard },
+                      ].map(method => {
+                        const isSelected = requestedPaymentMethod === method.id;
+                        const Icon = method.icon;
+                        return (
+                          <button
+                            key={method.id}
+                            type="button"
+                            onClick={() => setRequestedPaymentMethod(method.id as any)}
+                            className={`w-full p-3 rounded-2xl border-2 text-left flex items-center gap-3 transition-all ${
+                              isSelected 
+                                ? 'border-current shadow-sm' 
+                                : 'border-gray-200 bg-white hover:border-gray-300'
+                            }`}
+                            style={isSelected ? { borderColor: brandColor, backgroundColor: `${brandColor}0D` } : {}}
+                          >
+                            <div 
+                              className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                                isSelected ? 'text-white' : 'bg-gray-100 text-gray-600'
+                              }`}
+                              style={isSelected ? { backgroundColor: brandColor } : {}}
+                            >
+                              <Icon size={20} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-bold text-sm text-gray-900">{method.label}</p>
+                              <p className="text-xs text-gray-500 truncate">{method.desc}</p>
+                            </div>
+                            <div 
+                              className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                                isSelected ? 'border-current' : 'border-gray-300'
+                              }`}
+                              style={isSelected ? { borderColor: brandColor } : {}}
+                            >
+                              {isSelected && (
+                                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: brandColor }} />
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-gray-50 border-t border-gray-100 flex flex-col gap-2 flex-shrink-0">
+                  <button 
+                    onClick={() => handleRequestBillWithData(omitInvoiceData)}
+                    disabled={serviceRequestLoading}
+                    className="w-full py-3.5 rounded-xl font-bold text-white transition-all active:scale-95 text-sm flex items-center justify-center gap-2 shadow-md disabled:opacity-50"
+                    style={{ backgroundColor: brandColor }}
+                  >
+                    {serviceRequestLoading ? (
+                      <span>Solicitando cuenta...</span>
+                    ) : (
+                      <>
+                        <Check size={18} />
+                        <span>Confirmar y Pedir la Cuenta</span>
+                      </>
+                    )}
+                  </button>
+                  
+                  <button 
+                    onClick={() => setBillRequestStep(1)}
+                    disabled={serviceRequestLoading}
+                    className="w-full py-2.5 rounded-xl font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-100 transition-all active:scale-95 text-sm flex items-center justify-center gap-1.5"
+                  >
+                    <ArrowLeft size={16} />
+                    <span>Modificar datos de factura</span>
+                  </button>
+
+                  <button 
+                    onClick={() => setShowBillRequestModal(false)}
+                    className="w-full py-1 text-xs text-gray-400 font-medium hover:text-gray-600 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
