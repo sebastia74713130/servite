@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { RefreshCw, ShoppingCart, X, Plus, Minus, FileText, LayoutGrid, ChevronLeft, Search, CheckCircle, AlertCircle, ChevronRight, Download } from 'lucide-react';
+import { RefreshCw, ShoppingCart, X, Plus, Minus, FileText, LayoutGrid, ChevronLeft, Search, CheckCircle, AlertCircle, ChevronRight, Download, Trash2, Clock, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -400,6 +400,12 @@ export default function PublicMenuClient({
   const [generatedQrId, setGeneratedQrId] = useState<string | null>(null);
   const [qrTimer, setQrTimer] = useState<number>(0);
   const [qrStatus, setQrStatus] = useState<'pending' | 'paid' | 'cancelled' | 'expired'>('pending');
+  const [showClearHistoryModal, setShowClearHistoryModal] = useState(false);
+  const [qrAlertModal, setQrAlertModal] = useState<{
+    type: 'pending' | 'cancelled' | 'error';
+    title: string;
+    message: string;
+  } | null>(null);
   const [autoEmittedCuf, setAutoEmittedCuf] = useState<string | null>(null);
 
   useEffect(() => {
@@ -474,13 +480,25 @@ export default function PublicMenuClient({
         handleSubmitOrder(true);
       } else if (isCancelled) {
         setQrStatus('cancelled');
-        alert("El código QR ha sido anulado o expirado. Por favor, genera un nuevo pedido.");
+        setQrAlertModal({
+          type: 'cancelled',
+          title: 'Código QR expirado',
+          message: 'El código QR ha sido anulado o expiró su tiempo de validez. Por favor, genera un nuevo pedido.'
+        });
       } else {
-        alert("El banco aún registra el código QR como pendiente de pago (código 0: activo pendiente). Si acabas de transferir, por favor espera unos segundos mientras el banco lo procesa y vuelve a presionar 'Ya realicé el pago'.");
+        setQrAlertModal({
+          type: 'pending',
+          title: 'Pago en verificación',
+          message: 'El banco aún registra el código QR como pendiente de acreditación (código 0: activo pendiente). Si acabas de realizar la transferencia desde tu banca móvil, por favor espera unos segundos mientras la red bancaria lo procesa y vuelve a presionar "Ya realicé el pago".'
+        });
       }
     } catch (err) {
       console.error('Error in manual verify:', err);
-      alert("Hubo un inconveniente consultando al banco. Por favor intenta nuevamente en unos momentos.");
+      setQrAlertModal({
+        type: 'error',
+        title: 'Error de verificación',
+        message: 'Hubo un inconveniente consultando al banco. Por favor intenta nuevamente en unos momentos.'
+      });
     } finally {
       setIsVerifyingPayment(false);
     }
@@ -943,19 +961,22 @@ export default function PublicMenuClient({
   };
 
   const handleClearHistory = () => {
-    if (confirm("¿Seguro que deseas limpiar tu historial de pedidos?")) {
-      setBillOrders([]);
-      if (foodCourtSessionId) {
-        localStorage.removeItem('food_court_session_id');
-        setFoodCourtSessionId(null);
-      }
-      if (deviceSessionId) {
-        localStorage.removeItem('device_session_id');
-        setDeviceSessionId(null);
-      }
-      localStorage.removeItem(`device_session_id_${table.id}`);
-      setSessionEnded(true);
+    setShowClearHistoryModal(true);
+  };
+
+  const confirmClearHistory = () => {
+    setBillOrders([]);
+    if (foodCourtSessionId) {
+      localStorage.removeItem('food_court_session_id');
+      setFoodCourtSessionId(null);
     }
+    if (deviceSessionId) {
+      localStorage.removeItem('device_session_id');
+      setDeviceSessionId(null);
+    }
+    localStorage.removeItem(`device_session_id_${table.id}`);
+    setSessionEnded(true);
+    setShowClearHistoryModal(false);
   };
 
   const handleSimulatePayment = async () => {
@@ -2100,6 +2121,81 @@ export default function PublicMenuClient({
                 {isAlarmRinging ? "APAGAR ALARMA" : "Aceptar"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Confirmación: Limpiar Historial */}
+      {showClearHistoryModal && (
+        <div className="fixed inset-0 z-[80] bg-black/60 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
+              <Trash2 size={30} />
+            </div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">
+              ¿Limpiar historial?
+            </h3>
+            <p className="text-gray-500 text-sm mb-6 leading-relaxed">
+              ¿Estás seguro de que deseas limpiar tu historial de pedidos en este dispositivo? Esta acción reiniciará tu sesión actual en la mesa.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowClearHistoryModal(false)}
+                className="flex-1 py-3 px-4 rounded-xl font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors active:scale-95"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmClearHistory}
+                className="flex-1 py-3 px-4 rounded-xl font-bold text-white bg-red-600 hover:bg-red-700 shadow-md shadow-red-200 active:scale-95 transition-transform"
+              >
+                Sí, limpiar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Elegante: Estado de Verificación de Pago QR */}
+      {qrAlertModal && (
+        <div className="fixed inset-0 z-[80] bg-black/60 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200">
+            {qrAlertModal.type === 'pending' ? (
+              <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
+                <Clock size={32} />
+              </div>
+            ) : qrAlertModal.type === 'cancelled' ? (
+              <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
+                <AlertTriangle size={32} />
+              </div>
+            ) : (
+              <div className="w-16 h-16 bg-gray-100 text-gray-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
+                <AlertCircle size={32} />
+              </div>
+            )}
+
+            <h3 className="text-xl font-bold text-gray-900 mb-2">
+              {qrAlertModal.title}
+            </h3>
+            
+            <p className="text-gray-600 text-sm mb-4 leading-relaxed">
+              {qrAlertModal.message}
+            </p>
+
+            {qrAlertModal.type === 'pending' && (
+              <div className="bg-amber-50/80 border border-amber-200/60 rounded-2xl p-3 text-xs text-amber-900 text-left mb-6 flex items-start gap-2.5">
+                <AlertCircle size={16} className="flex-shrink-0 mt-0.5 text-amber-600" />
+                <span>Las transferencias entre bancos pueden tardar unos segundos en ser notificadas. El sistema continúa verificando de forma automática.</span>
+              </div>
+            )}
+
+            <button
+              onClick={() => setQrAlertModal(null)}
+              className="w-full py-3.5 px-6 rounded-xl font-bold text-white shadow-lg active:scale-95 transition-transform"
+              style={{ backgroundColor: brandColor }}
+            >
+              Entendido
+            </button>
           </div>
         </div>
       )}
