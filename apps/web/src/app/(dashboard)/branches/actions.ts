@@ -110,6 +110,17 @@ export async function deleteBranchUser(userId: string) {
 }
 
 export async function switchBranch(userId: string, targetBranchId: string | null) {
+  // Verificamos el rol del usuario que intenta cambiar
+  const { data: userProfile } = await supabaseAdmin
+    .from('restaurant_users')
+    .select('role')
+    .eq('user_id', userId)
+    .single();
+
+  if (userProfile?.role !== 'owner') {
+    return { error: 'Solo los administradores principales (owners) pueden cambiar de sucursal libremente.' };
+  }
+
   const { error } = await supabaseAdmin
     .from('restaurant_users')
     .update({ branch_id: targetBranchId })

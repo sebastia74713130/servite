@@ -97,7 +97,7 @@ export default function FinancesPage() {
       setIsOpening(true);
       const result = await openCashRegister({
         restaurant_id: restaurant.id,
-        branch_id: branch?.id || restaurant.id,
+        branch_id: branch?.id || null,
         status: 'open',
         opening_balance: parseFloat(openingBalance) || 0,
       });
@@ -110,7 +110,7 @@ export default function FinancesPage() {
         const cufdRes = await fetch('/api/siat/cufd', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ restaurantId: restaurant.id, branchId: branch?.id || restaurant.id })
+          body: JSON.stringify({ restaurantId: restaurant.id, branchId: branch?.id || undefined })
         });
         const cufdData = await cufdRes.json();
         

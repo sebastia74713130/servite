@@ -158,7 +158,11 @@ export default function PublicMenuClient({
               }
             } catch (e) {}
           };
-          checkUnpaid();
+          checkUnpaid(); // Run once on load
+          
+          // Poll every 15 seconds to actively expel devices if the session ends
+          const checkInterval = setInterval(checkUnpaid, 15000);
+          return () => clearInterval(checkInterval);
         }
       }
     }
@@ -820,7 +824,7 @@ export default function PublicMenuClient({
 
       if (error) throw error;
 
-      if (table.type !== 'takeaway' && isRefresh && billOrders.length > 0 && (!data || data.length === 0)) {
+      if (table.type !== 'takeaway' && sessionStorage.getItem(`has_ordered_${table.id}`) === 'true' && (!data || data.length === 0)) {
         setSessionEnded(true);
         localStorage.setItem(`session_ended_timestamp_${table.id}`, Date.now().toString());
       }
@@ -896,6 +900,23 @@ export default function PublicMenuClient({
   const handleServiceRequest = async (status: 'calling_waiter' | 'requesting_bill') => {
     setServiceRequestLoading(true);
     try {
+      if (status === 'requesting_bill') {
+        const { data: activeOrders } = await supabase
+          .from('orders')
+          .select('id')
+          .eq('table_id', table.id)
+          .eq('is_paid', false)
+          .neq('status', 'cancelled');
+          
+        if (!activeOrders || activeOrders.length === 0) {
+          setSessionEnded(true);
+          localStorage.setItem(`session_ended_timestamp_${table.id}`, Date.now().toString());
+          alert("No tienes pedidos pendientes por cobrar. La mesa ha sido liberada.");
+          setServiceRequestLoading(false);
+          return;
+        }
+      }
+
       const { error } = await supabase
         .from('tables')
         .update({ 
@@ -916,6 +937,22 @@ export default function PublicMenuClient({
   const handleRequestBillWithData = async (omit: boolean = false) => {
     setServiceRequestLoading(true);
     try {
+      const { data: activeOrders } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('table_id', table.id)
+        .eq('is_paid', false)
+        .neq('status', 'cancelled');
+        
+      if (!activeOrders || activeOrders.length === 0) {
+        setSessionEnded(true);
+        localStorage.setItem(`session_ended_timestamp_${table.id}`, Date.now().toString());
+        setShowBillRequestModal(false);
+        alert("No tienes pedidos pendientes por cobrar. La mesa ha sido liberada.");
+        setServiceRequestLoading(false);
+        return;
+      }
+
       const { error } = await supabase
         .from('tables')
         .update({ 
@@ -940,7 +977,7 @@ export default function PublicMenuClient({
     }
   };
 
-  const totalBill = billOrders.reduce((acc, o) => acc + (o.order_items?.reduce((sum: number, item: any) => sum + item.total_price, 0) || o.total), 0);
+  const totalBill = billOrders.reduce((acc, o) => acc + (o.order_items && o.order_items.length > 0 ? o.order_items.reduce((sum: number, item: any) => sum + Number(item.total_price || 0), 0) : o.total), 0);
 
   const cufToDownload = autoEmittedCuf || billOrders.flatMap(o => o.invoices || []).sort((a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())[0]?.cuf;
 
@@ -1705,7 +1742,7 @@ export default function PublicMenuClient({
                           ))}
                           <div className="border-t mt-3 pt-3 flex justify-between items-center font-bold text-gray-900">
                             <span>Subtotal</span>
-                            <span>Bs {order.total.toLocaleString('es-BO')}</span>
+                            <span>Bs {(order.order_items && order.order_items.length > 0 ? order.order_items.reduce((sum: number, item: any) => sum + Number(item.total_price || 0), 0) : order.total).toLocaleString('es-BO')}</span>
                           </div>
                           {(order.invoices && order.invoices.length > 0 || table.type === 'takeaway') && (
                             <div className="mt-3 pt-3 border-t border-dashed border-gray-200 flex flex-col gap-2">
@@ -1734,7 +1771,7 @@ export default function PublicMenuClient({
                       {isMultiRestaurant && (
                         <div className="flex justify-between items-center px-2 font-semibold text-gray-600 text-sm">
                           <span>Total {group.restaurantName}</span>
-                          <span>Bs {group.orders.reduce((a, o) => a + o.total, 0).toLocaleString('es-BO')}</span>
+                          <span>Bs {group.orders.reduce((a, o) => a + (o.order_items && o.order_items.length > 0 ? o.order_items.reduce((sum: number, item: any) => sum + Number(item.total_price || 0), 0) : o.total), 0).toLocaleString('es-BO')}</span>
                         </div>
                       )}
                     </div>

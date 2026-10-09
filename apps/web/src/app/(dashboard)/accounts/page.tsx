@@ -124,6 +124,9 @@ export default function AccountsPage() {
   const [paymentMethod, setPaymentMethod] = useState('Pago QR');
   const [cardNumber, setCardNumber] = useState('');
   const [siatPuntoVenta, setSiatPuntoVenta] = useState('0');
+  const [cashierNit, setCashierNit] = useState('');
+  const [cashierName, setCashierName] = useState('');
+  const [generateInvoice, setGenerateInvoice] = useState(false);
   const [activeRegister, setActiveRegister] = useState<any>(null);
 
   useEffect(() => {
@@ -131,6 +134,16 @@ export default function AccountsPage() {
       setPaymentMethod(selectedTable.requested_payment_method);
     } else {
       setPaymentMethod('QR / Transferencia');
+    }
+    
+    if (selectedTable?.siat_customer_nit || selectedTable?.siat_customer_name) {
+      setCashierNit(selectedTable.siat_customer_nit || '');
+      setCashierName(selectedTable.siat_customer_name || '');
+      setGenerateInvoice(true);
+    } else {
+      setCashierNit('');
+      setCashierName('');
+      setGenerateInvoice(false);
     }
   }, [selectedTable]);
 
@@ -167,14 +180,14 @@ export default function AccountsPage() {
       let generatedCuf = null;
 
       // 1. SIAT Emission Logic (If requested and there are orders)
-      if (orderIds.length > 0 && selectedTable.service_status === 'requesting_bill' && selectedTable.siat_customer_name) {
+      if (orderIds.length > 0 && generateInvoice && cashierName) {
         try {
-          const nitCi = (selectedTable.siat_customer_nit === '0' || !selectedTable.siat_customer_nit) ? '99002' : selectedTable.siat_customer_nit;
+          const nitCi = (cashierNit === '0' || !cashierNit) ? '99002' : cashierNit;
           const rznSocial = nitCi === '99002' 
             ? 'CONTROL TRIBUTARIO' 
-            : ((selectedTable.siat_customer_name === 'S/N' || !selectedTable.siat_customer_name) ? 'S/N' : selectedTable.siat_customer_name);
+            : ((cashierName === 'S/N' || !cashierName) ? 'S/N' : cashierName);
 
-          const totalAmount = tableOrders.reduce((acc, o) => acc + (o.order_items?.reduce((sum: number, item: any) => sum + item.total_price, 0) || o.total), 0);
+          const totalAmount = tableOrders.reduce((acc, o) => acc + (o.order_items && o.order_items.length > 0 ? o.order_items.reduce((sum: number, item: any) => sum + Number(item.total_price || 0), 0) : o.total), 0);
           const facturaParams: any = {
             cabecera: {
               fechaEmision: new Date().toISOString(),
@@ -185,13 +198,13 @@ export default function AccountsPage() {
               numeroDocumento: nitCi,
               codigoMetodoPago: paymentMethod === 'Tarjeta' ? 2 : (paymentMethod.includes('QR') ? 7 : 1),
             },
-            detalle: tableOrders.flatMap(o => o.order_items).map((item: any) => ({
+            detalle: tableOrders.flatMap(o => o.order_items || []).map((item: any) => ({
               codigoProducto: item.product_id ? item.product_id.substring(0, 8) : '00000000',
               descripcion: item.product_name,
-              cantidad: item.quantity,
-              precioUnitario: item.unit_price,
+              cantidad: Number(item.quantity || 1),
+              precioUnitario: Number(item.unit_price || 0),
               montoDescuento: 0,
-              subTotal: item.total_price
+              subTotal: Number(item.total_price || 0)
             }))
           };
 
@@ -354,7 +367,7 @@ export default function AccountsPage() {
       `)
     ).join("");
 
-    const total = tableOrders.reduce((acc, o) => acc + (o.order_items?.reduce((sum: number, item: any) => sum + item.total_price, 0) || o.total), 0);
+    const total = tableOrders.reduce((acc, o) => acc + (o.order_items && o.order_items.length > 0 ? o.order_items.reduce((sum: number, item: any) => sum + Number(item.total_price || 0), 0) : o.total), 0);
 
     const html = `
       <html>
@@ -563,7 +576,7 @@ export default function AccountsPage() {
               <div className="flex justify-between items-center mb-6">
                 <span className="text-lg text-gray-600">Total a cobrar:</span>
                 <span className="text-3xl font-bold text-gray-900">
-                  Bs {tableOrders.reduce((acc, o) => acc + (o.order_items?.reduce((sum: number, item: any) => sum + item.total_price, 0) || o.total), 0).toLocaleString('es-BO')}
+                  Bs {tableOrders.reduce((acc, o) => acc + (o.order_items && o.order_items.length > 0 ? o.order_items.reduce((sum: number, item: any) => sum + Number(item.total_price || 0), 0) : o.total), 0).toLocaleString('es-BO')}
                 </span>
               </div>
               
@@ -598,24 +611,55 @@ export default function AccountsPage() {
                   </div>
                 )}
 
-                {selectedTable.service_status === 'requesting_bill' && selectedTable.siat_customer_name && (
-                  <div className="mt-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Punto de Venta SIAT:
-                    </label>
-                    <select 
-                      value={siatPuntoVenta}
-                      onChange={e => setSiatPuntoVenta(e.target.value)}
-                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32]"
-                    >
-                      <option value="0">Punto de Venta 0 (Por Defecto)</option>
-                      <option value="1">Punto de Venta 1</option>
-                      <option value="2">Punto de Venta 2</option>
-                      <option value="3">Punto de Venta 3</option>
-                    </select>
+                <div className="mt-4 pt-4 border-t border-gray-100">
+                  <label className="flex items-center gap-2 cursor-pointer mb-4">
+                    <input 
+                      type="checkbox" 
+                      checked={generateInvoice}
+                      onChange={e => setGenerateInvoice(e.target.checked)}
+                      className="w-5 h-5 text-[#2E7D32] rounded focus:ring-[#2E7D32]"
+                    />
+                    <span className="font-bold text-gray-800">Generar Factura (SIAT)</span>
+                  </label>
 
-                  </div>
-                )}
+                  {generateInvoice && (
+                    <div className="space-y-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">NIT/CI</label>
+                        <input 
+                          type="text" 
+                          value={cashierNit}
+                          onChange={e => setCashierNit(e.target.value)}
+                          placeholder="Ej. 1234567"
+                          className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Razón Social</label>
+                        <input 
+                          type="text" 
+                          value={cashierName}
+                          onChange={e => setCashierName(e.target.value)}
+                          placeholder="Nombre del cliente"
+                          className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Punto de Venta SIAT</label>
+                        <select 
+                          value={siatPuntoVenta}
+                          onChange={e => setSiatPuntoVenta(e.target.value)}
+                          className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32]"
+                        >
+                          <option value="0">Punto de Venta 0 (Por Defecto)</option>
+                          <option value="1">Punto de Venta 1</option>
+                          <option value="2">Punto de Venta 2</option>
+                          <option value="3">Punto de Venta 3</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                 {!activeRegister && (
                   <p className="text-xs text-orange-600 mt-2">

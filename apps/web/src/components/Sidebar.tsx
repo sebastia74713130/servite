@@ -262,7 +262,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: { isOpen?: boolean, setIsO
           const isActive = pathname === link.href;
           
           let badgeCount = 0;
-          if (link.name === "Pedidos") badgeCount = stats?.nuevos || 0;
+          if (link.name === "Pedidos" || link.name === "Cocina") badgeCount = stats?.nuevos || 0;
           if (link.name === "Cuentas") badgeCount = callingTablesCount;
           if (link.name === "Reservas") badgeCount = pendingReservationsCount;
 
