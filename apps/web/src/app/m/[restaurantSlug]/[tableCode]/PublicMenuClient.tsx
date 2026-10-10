@@ -106,7 +106,8 @@ export default function PublicMenuClient({
   }, [externalSelectedCatId]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (isPreviewMode) return;
+    if (typeof window !== 'undefined' && table?.id) {
       if (table.type === 'takeaway') {
         let sid = localStorage.getItem(`device_session_id_${table.id}`);
         if (!sid) {
@@ -184,6 +185,8 @@ export default function PublicMenuClient({
   const [isAlarmRinging, setIsAlarmRinging] = useState(false);
 
   useEffect(() => {
+    if (isPreviewMode) return;
+    if (!table?.id || table.id === 'mock') return;
     if (table.type === 'takeaway') return;
 
     const channel = supabase
@@ -257,6 +260,7 @@ export default function PublicMenuClient({
   }, [table.id, table.type]);
 
   useEffect(() => {
+    if (isPreviewMode) return;
     if (table.type === 'takeaway' && foodCourtSessionId) {
       // Listen for updates on all orders in the food court session (multi-restaurant)
       const channel = supabase
@@ -284,10 +288,11 @@ export default function PublicMenuClient({
         supabase.removeChannel(channel);
       };
     }
-  }, [table.type, foodCourtSessionId]);
+  }, [table.type, foodCourtSessionId, isPreviewMode]);
 
   // Efecto para finalizar la sesión cuando todos los pedidos de la barra estén entregados
   useEffect(() => {
+    if (isPreviewMode) return;
     if (table.type === 'takeaway' && billOrders.length > 0) {
       const allDelivered = billOrders.every(o => o.status === 'delivered' || o.status === 'cancelled');
       if (allDelivered) {
@@ -576,23 +581,29 @@ export default function PublicMenuClient({
 
   // Load cart from localStorage on mount
   useEffect(() => {
-    const savedCart = localStorage.getItem(`cart_${table.table_code}`) ||
-      (table.table_code.startsWith('BARRA-') ? localStorage.getItem(`cart_${table.table_code.replace('BARRA-', 'MESA-')}`) : null);
+    if (isPreviewMode) return;
+    const code = table?.table_code || '';
+    const savedCart = localStorage.getItem(`cart_${code}`) ||
+      (code.startsWith('BARRA-') ? localStorage.getItem(`cart_${code.replace('BARRA-', 'MESA-')}`) : null);
     if (savedCart) {
       try {
         setCartItems(JSON.parse(savedCart));
       } catch (e) {}
     }
-  }, [table.table_code]);
+  }, [table?.table_code, isPreviewMode]);
 
   // Save cart to localStorage when it changes
   useEffect(() => {
-    localStorage.setItem(`cart_${table.table_code}`, JSON.stringify(cartItems));
-  }, [cartItems, table.table_code]);
+    if (isPreviewMode) return;
+    if (table?.table_code) {
+      localStorage.setItem(`cart_${table.table_code}`, JSON.stringify(cartItems));
+    }
+  }, [cartItems, table?.table_code, isPreviewMode]);
 
-  const tableDisplayName = table.type === 'takeaway'
-    ? (table.table_number.toLowerCase().startsWith('barra') ? table.table_number : `Barra ${table.table_number}`)
-    : (table.table_number.toLowerCase().startsWith('mesa') ? table.table_number : `Mesa ${table.table_number}`);
+  const rawTableNumber = table?.table_number ? String(table.table_number) : (table?.table_code ? String(table.table_code) : '1');
+  const tableDisplayName = table?.type === 'takeaway'
+    ? (rawTableNumber.toLowerCase().startsWith('barra') ? rawTableNumber : `Barra ${rawTableNumber}`)
+    : (rawTableNumber.toLowerCase().startsWith('mesa') ? rawTableNumber : `Mesa ${rawTableNumber}`);
 
   const brandColor = restaurant?.brand_color || '#E76F51';
   

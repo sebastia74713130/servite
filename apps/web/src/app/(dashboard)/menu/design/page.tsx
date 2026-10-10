@@ -413,9 +413,9 @@ export default function MenuDesignPage() {
   if (sessionLoading) return <LoadingState />;
 
   // Create a mock table and restaurant object for the public menu client
-  const mockTable = { id: 'mock', table_code: 'preview' };
+  const mockTable = { id: 'mock', table_code: 'preview', table_number: '1', type: 'dine_in' };
   const mockRestaurant = {
-    ...restaurant,
+    ...(restaurant || {}),
     cover_url: coverUrl,
     menu_background_color: menuBgColor,
     menu_text_color: menuTextColor,
