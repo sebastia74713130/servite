@@ -1,9 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { getUserRestaurant } from '@/app/actions';
+import { isSuperAdmin } from '@/app/admin/actions';
+import { ModuleKey } from '@/shared/types';
 
 export function useRestaurantSession() {
   const router = useRouter();
@@ -12,6 +14,7 @@ export function useRestaurantSession() {
   const [role, setRole] = useState<string | null>(null);
   const [billingCycle, setBillingCycle] = useState<any>(null);
   const [isMainBranch, setIsMainBranch] = useState<boolean>(true);
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -21,6 +24,14 @@ export function useRestaurantSession() {
         if (!session) {
           router.push('/login');
           return;
+        }
+
+        // Check if user has SuperAdmin platform privileges
+        try {
+          const superAdminStatus = await isSuperAdmin(session.user.id, session.user.email);
+          setIsAdmin(superAdminStatus);
+        } catch (err) {
+          console.warn("Could not check superadmin status:", err);
         }
 
         const userRest = await getUserRestaurant(session.user.id);
@@ -44,6 +55,22 @@ export function useRestaurantSession() {
     loadSession();
   }, [router]);
 
-  return { restaurant, branch, role, billingCycle, loading, isMainBranch };
-}
+  const hasModule = useCallback((modKey: ModuleKey): boolean => {
+    if (!restaurant) return false;
+    const enabled = restaurant.enabled_modules;
+    // Si no está definido (restaurantes previos), se asume habilitado para retrocompatibilidad
+    if (!Array.isArray(enabled) || enabled.length === 0) return true;
+    return enabled.includes(modKey);
+  }, [restaurant]);
 
+  return { 
+    restaurant, 
+    branch, 
+    role, 
+    billingCycle, 
+    loading, 
+    isMainBranch,
+    isAdmin,
+    hasModule
+  };
+}

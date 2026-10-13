@@ -1,11 +1,146 @@
 // === Enums ===
 export type OrderStatus = 'sent' | 'received' | 'preparing' | 'ready' | 'delivered' | 'cancelled';
-export type UserRole = 'owner' | 'admin' | 'kitchen';
-export type SubscriptionPlan = 'TEST' | 'BASIC' | 'PRO' | 'FULL';
+export type UserRole = 'owner' | 'admin' | 'kitchen' | 'waitstaff' | 'superadmin';
+export type SubscriptionPlan = 'TEST' | 'BASIC' | 'PRO' | 'FULL' | 'CUSTOM';
 export type OrderChannel = 'dine_in' | 'own_delivery' | 'third_party';
 export type MacroCategory = 'food' | 'beverage' | 'dessert' | 'other';
 
+export type ModuleKey = 
+  | 'menu' 
+  | 'tables' 
+  | 'takeaway' 
+  | 'orders' 
+  | 'kitchen' 
+  | 'accounts' 
+  | 'invoices' 
+  | 'inventory' 
+  | 'finances' 
+  | 'reservations' 
+  | 'branches';
+
+export interface ModuleDefinition {
+  key: ModuleKey;
+  name: string;
+  category: 'salon' | 'cocina' | 'caja' | 'gestion';
+  description: string;
+  routes: string[];
+}
+
+export const AVAILABLE_MODULES: Record<ModuleKey, ModuleDefinition> = {
+  menu: {
+    key: 'menu',
+    name: 'Menú Digital',
+    category: 'salon',
+    description: 'Catálogo digital con fotos, categorías, modificadores y código QR.',
+    routes: ['/menu', '/menu/design']
+  },
+  tables: {
+    key: 'tables',
+    name: 'Mesas & Salón',
+    category: 'salon',
+    description: 'Gestión de mesas, QR de mesa, llamados de mesero y cobro con QR dinámico en mesa.',
+    routes: ['/tables']
+  },
+  takeaway: {
+    key: 'takeaway',
+    name: 'Barra & Takeaway',
+    category: 'salon',
+    description: 'Atención rápida en barra, captura de datos del cliente y aviso sonoro de pedido listo.',
+    routes: ['/tables']
+  },
+  orders: {
+    key: 'orders',
+    name: 'Gestión de Pedidos',
+    category: 'salon',
+    description: 'Bandeja en tiempo real de órdenes de salón o barra y asignación a mozos.',
+    routes: ['/orders']
+  },
+  kitchen: {
+    key: 'kitchen',
+    name: 'Cocina & KDS',
+    category: 'cocina',
+    description: 'Pantalla de cocina táctil en vivo con separación por estaciones y alertas sonoras.',
+    routes: ['/kitchen']
+  },
+  accounts: {
+    key: 'accounts',
+    name: 'Caja & Cuentas',
+    category: 'caja',
+    description: 'Cierre de cuentas de mesas, cobros en efectivo/tarjeta/QR y liberación de mesa.',
+    routes: ['/accounts']
+  },
+  invoices: {
+    key: 'invoices',
+    name: 'Facturación SIAT',
+    category: 'caja',
+    description: 'Facturación electrónica computarizada en línea validada por Impuestos Nacionales.',
+    routes: ['/invoices', '/settings/siat']
+  },
+  finances: {
+    key: 'finances',
+    name: 'Finanzas & Arqueos',
+    category: 'caja',
+    description: 'Cajas chicas, aperturas/cierres de turno, ingresos, egresos y reportes.',
+    routes: ['/finances']
+  },
+  inventory: {
+    key: 'inventory',
+    name: 'Inventario & Costeo',
+    category: 'gestion',
+    description: 'Insumos, recetas, cálculo de Food Cost y descuento automático de stock con cada venta.',
+    routes: ['/inventory']
+  },
+  reservations: {
+    key: 'reservations',
+    name: 'Reservas Online',
+    category: 'gestion',
+    description: 'Página web pública de reservas de mesa por turnos y confirmación de asistencia.',
+    routes: ['/reservations', '/settings/reservations']
+  },
+  branches: {
+    key: 'branches',
+    name: 'Múltiples Sucursales',
+    category: 'gestion',
+    description: 'Administración centralizada de más de un local o sucursal de la marca.',
+    routes: ['/branches']
+  }
+};
+
+export const PRESET_MODULE_PLANS: Record<string, { name: string; modules: ModuleKey[] }> = {
+  MENU_ONLY: {
+    name: 'Plan Menú Digital',
+    modules: ['menu']
+  },
+  BASIC: {
+    name: 'Plan Menú & Barra',
+    modules: ['menu', 'takeaway', 'orders']
+  },
+  DINE_IN: {
+    name: 'Plan Salón & Mesas',
+    modules: ['menu', 'tables', 'orders', 'kitchen', 'accounts']
+  },
+  STANDARD: {
+    name: 'Plan Operativo Completo',
+    modules: ['menu', 'tables', 'takeaway', 'orders', 'kitchen', 'accounts', 'finances']
+  },
+  FULL: {
+    name: 'Plan Total (Todo Incluido)',
+    modules: ['menu', 'tables', 'takeaway', 'orders', 'kitchen', 'accounts', 'invoices', 'inventory', 'finances', 'reservations', 'branches']
+  }
+};
+
 // === Database Models ===
+export interface PlatformAdmin {
+  id: string;
+  user_id: string;
+  email: string;
+  full_name?: string | null;
+  role: 'superadmin' | 'support';
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface BillingCycle {
   id: string;
   restaurant_id: string;
@@ -20,8 +155,12 @@ export interface Restaurant {
   slug: string;
   logo_url: string | null;
   subscription_plan?: SubscriptionPlan;
-  subscription_status?: 'active' | 'inactive' | 'expired';
+  subscription_status?: 'active' | 'inactive' | 'expired' | 'suspended';
   subscription_expires_at?: string | null;
+  subscription_notes?: string | null;
+  monthly_price?: number;
+  billing_period?: 'monthly' | 'semiannual' | 'annual';
+  enabled_modules?: ModuleKey[];
   brand_color?: string | null;
   cover_url?: string | null;
   menu_background_color?: string | null;

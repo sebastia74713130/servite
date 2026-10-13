@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import { useRestaurantSession } from "@/hooks/useRestaurantSession";
 import { useDashboardStats } from "@/hooks/useDashboardStats";
+import { ModuleKey } from "@/shared/types";
 import { 
   Home,
   FileText, 
@@ -20,7 +21,8 @@ import {
   Wallet,
   Package,
   CalendarClock,
-  Store
+  Store,
+  ShieldCheck
 } from "lucide-react";
 
 let globalUtterance: SpeechSynthesisUtterance | null = null;
@@ -28,7 +30,7 @@ let globalUtterance: SpeechSynthesisUtterance | null = null;
 export function Sidebar({ isOpen = true, setIsOpen }: { isOpen?: boolean, setIsOpen?: (v: boolean) => void }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { restaurant, branch, role } = useRestaurantSession();
+  const { restaurant, branch, role, hasModule, isAdmin } = useRestaurantSession();
   const { stats } = useDashboardStats(restaurant?.id, branch?.id);
   const [callingTablesCount, setCallingTablesCount] = useState(0);
   const [pendingReservationsCount, setPendingReservationsCount] = useState(0);
@@ -204,25 +206,41 @@ export function Sidebar({ isOpen = true, setIsOpen }: { isOpen?: boolean, setIsO
 
   const currentPlan = restaurant?.subscription_plan || 'BASIC';
 
-  const allLinks = [
+  interface SidebarLink {
+    name: string;
+    href: string;
+    icon: any;
+    allowedRoles?: string[];
+    module?: ModuleKey;
+  }
+
+  const allLinks: SidebarLink[] = [
     { name: "Dashboard", href: "/", icon: Home },
-    { name: "Pedidos", href: "/orders", icon: ClipboardList, allowedRoles: ['kitchen', 'waitstaff'] },
-    { name: "Cocina", href: "/kitchen", icon: ChefHat, allowedRoles: ['kitchen'] },
-    { name: "Cuentas", href: "/accounts", icon: Receipt, allowedRoles: ['waitstaff'] },
-    { name: "Facturas", href: "/invoices", icon: FileText },
-    { name: "Finanzas", href: "/finances", icon: Wallet },
-    { name: "Inventario", href: "/inventory", icon: Package },
-    { name: "Menú", href: "/menu", icon: UtensilsCrossed, allowedRoles: ['kitchen', 'waitstaff'] },
-    { name: "Mesas", href: "/tables", icon: LayoutGrid, allowedRoles: ['waitstaff'] },
-    { name: "Reservas", href: "/reservations", icon: CalendarClock },
-    { name: "Sucursales", href: "/branches", icon: Store },
+    { name: "Pedidos", href: "/orders", icon: ClipboardList, allowedRoles: ['kitchen', 'waitstaff'], module: 'orders' },
+    { name: "Cocina", href: "/kitchen", icon: ChefHat, allowedRoles: ['kitchen'], module: 'kitchen' },
+    { name: "Cuentas", href: "/accounts", icon: Receipt, allowedRoles: ['waitstaff'], module: 'accounts' },
+    { name: "Facturas", href: "/invoices", icon: FileText, module: 'invoices' },
+    { name: "Finanzas", href: "/finances", icon: Wallet, module: 'finances' },
+    { name: "Inventario", href: "/inventory", icon: Package, module: 'inventory' },
+    { name: "Menú", href: "/menu", icon: UtensilsCrossed, allowedRoles: ['kitchen', 'waitstaff'], module: 'menu' },
+    { name: "Mesas", href: "/tables", icon: LayoutGrid, allowedRoles: ['waitstaff'], module: 'tables' },
+    { name: "Reservas", href: "/reservations", icon: CalendarClock, module: 'reservations' },
+    { name: "Sucursales", href: "/branches", icon: Store, module: 'branches' },
     { name: "Configuración", href: "/settings", icon: Settings },
   ];
 
   const links = allLinks.filter(link => {
-    
-    
+    // 1. Filtrar por módulo contratado
+    if (link.module) {
+      if (link.module === 'tables') {
+        // Tanto 'tables' (salón) como 'takeaway' (barra) usan la vista /tables
+        if (!hasModule('tables') && !hasModule('takeaway')) return false;
+      } else if (!hasModule(link.module)) {
+        return false;
+      }
+    }
 
+    // 2. Filtrar por rol de usuario
     if (role === 'owner' || role === 'admin') return true;
     if (link.allowedRoles?.includes(role as string)) return true;
     return false;
@@ -295,7 +313,16 @@ export function Sidebar({ isOpen = true, setIsOpen }: { isOpen?: boolean, setIsO
         })}
       </nav>
 
-      <div className="p-4 border-t border-white/10">
+      <div className="p-4 border-t border-white/10 space-y-2">
+        {isAdmin && (
+          <Link
+            href="/admin"
+            className="flex items-center space-x-3 px-4 py-2.5 w-full bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-400/30 text-indigo-200 hover:text-white rounded-xl transition-colors font-medium text-sm"
+          >
+            <ShieldCheck size={18} className="text-indigo-400" />
+            <span>Panel SuperAdmin</span>
+          </Link>
+        )}
         <button
           onClick={handleLogout}
           className="flex items-center space-x-3 px-4 py-3 w-full text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-colors"
