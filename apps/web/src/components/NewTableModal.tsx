@@ -10,6 +10,7 @@ interface NewTableModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSaved: () => void;
+  forceType?: "dine_in" | "takeaway";
 }
 
 export function NewTableModal({
@@ -18,9 +19,10 @@ export function NewTableModal({
   isOpen,
   onClose,
   onSaved,
+  forceType,
 }: NewTableModalProps) {
   const [tableNumber, setTableNumber] = useState("");
-  const [type, setType] = useState<"dine_in" | "takeaway">("dine_in");
+  const [type, setType] = useState<"dine_in" | "takeaway">(forceType || "dine_in");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -98,35 +100,37 @@ export function NewTableModal({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2 block">
-              Tipo de ubicación
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setType("dine_in")}
-                className={`py-2.5 px-3 rounded-xl border text-xs sm:text-sm font-bold transition-all text-center ${
-                  type === "dine_in"
-                    ? "bg-[#E76F51]/10 border-[#E76F51] text-[#E76F51]"
-                    : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
-                }`}
-              >
-                Mesa Salón
-              </button>
-              <button
-                type="button"
-                onClick={() => setType("takeaway")}
-                className={`py-2.5 px-3 rounded-xl border text-xs sm:text-sm font-bold transition-all text-center ${
-                  type === "takeaway"
-                    ? "bg-[#E76F51]/10 border-[#E76F51] text-[#E76F51]"
-                    : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
-                }`}
-              >
-                Barra / Fila
-              </button>
+          {!forceType && (
+            <div>
+              <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2 block">
+                Tipo de ubicación
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setType("dine_in")}
+                  className={`py-2.5 px-3 rounded-xl border text-xs sm:text-sm font-bold transition-all text-center ${
+                    type === "dine_in"
+                      ? "bg-[#E76F51]/10 border-[#E76F51] text-[#E76F51]"
+                      : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                  }`}
+                >
+                  Mesa Salón
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setType("takeaway")}
+                  className={`py-2.5 px-3 rounded-xl border text-xs sm:text-sm font-bold transition-all text-center ${
+                    type === "takeaway"
+                      ? "bg-[#E76F51]/10 border-[#E76F51] text-[#E76F51]"
+                      : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                  }`}
+                >
+                  Barra / Fila
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           <div>
             <label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2 block">

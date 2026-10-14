@@ -216,7 +216,8 @@ export function Sidebar({ isOpen = true, setIsOpen }: { isOpen?: boolean, setIsO
 
   const allLinks: SidebarLink[] = [
     { name: "Dashboard", href: "/", icon: Home },
-    { name: "Mesas y Pedidos", href: "/accounts", icon: LayoutGrid, allowedRoles: ['kitchen', 'waitstaff'], module: 'orders&accounts' },
+    { name: "Mesas y Cuentas", href: "/accounts", icon: LayoutGrid, allowedRoles: ['kitchen', 'waitstaff'], module: 'accounts' },
+    { name: "Pedidos", href: "/orders", icon: ClipboardList, allowedRoles: ['kitchen', 'waitstaff'], module: 'orders' },
     { name: "Cocina", href: "/kitchen", icon: ChefHat, allowedRoles: ['kitchen'], module: 'kitchen' },
     { name: "Facturas", href: "/invoices", icon: FileText, module: 'invoices' },
     { name: "Finanzas", href: "/finances", icon: Wallet, module: 'finances' },
@@ -276,7 +277,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: { isOpen?: boolean, setIsO
           
           let badgeCount = 0;
           if (link.name === "Pedidos" || link.name === "Cocina") badgeCount = stats?.nuevos || 0;
-          if (link.name === "Cuentas") badgeCount = callingTablesCount;
+          if (link.name === "Mesas y Cuentas" || link.name === "Cuentas") badgeCount = callingTablesCount;
           if (link.name === "Reservas") badgeCount = pendingReservationsCount;
 
           return (

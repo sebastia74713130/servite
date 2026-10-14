@@ -266,7 +266,21 @@ export default function PublicMenuClient({
         schema: 'public',
         table: 'orders',
         filter: `table_id=eq.${table.id}`
-      }, async () => {
+      }, async (payload: any) => {
+        if (table.type === 'takeaway') {
+          if (payload.eventType === 'UPDATE' && payload.new) {
+            setBillOrders(prev => prev.map(o => o.id === payload.new.id ? { ...o, ...payload.new } : o));
+            if (payload.new.status === 'ready' && payload.old?.status !== 'ready') {
+              setServiceMessage("¡Tu pedido está listo! Por favor acércate a la barra a recogerlo.");
+              if (alarmAudioRef.current) {
+                alarmAudioRef.current.currentTime = 0;
+                alarmAudioRef.current.play().catch(() => {});
+                setIsAlarmRinging(true);
+              }
+            }
+          }
+        }
+
         if (sessionStorage.getItem(`has_ordered_${table.id}`) === 'true') {
           try {
             const { data: unpaid } = await supabase
@@ -313,8 +327,8 @@ export default function PublicMenuClient({
               setIsAlarmRinging(true);
             }
           }
-          // Update order status in the bill view
-          setBillOrders(prev => prev.map(o => o.id === payload.new.id ? { ...o, status: payload.new.status } : o));
+          // Update order status and details in the bill view
+          setBillOrders(prev => prev.map(o => o.id === payload.new.id ? { ...o, ...payload.new } : o));
         })
         .subscribe();
 
@@ -2172,6 +2186,47 @@ export default function PublicMenuClient({
                                order.status === 'ready' ? (table?.type === 'takeaway' ? '¡Listo! Pasa a recoger' : '¡Pedido listo!') : 'En preparación'}
                             </span>
                           </div>
+
+                          {/* Takeaway Estimated Prep Time Banner */}
+                          {table?.type === 'takeaway' && (
+                            <div className="mb-3">
+                              {order.status === 'preparing' && (
+                                <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <Clock size={18} className="text-[#E76F51]" />
+                                    <div>
+                                      <p className="text-xs font-bold text-orange-950">
+                                        ⏱️ Tiempo estimado: ~{order.estimated_prep_minutes || 20} min
+                                      </p>
+                                      {order.estimated_ready_at && (
+                                        <p className="text-[11px] text-orange-800 mt-0.5">
+                                          Listo aprox: {new Intl.DateTimeFormat('es-BO', { hour: '2-digit', minute: '2-digit', timeZone: 'America/La_Paz' }).format(new Date(order.estimated_ready_at))}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <span className="text-[10px] uppercase tracking-wider font-extrabold px-2 py-0.5 bg-orange-200/60 text-orange-900 rounded-full">
+                                    En cocina
+                                  </span>
+                                </div>
+                              )}
+                              {(order.status === 'sent' || order.status === 'received') && (
+                                <div className="bg-blue-50 border border-blue-100 rounded-xl p-2.5 flex items-center gap-2 text-xs text-blue-900">
+                                  <Clock size={15} className="text-blue-600 animate-pulse flex-shrink-0" />
+                                  <span>Tu orden fue recibida. La cocina indicará el tiempo de espera en breve.</span>
+                                </div>
+                              )}
+                              {order.status === 'ready' && (
+                                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center gap-2.5 text-emerald-950">
+                                  <span className="text-2xl animate-bounce">🎉</span>
+                                  <div>
+                                    <p className="text-xs font-bold text-emerald-900">¡Tu pedido está listo para recoger!</p>
+                                    <p className="text-[11px] text-emerald-700">Por favor acércate a la barra a recogerlo.</p>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
                           {order.order_items?.map((item: any) => (
                             <div key={item.id} className="flex justify-between items-center mb-2">
                               <div className="text-gray-900 text-sm">

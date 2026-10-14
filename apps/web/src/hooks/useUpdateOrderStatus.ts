@@ -6,9 +6,14 @@ import { supabase } from "@/lib/supabase";
 export function useUpdateOrderStatus() {
   const [loading, setLoading] = useState(false);
 
-  const updateStatus = async (orderId: string, newStatus: string, restaurantId?: string) => {
+  const updateStatus = async (
+    orderId: string, 
+    newStatus: string, 
+    restaurantId?: string,
+    extraPayload?: Record<string, any>
+  ) => {
     setLoading(true);
-    const updatePayload: any = { status: newStatus };
+    const updatePayload: any = { status: newStatus, ...(extraPayload || {}) };
     if (restaurantId) updatePayload.restaurant_id = restaurantId;
 
     const { error } = await supabase

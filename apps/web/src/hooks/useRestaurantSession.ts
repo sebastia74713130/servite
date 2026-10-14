@@ -61,8 +61,27 @@ export function useRestaurantSession() {
     // Si no está definido (restaurantes previos), se asume habilitado para retrocompatibilidad
     if (!Array.isArray(enabled) || enabled.length === 0) return true;
 
-    // Unificación de módulo orders & accounts
-    if (modKey === 'orders&accounts' || modKey === 'orders&acounts' || modKey === 'accounts' || modKey === 'orders') {
+    // Mesas y Cuentas (salón)
+    if (modKey === 'accounts' || modKey === 'tables') {
+      return (
+        enabled.includes('accounts') ||
+        enabled.includes('tables') ||
+        enabled.includes('orders&accounts') ||
+        enabled.includes('orders&acounts')
+      );
+    }
+
+    // Pedidos (takeaway / barra)
+    if (modKey === 'orders' || modKey === 'takeaway') {
+      return (
+        enabled.includes('orders') ||
+        enabled.includes('takeaway') ||
+        enabled.includes('orders&accounts') ||
+        enabled.includes('orders&acounts')
+      );
+    }
+
+    if (modKey === 'orders&accounts' || modKey === 'orders&acounts') {
       return (
         enabled.includes('orders&accounts') ||
         enabled.includes('orders&acounts') ||

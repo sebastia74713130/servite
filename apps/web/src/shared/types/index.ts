@@ -47,21 +47,21 @@ export const AVAILABLE_MODULES: Record<ModuleKey, ModuleDefinition> = {
     key: 'takeaway',
     name: 'Barra & Takeaway',
     category: 'salon',
-    description: 'Atención rápida en barra, captura de datos del cliente y aviso sonoro de pedido listo.',
-    routes: ['/accounts']
+    description: 'Atención rápida en barra, pedidos para llevar y aviso sonoro de pedido listo.',
+    routes: ['/orders']
   },
   'orders&accounts': {
     key: 'orders&accounts',
-    name: 'Mesas y Pedidos',
+    name: 'Mesas y Cuentas',
     category: 'salon',
-    description: 'Control unificado de salón: cuadrícula de mesas, pedidos en tiempo real, estados de platos, cobro y liberación.',
+    description: 'Control de salón: cuadrícula de mesas, pedidos en tiempo real, estados de platos, cobro y liberación.',
     routes: ['/accounts', '/orders', '/tables']
   },
   'orders&acounts': {
     key: 'orders&acounts',
-    name: 'Mesas y Pedidos',
+    name: 'Mesas y Cuentas',
     category: 'salon',
-    description: 'Control unificado de salón: cuadrícula de mesas, pedidos en tiempo real, estados de platos, cobro y liberación.',
+    description: 'Control de salón: cuadrícula de mesas, pedidos en tiempo real, estados de platos, cobro y liberación.',
     routes: ['/accounts', '/orders', '/tables']
   },
   orders: {
@@ -80,9 +80,9 @@ export const AVAILABLE_MODULES: Record<ModuleKey, ModuleDefinition> = {
   },
   accounts: {
     key: 'accounts',
-    name: 'Caja & Cuentas',
+    name: 'Mesas y Cuentas',
     category: 'caja',
-    description: 'Cierre de cuentas de mesas, cobros en efectivo/tarjeta/QR y liberación de mesa.',
+    description: 'Control de mesas de salón, pedidos en tiempo real, cobros y liberación de mesa.',
     routes: ['/accounts']
   },
   invoices: {
@@ -299,6 +299,11 @@ export interface Order {
   payment_method?: string | null;
   cash_register_id?: string | null;
   paid_at?: string | null;
+  customer_name?: string | null;
+  customer_nit?: string | null;
+  food_court_session_id?: string | null;
+  estimated_prep_minutes?: number | null;
+  estimated_ready_at?: string | null;
   order_items?: OrderItem[];
 }
 

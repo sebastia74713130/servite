@@ -57,7 +57,7 @@ export default function AccountsPage() {
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
 
   // Table grid filters
-  const [activeTabFilter, setActiveTabFilter] = useState<'all' | 'dine_in' | 'takeaway' | 'occupied' | 'calling'>('all');
+  const [activeTabFilter, setActiveTabFilter] = useState<'all' | 'occupied' | 'free' | 'calling'>('all');
 
   const [siatResult, setSiatResult] = useState<{
     type: 'success' | 'error';
@@ -571,24 +571,24 @@ export default function AccountsPage() {
 
   const activeTableIdsWithOrders = useMemo(() => new Set(orders.map(o => o.table_id)), [orders]);
 
+  const salonTables = useMemo(() => tables.filter(t => t.type !== 'takeaway'), [tables]);
+
   const counts = useMemo(() => {
-    const total = tables.length;
-    const dineIn = tables.filter(t => t.type !== 'takeaway').length;
-    const takeaway = tables.filter(t => t.type === 'takeaway').length;
-    const occupied = tables.filter(t => activeTableIdsWithOrders.has(t.id)).length;
-    const calling = tables.filter(t => t.service_status === 'calling_waiter' || t.service_status === 'requesting_bill').length;
-    return { total, dineIn, takeaway, occupied, calling };
-  }, [tables, activeTableIdsWithOrders]);
+    const total = salonTables.length;
+    const occupied = salonTables.filter(t => activeTableIdsWithOrders.has(t.id)).length;
+    const calling = salonTables.filter(t => t.service_status === 'calling_waiter' || t.service_status === 'requesting_bill').length;
+    const free = Math.max(0, total - occupied);
+    return { total, occupied, free, calling };
+  }, [salonTables, activeTableIdsWithOrders]);
 
   const filteredTables = useMemo(() => {
-    return tables.filter(t => {
-      if (activeTabFilter === 'dine_in') return t.type !== 'takeaway';
-      if (activeTabFilter === 'takeaway') return t.type === 'takeaway';
+    return salonTables.filter(t => {
       if (activeTabFilter === 'occupied') return activeTableIdsWithOrders.has(t.id);
+      if (activeTabFilter === 'free') return !activeTableIdsWithOrders.has(t.id);
       if (activeTabFilter === 'calling') return t.service_status === 'calling_waiter' || t.service_status === 'requesting_bill';
       return true;
     });
-  }, [tables, activeTabFilter, activeTableIdsWithOrders]);
+  }, [salonTables, activeTabFilter, activeTableIdsWithOrders]);
 
   if (sessionLoading || loading) return <LoadingState />;
 
@@ -597,12 +597,12 @@ export default function AccountsPage() {
       {/* Top Header */}
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-[#1F2933]">Mesas y Pedidos</h1>
-          <p className="text-gray-500 mt-1">Control integral de salón: mesas, pedidos en tiempo real y cobros.</p>
+          <h1 className="text-3xl font-bold text-[#1F2933]">Mesas y Cuentas</h1>
+          <p className="text-gray-500 mt-1">Gestión de mesas de salón, pedidos en tiempo real y cobros.</p>
         </div>
         <button
           onClick={() => setShowNewTableModal(true)}
-          className="flex items-center gap-2 bg-[#2E7D32] hover:bg-[#256629] text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-sm active:scale-95 text-sm self-start sm:self-auto"
+          className="flex items-center gap-2 bg-[#2E7D32] hover:bg-[#256629] text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-sm active:scale-95 text-sm self-start sm:self-auto cursor-pointer"
         >
           <Plus size={18} />
           <span>Nueva Mesa</span>
@@ -613,7 +613,7 @@ export default function AccountsPage() {
       <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-2 border-b border-gray-100">
         <button
           onClick={() => setActiveTabFilter('all')}
-          className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors flex items-center gap-2 ${
+          className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors flex items-center gap-2 cursor-pointer ${
             activeTabFilter === 'all'
               ? 'bg-[#1F2933] text-white'
               : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
@@ -626,36 +626,8 @@ export default function AccountsPage() {
         </button>
 
         <button
-          onClick={() => setActiveTabFilter('dine_in')}
-          className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors flex items-center gap-2 ${
-            activeTabFilter === 'dine_in'
-              ? 'bg-[#1F2933] text-white'
-              : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
-          }`}
-        >
-          <span>Salón</span>
-          <span className={`px-1.5 py-0.5 rounded-full text-xs ${activeTabFilter === 'dine_in' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-700'}`}>
-            {counts.dineIn}
-          </span>
-        </button>
-
-        <button
-          onClick={() => setActiveTabFilter('takeaway')}
-          className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors flex items-center gap-2 ${
-            activeTabFilter === 'takeaway'
-              ? 'bg-[#1F2933] text-white'
-              : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
-          }`}
-        >
-          <span>Barra / Llevar</span>
-          <span className={`px-1.5 py-0.5 rounded-full text-xs ${activeTabFilter === 'takeaway' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-700'}`}>
-            {counts.takeaway}
-          </span>
-        </button>
-
-        <button
           onClick={() => setActiveTabFilter('occupied')}
-          className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors flex items-center gap-2 ${
+          className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors flex items-center gap-2 cursor-pointer ${
             activeTabFilter === 'occupied'
               ? 'bg-blue-600 text-white'
               : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
@@ -667,10 +639,24 @@ export default function AccountsPage() {
           </span>
         </button>
 
+        <button
+          onClick={() => setActiveTabFilter('free')}
+          className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors flex items-center gap-2 cursor-pointer ${
+            activeTabFilter === 'free'
+              ? 'bg-[#2E7D32] text-white'
+              : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+          }`}
+        >
+          <span>Libres</span>
+          <span className={`px-1.5 py-0.5 rounded-full text-xs ${activeTabFilter === 'free' ? 'bg-white/20 text-white' : 'bg-emerald-50 text-emerald-700'}`}>
+            {counts.free}
+          </span>
+        </button>
+
         {counts.calling > 0 && (
           <button
             onClick={() => setActiveTabFilter('calling')}
-            className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors flex items-center gap-2 cursor-pointer ${
               activeTabFilter === 'calling'
                 ? 'bg-orange-500 text-white animate-pulse'
                 : 'bg-orange-50 text-orange-800 border border-orange-200 hover:bg-orange-100'
@@ -1156,6 +1142,7 @@ export default function AccountsPage() {
         restaurantId={restaurant?.id || ''}
         branchId={branch?.id}
         isOpen={showNewTableModal}
+        forceType="dine_in"
         onClose={() => setShowNewTableModal(false)}
         onSaved={() => {
           fetchTables();
