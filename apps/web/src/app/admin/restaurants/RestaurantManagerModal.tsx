@@ -305,6 +305,83 @@ export function RestaurantManagerModal({
                 </div>
               </div>
 
+              {/* Tax Regime Selector (Régimen General vs Régimen Simplificado) */}
+              <div className="p-4 bg-gradient-to-r from-slate-50 to-indigo-50/40 rounded-2xl border border-indigo-100 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Receipt size={16} className="text-indigo-600" />
+                    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                      Régimen Tributario del Restaurante
+                    </h3>
+                  </div>
+                  <span className={`px-2 py-0.5 text-[11px] font-bold rounded-md ${
+                    selectedModules.includes('invoices')
+                      ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                      : 'bg-amber-100 text-amber-800 border border-amber-200'
+                  }`}>
+                    {selectedModules.includes('invoices') ? 'RÉGIMEN GENERAL (SIAT)' : 'RÉGIMEN SIMPLIFICADO'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!selectedModules.includes('invoices')) {
+                        setSelectedModules(prev => [...prev, 'invoices']);
+                        setSuccessMsg('Régimen General activado (Módulo Facturación SIAT habilitado)');
+                        setTimeout(() => setSuccessMsg(null), 3000);
+                      }
+                    }}
+                    className={`p-3 rounded-xl border text-left transition-all ${
+                      selectedModules.includes('invoices')
+                        ? 'bg-white border-blue-500 ring-2 ring-blue-500/20 shadow-sm'
+                        : 'bg-white/80 border-slate-200 hover:border-slate-300 opacity-70'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <FileText size={16} className="text-blue-600" />
+                        <span className="font-bold text-xs text-slate-900">Régimen General (Con Factura)</span>
+                      </div>
+                      {selectedModules.includes('invoices') && (
+                        <Check size={14} className="text-blue-600" strokeWidth={3} />
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                      Emite facturas electrónicas computarizadas validadas por Impuestos Nacionales (SIAT). Pide NIT/CI a clientes.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedModules(prev => prev.filter(m => m !== 'invoices'));
+                      setSuccessMsg('Régimen Simplificado activado (Módulo Facturación SIAT deshabilitado)');
+                      setTimeout(() => setSuccessMsg(null), 3000);
+                    }}
+                    className={`p-3 rounded-xl border text-left transition-all ${
+                      !selectedModules.includes('invoices')
+                        ? 'bg-white border-amber-500 ring-2 ring-amber-500/20 shadow-sm'
+                        : 'bg-white/80 border-slate-200 hover:border-slate-300 opacity-70'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Receipt size={16} className="text-amber-600" />
+                        <span className="font-bold text-xs text-slate-900">Régimen Simplificado (Sin Factura)</span>
+                      </div>
+                      {!selectedModules.includes('invoices') && (
+                        <Check size={14} className="text-amber-600" strokeWidth={3} />
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                      Emite comprobantes y notas de venta de consumo. No interactúa con SIAT ni solicita NIT a los comensales.
+                    </p>
+                  </button>
+                </div>
+              </div>
+
               {/* Module Groups */}
               {Object.entries(modulesByCategory).map(([catKey, modKeys]) => {
                 const catInfo = CATEGORY_LABELS[catKey];

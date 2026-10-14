@@ -10,7 +10,8 @@ import { RestaurantTable, Order } from '@shared/types';
 import { useOrders } from '@/hooks/useOrders';
 
 export default function AccountsPage() {
-  const { restaurant, branch, loading: sessionLoading } = useRestaurantSession();
+  const { restaurant, branch, loading: sessionLoading, hasModule } = useRestaurantSession();
+  const hasInvoices = hasModule('invoices');
   const { orders } = useOrders(restaurant?.id, branch?.id, { onlyUnpaid: true });
   const [tables, setTables] = useState<RestaurantTable[]>([]);
   const [loading, setLoading] = useState(true);
@@ -179,7 +180,7 @@ export default function AccountsPage() {
       setPaymentMethod('QR / Transferencia');
     }
     
-    if (selectedTable?.siat_customer_nit || selectedTable?.siat_customer_name) {
+    if (hasInvoices && (selectedTable?.siat_customer_nit || selectedTable?.siat_customer_name)) {
       setCashierNit(selectedTable.siat_customer_nit || '');
       setCashierName(selectedTable.siat_customer_name || '');
       setGenerateInvoice(true);
@@ -222,8 +223,8 @@ export default function AccountsPage() {
       
       let generatedCuf = null;
 
-      // 1. SIAT Emission Logic (If requested and there are orders)
-      if (orderIds.length > 0 && generateInvoice && cashierName) {
+      // 1. SIAT Emission Logic (If invoices module enabled, requested, and there are orders)
+      if (hasInvoices && orderIds.length > 0 && generateInvoice && cashierName) {
         try {
           const nitCi = (cashierNit === '0' || !cashierNit) ? '99002' : cashierNit;
           const rznSocial = nitCi === '99002' 
@@ -398,6 +399,11 @@ export default function AccountsPage() {
         
       if (tableError) throw tableError;
 
+      // Imprimir comprobante de venta térmico si opera bajo Régimen Simplificado
+      if (!hasInvoices && orderIds.length > 0) {
+        window.open(`/api/receipt/print?tableId=${selectedTable.id}&autoPrint=true`, '_blank');
+      }
+
       setSelectedTable(null);
       setTableOrders([]);
       setPaymentMethod('QR / Transferencia'); // reset
@@ -411,6 +417,11 @@ export default function AccountsPage() {
 
   const handlePrintBill = () => {
     if (!selectedTable || tableOrders.length === 0) return;
+
+    if (!hasInvoices) {
+      window.open(`/api/receipt/print?tableId=${selectedTable.id}&autoPrint=true`, '_blank');
+      return;
+    }
 
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
@@ -698,55 +709,69 @@ export default function AccountsPage() {
                     </div>
                   )}
 
-                  <div className="mt-4 pt-4 border-t border-gray-100">
-                    <label className="flex items-center gap-2 cursor-pointer mb-4">
-                      <input 
-                        type="checkbox" 
-                        checked={generateInvoice}
-                        onChange={e => setGenerateInvoice(e.target.checked)}
-                        className="w-5 h-5 text-[#2E7D32] rounded focus:ring-[#2E7D32]"
-                      />
-                      <span className="font-bold text-gray-800">Generar Factura (SIAT)</span>
-                    </label>
+                  {hasInvoices ? (
+                    <div className="mt-4 pt-4 border-t border-gray-100">
+                      <label className="flex items-center gap-2 cursor-pointer mb-4">
+                        <input 
+                          type="checkbox" 
+                          checked={generateInvoice}
+                          onChange={e => setGenerateInvoice(e.target.checked)}
+                          className="w-5 h-5 text-[#2E7D32] rounded focus:ring-[#2E7D32]"
+                        />
+                        <span className="font-bold text-gray-800">Generar Factura (SIAT)</span>
+                      </label>
 
-                    {generateInvoice && (
-                      <div className="space-y-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">NIT/CI</label>
-                          <input 
-                            type="text" 
-                            value={cashierNit}
-                            onChange={e => setCashierNit(e.target.value)}
-                            placeholder="Ej. 1234567"
-                            className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32]"
-                          />
+                      {generateInvoice && (
+                        <div className="space-y-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">NIT/CI</label>
+                            <input 
+                              type="text" 
+                              value={cashierNit}
+                              onChange={e => setCashierNit(e.target.value)}
+                              placeholder="Ej. 1234567"
+                              className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32]"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Razón Social</label>
+                            <input 
+                              type="text" 
+                              value={cashierName}
+                              onChange={e => setCashierName(e.target.value)}
+                              placeholder="Nombre del cliente"
+                              className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32]"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Punto de Venta SIAT</label>
+                            <select 
+                              value={siatPuntoVenta}
+                              onChange={e => setSiatPuntoVenta(e.target.value)}
+                              className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32]"
+                            >
+                              <option value="0">Punto de Venta 0 (Por Defecto)</option>
+                              <option value="1">Punto de Venta 1</option>
+                              <option value="2">Punto de Venta 2</option>
+                              <option value="3">Punto de Venta 3</option>
+                            </select>
+                          </div>
                         </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="mt-4 pt-4 border-t border-gray-100">
+                      <div className="bg-amber-50 border border-amber-200/80 rounded-xl p-3.5 flex items-start gap-2.5 text-xs text-amber-900">
+                        <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Razón Social</label>
-                          <input 
-                            type="text" 
-                            value={cashierName}
-                            onChange={e => setCashierName(e.target.value)}
-                            placeholder="Nombre del cliente"
-                            className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32]"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Punto de Venta SIAT</label>
-                          <select 
-                            value={siatPuntoVenta}
-                            onChange={e => setSiatPuntoVenta(e.target.value)}
-                            className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32]"
-                          >
-                            <option value="0">Punto de Venta 0 (Por Defecto)</option>
-                            <option value="1">Punto de Venta 1</option>
-                            <option value="2">Punto de Venta 2</option>
-                            <option value="3">Punto de Venta 3</option>
-                          </select>
+                          <p className="font-bold text-amber-950">Régimen Tributario Simplificado (RTS)</p>
+                          <p className="text-amber-800 text-[11px] mt-0.5 leading-relaxed">
+                            Este restaurante opera sin emisión de facturas fiscales SIAT. Al cerrar la cuenta se emitirá un comprobante de venta térmico no válido para crédito fiscal.
+                          </p>
                         </div>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
 
                   {!activeRegister && (
                     <p className="text-xs text-orange-600 mt-2">

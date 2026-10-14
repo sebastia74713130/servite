@@ -20,7 +20,9 @@ import {
   Phone,
   MapPin,
   Calendar,
-  Sparkles
+  Sparkles,
+  FileText,
+  Receipt
 } from "lucide-react";
 
 export default function AdminRestaurantsPage() {
@@ -297,9 +299,22 @@ export default function AdminRestaurantsPage() {
                       {/* Plan & Pricing */}
                       <td className="py-3.5 px-4">
                         <div>
-                          <span className="inline-block px-2 py-0.5 rounded text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">
-                            {rest.subscription_plan || "BASIC"}
-                          </span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="inline-block px-2 py-0.5 rounded text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                              {rest.subscription_plan || "BASIC"}
+                            </span>
+                            {mods.includes('invoices') ? (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200" title="Régimen General: Facturación electrónica SIAT habilitada">
+                                <FileText size={10} />
+                                SIAT
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200" title="Régimen Simplificado: Sin facturación, comprobantes de venta">
+                                <Receipt size={10} />
+                                Simplificado
+                              </span>
+                            )}
+                          </div>
                           <div className="text-xs font-semibold text-slate-900 mt-1">
                             {rest.monthly_price !== null && rest.monthly_price !== undefined
                               ? `Bs. ${Number(rest.monthly_price).toLocaleString("es-BO")}/mes`

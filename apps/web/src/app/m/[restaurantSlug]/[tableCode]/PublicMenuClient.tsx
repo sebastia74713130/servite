@@ -36,6 +36,11 @@ export default function PublicMenuClient({
   const [selectedCatId, setSelectedCatId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Check if restaurant operates under General SIAT Regime (invoices module enabled) or Simplificado
+  const hasInvoices = !Array.isArray(restaurant?.enabled_modules) || restaurant.enabled_modules.length === 0
+    ? true
+    : restaurant.enabled_modules.includes('invoices');
+
   // Determine if restaurant is currently open based on operating_hours
   const [restaurantStatus, setRestaurantStatus] = useState<'open' | 'closed' | 'closing_soon'>('open');
   const [closingMessage, setClosingMessage] = useState('');
@@ -825,9 +830,9 @@ export default function PublicMenuClient({
           .eq('id', targetOrderId);
       }
       
-      // Intentar emitir factura automáticamente si el pago se completó
+      // Intentar emitir factura automáticamente si el pago se completó y la facturación está habilitada
       let emittedCuf: string | null = null;
-      if (isPaid && firstOrderId) {
+      if (isPaid && firstOrderId && hasInvoices) {
         try {
           const nitCi = (customerNit.trim() === '' || customerNit.trim() === '0') ? '99002' : customerNit.trim();
           const rznSocial = nitCi === '99002' 
@@ -1133,8 +1138,8 @@ export default function PublicMenuClient({
       setServiceMessage("¡Cuenta solicitada! Enseguida te la llevarán.");
       setShowBill(false);
       setShowBillRequestModal(false);
-      setBillRequestStep(1);
-      setOmitInvoiceData(false);
+      setBillRequestStep(hasInvoices ? 1 : 2);
+      setOmitInvoiceData(!hasInvoices);
     } catch (err: any) {
       alert("Error al solicitar la cuenta");
     } finally {
@@ -1196,7 +1201,7 @@ export default function PublicMenuClient({
       }
 
       // Emisión de factura digital SIAT si aplica
-      if (activeOrderIds.length > 0) {
+      if (activeOrderIds.length > 0 && hasInvoices) {
         try {
           const nitCi = (omitInvoiceData || !customerNit.trim() || customerNit.trim() === '0') ? '99002' : customerNit.trim();
           const rznSocial = nitCi === '99002' 
@@ -1384,13 +1389,23 @@ export default function PublicMenuClient({
         <h2 className="text-3xl font-bold text-gray-900 mb-3">¡Gracias por venir!</h2>
         <p className="text-gray-500 text-lg max-w-sm mb-8">Esperamos que hayas disfrutado tu experiencia en {restaurant?.name || 'nuestro restaurante'}. ¡Vuelve pronto!</p>
         
-        {cufToDownload && (
+        {hasInvoices && cufToDownload && (
           <button
             onClick={() => window.open('/api/siat/factura/print?cuf=' + cufToDownload, '_blank')}
             className="flex items-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-full font-medium active:scale-95 transition-transform"
           >
             <FileText size={20} />
             Descargar Factura (PDF)
+          </button>
+        )}
+
+        {!hasInvoices && (
+          <button
+            onClick={() => window.open(`/api/receipt/print?tableId=${table.id}&restaurantId=${restaurant.id}&autoPrint=true`, '_blank')}
+            className="flex items-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-full font-medium active:scale-95 transition-transform"
+          >
+            <FileText size={20} />
+            Ver Comprobante de Venta
           </button>
         )}
       </div>
@@ -1916,22 +1931,24 @@ export default function PublicMenuClient({
                     autoFocus
                   />
                 </div>
-                <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">NIT (opcional, para factura)</label>
-                  <input
-                    type="text"
-                    value={customerNit}
-                    onChange={e => setCustomerNit(e.target.value)}
-                    onFocus={(e) => {
-                      setTimeout(() => {
-                        e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                      }, 300);
-                    }}
-                    placeholder="Ej. 1234567"
-                    className="w-full mt-1.5 px-4 py-3 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2"
-                    style={{ '--tw-ring-color': brandColor } as React.CSSProperties}
-                  />
-                </div>
+                {hasInvoices && (
+                  <div>
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">NIT (opcional, para factura)</label>
+                    <input
+                      type="text"
+                      value={customerNit}
+                      onChange={e => setCustomerNit(e.target.value)}
+                      onFocus={(e) => {
+                        setTimeout(() => {
+                          e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }, 300);
+                      }}
+                      placeholder="Ej. 1234567"
+                      className="w-full mt-1.5 px-4 py-3 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2"
+                      style={{ '--tw-ring-color': brandColor } as React.CSSProperties}
+                    />
+                  </div>
+                )}
                 <div className="flex gap-3 pt-2">
                   <button
                     onClick={() => setShowCustomerDataStep(false)}
@@ -2230,8 +2247,8 @@ export default function PublicMenuClient({
                       setDineInQrId(null);
                       setDineInQrError('');
                       setDineInQrStatus('pending');
-                      setBillRequestStep(1);
-                      setOmitInvoiceData(false);
+                      setBillRequestStep(hasInvoices ? 1 : 2);
+                      setOmitInvoiceData(!hasInvoices);
                       setShowBillRequestModal(true);
                     }}
                     className="py-3 rounded-xl font-bold text-white active:scale-95 transition-transform disabled:opacity-50"
@@ -2271,7 +2288,9 @@ export default function PublicMenuClient({
                         className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider"
                         style={{ backgroundColor: `${brandColor}15`, color: brandColor }}
                       >
-                        Paso {billRequestStep} de {requestedPaymentMethod === 'Pago QR' ? 3 : 2}
+                        {hasInvoices
+                          ? `Paso ${billRequestStep} de ${requestedPaymentMethod === 'Pago QR' ? 3 : 2}`
+                          : `Paso ${billRequestStep === 3 ? 2 : 1} de ${requestedPaymentMethod === 'Pago QR' ? 2 : 1}`}
                       </span>
                       <span className="text-xs text-gray-400 font-medium">
                         {billRequestStep === 1 ? 'Facturación' : billRequestStep === 2 ? 'Método de Pago' : 'Pago con QR'}
@@ -2305,8 +2324,8 @@ export default function PublicMenuClient({
               )}
             </div>
 
-            {/* Step 1: Invoice Data */}
-            {billRequestStep === 1 && !dineInPaymentCompleted && (
+            {/* Step 1: Invoice Data (Only for General Regime with invoices) */}
+            {hasInvoices && billRequestStep === 1 && !dineInPaymentCompleted && (
               <>
                 <div className="p-5 flex-1 overflow-y-auto space-y-3.5">
                   <p className="text-xs text-gray-500 leading-relaxed">
@@ -2405,12 +2424,21 @@ export default function PublicMenuClient({
                         Bs. {totalBill.toFixed(2)}
                       </span>
                     </div>
-                    <div className="flex justify-between items-center pt-2 border-t border-gray-200/60 text-xs">
-                      <span className="text-gray-500">Factura:</span>
-                      <span className="font-semibold text-gray-800 truncate max-w-[200px]">
-                        {omitInvoiceData ? 'Sin Nombre (Control Tributario)' : `${customerName} (${customerNit})`}
-                      </span>
-                    </div>
+                    {hasInvoices ? (
+                      <div className="flex justify-between items-center pt-2 border-t border-gray-200/60 text-xs">
+                        <span className="text-gray-500">Factura:</span>
+                        <span className="font-semibold text-gray-800 truncate max-w-[200px]">
+                          {omitInvoiceData ? 'Sin Nombre (Control Tributario)' : `${customerName} (${customerNit})`}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex justify-between items-center pt-2 border-t border-gray-200/60 text-[11px] text-gray-500">
+                        <span>Régimen Tributario:</span>
+                        <span className="font-medium text-amber-800 bg-amber-50 border border-amber-200/60 px-2 py-0.5 rounded-md">
+                          Simplificado (Sin Factura)
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   <div>
@@ -2499,14 +2527,16 @@ export default function PublicMenuClient({
                     </button>
                   )}
                   
-                  <button 
-                    onClick={() => setBillRequestStep(1)}
-                    disabled={serviceRequestLoading}
-                    className="w-full py-2.5 rounded-xl font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-100 transition-all active:scale-95 text-sm flex items-center justify-center gap-1.5"
-                  >
-                    <ArrowLeft size={16} />
-                    <span>Modificar datos de factura</span>
-                  </button>
+                  {hasInvoices && (
+                    <button 
+                      onClick={() => setBillRequestStep(1)}
+                      disabled={serviceRequestLoading}
+                      className="w-full py-2.5 rounded-xl font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-100 transition-all active:scale-95 text-sm flex items-center justify-center gap-1.5"
+                    >
+                      <ArrowLeft size={16} />
+                      <span>Modificar datos de factura</span>
+                    </button>
+                  )}
 
                   <button 
                     onClick={() => {
@@ -2533,12 +2563,21 @@ export default function PublicMenuClient({
                         Bs. {totalBill.toFixed(2)}
                       </span>
                     </div>
-                    <div className="flex justify-between items-center pt-2 border-t border-gray-200/60 text-xs">
-                      <span className="text-gray-500">Factura:</span>
-                      <span className="font-semibold text-gray-800 truncate max-w-[200px]">
-                        {omitInvoiceData ? 'Sin Nombre (Control Tributario)' : `${customerName} (${customerNit})`}
-                      </span>
-                    </div>
+                    {hasInvoices ? (
+                      <div className="flex justify-between items-center pt-2 border-t border-gray-200/60 text-xs">
+                        <span className="text-gray-500">Factura:</span>
+                        <span className="font-semibold text-gray-800 truncate max-w-[200px]">
+                          {omitInvoiceData ? 'Sin Nombre (Control Tributario)' : `${customerName} (${customerNit})`}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex justify-between items-center pt-2 border-t border-gray-200/60 text-[11px] text-gray-500">
+                        <span>Régimen Tributario:</span>
+                        <span className="font-medium text-amber-800 bg-amber-50 border border-amber-200/60 px-2 py-0.5 rounded-md">
+                          Simplificado (Sin Factura)
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Estado Cargando */}
@@ -2708,8 +2747,8 @@ export default function PublicMenuClient({
                     </p>
                   </div>
 
-                  {/* Detalle de factura emitida */}
-                  {(autoEmittedCuf || cufToDownload) && (
+                  {/* Detalle de factura emitida o comprobante de venta simplificado */}
+                  {hasInvoices && (autoEmittedCuf || cufToDownload) && (
                     <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 text-left text-xs space-y-1">
                       <div className="flex items-center justify-between text-gray-500">
                         <span>Factura emitida:</span>
@@ -2720,17 +2759,39 @@ export default function PublicMenuClient({
                       </p>
                     </div>
                   )}
+
+                  {!hasInvoices && (
+                    <div className="p-3 bg-amber-50/80 rounded-xl border border-amber-200/70 text-left text-xs space-y-1">
+                      <div className="flex items-center justify-between text-amber-900 font-semibold">
+                        <span>Comprobante de Venta:</span>
+                        <span className="text-[10px] bg-amber-200/70 text-amber-900 px-2 py-0.5 rounded-full font-bold">RTS</span>
+                      </div>
+                      <p className="text-amber-800 text-[11px] leading-relaxed">
+                        Régimen Tributario Simplificado. Documento no válido para crédito fiscal.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Footer Éxito */}
                 <div className="p-4 bg-gray-50 border-t border-gray-100 flex flex-col gap-2.5 flex-shrink-0">
-                  {(autoEmittedCuf || cufToDownload) && (
+                  {hasInvoices && (autoEmittedCuf || cufToDownload) && (
                     <button
                       onClick={() => window.open(`/api/siat/factura/print?cuf=${autoEmittedCuf || cufToDownload}`, '_blank')}
                       className="w-full py-3 rounded-xl font-bold text-gray-800 bg-white border border-gray-200 shadow-sm hover:bg-gray-50 transition-all active:scale-95 text-sm flex items-center justify-center gap-2"
                     >
                       <FileText size={18} className="text-gray-600" />
                       <span>Descargar Factura Electrónica</span>
+                    </button>
+                  )}
+
+                  {!hasInvoices && (
+                    <button
+                      onClick={() => window.open(`/api/receipt/print?tableId=${table.id}&restaurantId=${restaurant.id}&autoPrint=true`, '_blank')}
+                      className="w-full py-3 rounded-xl font-bold text-gray-800 bg-white border border-gray-200 shadow-sm hover:bg-gray-50 transition-all active:scale-95 text-sm flex items-center justify-center gap-2"
+                    >
+                      <FileText size={18} className="text-gray-600" />
+                      <span>Ver Comprobante de Venta</span>
                     </button>
                   )}
 

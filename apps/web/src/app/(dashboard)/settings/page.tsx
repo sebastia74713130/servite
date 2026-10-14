@@ -27,7 +27,7 @@ import { SiatSettingsForm } from '@/components/SiatSettingsForm';
 import { PaymentSettingsForm } from './PaymentSettingsForm';
 
 export default function SettingsPage() {
-  const { restaurant, branch, isMainBranch, loading: sessionLoading } = useRestaurantSession();
+  const { restaurant, branch, isMainBranch, loading: sessionLoading, hasModule } = useRestaurantSession();
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -583,7 +583,29 @@ export default function SettingsPage() {
 
       {/* SIAT Configuration Section */}
       {restaurant && (
-        <SiatSettingsForm restaurantId={restaurant.id} branchId={branch?.id} isMainBranch={isMainBranch} />
+        hasModule('invoices') ? (
+          <SiatSettingsForm restaurantId={restaurant.id} branchId={branch?.id} isMainBranch={isMainBranch} />
+        ) : (
+          <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                <FileText size={20} />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Régimen Tributario: Simplificado (RTS)</h2>
+                <p className="text-sm text-gray-500">Módulo de facturación fiscal no requerido</p>
+              </div>
+            </div>
+            <div className="bg-amber-50/70 border border-amber-200/60 rounded-xl p-4 text-sm text-amber-900">
+              <p className="font-semibold text-amber-950 mb-1">
+                Este restaurante opera bajo el Régimen Tributario Simplificado.
+              </p>
+              <p className="text-xs text-amber-800 leading-relaxed">
+                De acuerdo con la normativa tributaria boliviana, las actividades económicas pertenecientes al Régimen Simplificado no emiten facturas fiscales con crédito IVA. En su lugar, el sistema emite notas y comprobantes de venta válidos para constancia del cliente. Si en el futuro necesitas habilitar la facturación electrónica en línea SIAT, el administrador del sistema puede activar el módulo de Facturación desde el panel central de SuperAdmin.
+              </p>
+            </div>
+          </div>
+        )
       )}
 
       {/* Payment Integrations */}
