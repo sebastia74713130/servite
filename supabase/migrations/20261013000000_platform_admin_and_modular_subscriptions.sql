@@ -3,15 +3,14 @@
 
 -- 1. Extend restaurants table with modular subscription fields
 ALTER TABLE public.restaurants 
-ADD COLUMN IF NOT EXISTS enabled_modules TEXT[] DEFAULT ARRAY['menu', 'tables', 'takeaway', 'orders', 'kitchen', 'accounts']::TEXT[],
+ADD COLUMN IF NOT EXISTS enabled_modules TEXT[] DEFAULT ARRAY['menu', 'tables', 'takeaway', 'orders', 'kitchen', 'accounts', 'invoices', 'inventory', 'finances', 'reservations', 'branches']::TEXT[],
 ADD COLUMN IF NOT EXISTS subscription_notes TEXT,
 ADD COLUMN IF NOT EXISTS monthly_price NUMERIC DEFAULT 0,
 ADD COLUMN IF NOT EXISTS billing_period TEXT DEFAULT 'monthly';
 
 -- 2. Backfill existing restaurants with all current modules to prevent any operational disruption
 UPDATE public.restaurants 
-SET enabled_modules = ARRAY['menu', 'tables', 'takeaway', 'orders', 'kitchen', 'accounts', 'invoices', 'inventory', 'finances', 'reservations', 'branches']::TEXT[]
-WHERE enabled_modules IS NULL OR cardinality(enabled_modules) = 0;
+SET enabled_modules = ARRAY['menu', 'tables', 'takeaway', 'orders', 'kitchen', 'accounts', 'invoices', 'inventory', 'finances', 'reservations', 'branches']::TEXT[];
 
 -- 3. Create platform_admins table for SuperAdmin users
 CREATE TABLE IF NOT EXISTS public.platform_admins (

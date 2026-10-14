@@ -47,9 +47,10 @@ import { CSS } from '@dnd-kit/utilities';
 import { SubsectionsModal } from './SubsectionsModal';
 import { ImageCropperModal } from '@/components/ImageCropperModal';
 import { MenuScanModal } from './MenuScanModal';
+import { MenuQrModal } from './MenuQrModal';
 import { ProductGridArea } from './ProductGridArea';
 import { ProductRecipeTab } from './ProductRecipeTab';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, QrCode } from 'lucide-react';
 
 /* ─── helpers ────────────────────────────────────────────────────── */
 function formatPrice(n: number) {
@@ -73,6 +74,7 @@ export default function MenuPage() {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [managingSubsectionsFor, setManagingSubsectionsFor] = useState<Category | null>(null);
   const [showScanModal, setShowScanModal] = useState(false);
+  const [showQrModal, setShowQrModal] = useState(false);
   const [copying, setCopying] = useState(false);
 
   // auto-select first category
@@ -164,10 +166,17 @@ export default function MenuPage() {
           <button
             onClick={handleCopyMenu}
             disabled={copying}
-            className="flex items-center gap-2 bg-white border border-[#E5E7EB] text-[#1F2933] px-5 py-2.5 rounded-xl font-medium hover:bg-gray-50 transition-colors shadow-sm disabled:opacity-50"
+            className="flex items-center gap-2 bg-white border border-[#E5E7EB] text-[#1F2933] px-4 py-2.5 rounded-xl font-medium hover:bg-gray-50 transition-colors shadow-sm disabled:opacity-50"
           >
             <Sparkles size={18} />
             {copying ? 'Copiando...' : 'Copiar menú principal'}
+          </button>
+          <button
+            onClick={() => setShowQrModal(true)}
+            className="flex items-center gap-2 bg-[#E76F51] text-white px-5 py-2.5 rounded-xl font-medium hover:bg-[#d65e40] transition-colors shadow-sm"
+          >
+            <QrCode size={18} />
+            QR Menú Digital
           </button>
           <button
             onClick={() => router.push('/menu/design')}
@@ -293,6 +302,14 @@ export default function MenuPage() {
             refetchCats();
             refetchProds();
           }}
+        />
+      )}
+
+      {restaurant && (
+        <MenuQrModal
+          restaurant={restaurant}
+          isOpen={showQrModal}
+          onClose={() => setShowQrModal(false)}
         />
       )}
     </div>
