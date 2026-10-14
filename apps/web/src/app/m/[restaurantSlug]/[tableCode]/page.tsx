@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 import PublicMenuClient from './PublicMenuClient';
 import { notFound } from 'next/navigation';
 import { Metadata } from 'next';
@@ -9,7 +9,7 @@ export async function generateMetadata({ params }: { params: Promise<{ restauran
   const { restaurantSlug: rawSlug } = await params;
   const restaurantSlug = decodeURIComponent(rawSlug);
 
-  const { data: restaurant } = await supabase
+  const { data: restaurant } = await supabaseAdmin
     .from('restaurants')
     .select('name, logo_url')
     .eq('slug', restaurantSlug)
@@ -25,7 +25,20 @@ export async function generateMetadata({ params }: { params: Promise<{ restauran
         description,
         images: restaurant.logo_url ? [restaurant.logo_url] : [],
       },
-      icons: restaurant.logo_url ? [{ rel: 'icon', url: restaurant.logo_url }] : undefined,
+      icons: restaurant.logo_url
+        ? {
+            icon: [
+              { url: restaurant.logo_url },
+              { url: restaurant.logo_url, sizes: '32x32' },
+              { url: restaurant.logo_url, sizes: '192x192' },
+            ],
+            shortcut: [restaurant.logo_url],
+            apple: [
+              { url: restaurant.logo_url },
+              { url: restaurant.logo_url, sizes: '180x180' },
+            ],
+          }
+        : undefined,
     };
   }
   
@@ -40,7 +53,7 @@ export default async function PublicMenuPage({ params }: { params: Promise<{ res
   const tableCode = decodeURIComponent(rawTableCode);
 
   // 1. Fetch restaurant by slug
-  const { data: restaurantData, error: restaurantError } = await supabase
+  const { data: restaurantData, error: restaurantError } = await supabaseAdmin
     .from('restaurants')
     .select('*')
     .eq('slug', restaurantSlug)
@@ -53,7 +66,7 @@ export default async function PublicMenuPage({ params }: { params: Promise<{ res
   const restaurant = restaurantData;
 
   // 2. Fetch table info scoped to this restaurant
-  let { data: tableData, error: tableError } = await supabase
+  let { data: tableData, error: tableError } = await supabaseAdmin
     .from('tables')
     .select('*')
     .eq('table_code', tableCode)
@@ -71,7 +84,7 @@ export default async function PublicMenuPage({ params }: { params: Promise<{ res
     }
 
     if (alternateCode) {
-      const { data: altTableData, error: altError } = await supabase
+      const { data: altTableData, error: altError } = await supabaseAdmin
         .from('tables')
         .select('*')
         .eq('table_code', alternateCode)
@@ -96,7 +109,7 @@ export default async function PublicMenuPage({ params }: { params: Promise<{ res
   const branchId = tableData.branch_id;
 
   // 2. Fetch categories
-  const { data: categories } = await supabase
+  const { data: categories } = await supabaseAdmin
     .from('categories')
     .select('*')
     .eq('branch_id', branchId)
@@ -104,7 +117,7 @@ export default async function PublicMenuPage({ params }: { params: Promise<{ res
     .order('sort_order', { ascending: true });
 
   // 3. Fetch products
-  const { data: products } = await supabase
+  const { data: products } = await supabaseAdmin
     .from('products')
     .select('*')
     .eq('branch_id', branchId)
@@ -115,7 +128,7 @@ export default async function PublicMenuPage({ params }: { params: Promise<{ res
   const categoryIds = categories?.map(c => c.id) || [];
   let subsections: any[] = [];
   if (categoryIds.length > 0) {
-    const { data } = await supabase
+    const { data } = await supabaseAdmin
       .from('subsections')
       .select('*')
       .in('category_id', categoryIds)

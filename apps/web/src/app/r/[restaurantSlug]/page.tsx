@@ -22,7 +22,20 @@ export async function generateMetadata({ params }: { params: Promise<{ restauran
         description,
         images: restaurant.logo_url ? [restaurant.logo_url] : [],
       },
-      icons: restaurant.logo_url ? [{ rel: 'icon', url: restaurant.logo_url }] : undefined,
+      icons: restaurant.logo_url
+        ? {
+            icon: [
+              { url: restaurant.logo_url },
+              { url: restaurant.logo_url, sizes: '32x32' },
+              { url: restaurant.logo_url, sizes: '192x192' },
+            ],
+            shortcut: [restaurant.logo_url],
+            apple: [
+              { url: restaurant.logo_url },
+              { url: restaurant.logo_url, sizes: '180x180' },
+            ],
+          }
+        : undefined,
     };
   }
   

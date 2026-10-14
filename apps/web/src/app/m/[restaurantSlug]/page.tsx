@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 import PublicCatalogMenuClient from "./PublicCatalogMenuClient";
 import { Metadata } from "next";
 import { UtensilsCrossed, ArrowLeft } from "lucide-react";
@@ -14,7 +14,7 @@ export async function generateMetadata({
   const { restaurantSlug: rawSlug } = await params;
   const restaurantSlug = decodeURIComponent(rawSlug);
 
-  const { data: restaurant } = await supabase
+  const { data: restaurant } = await supabaseAdmin
     .from("restaurants")
     .select("name, logo_url, cover_url, description")
     .eq("slug", restaurantSlug)
@@ -30,7 +30,20 @@ export async function generateMetadata({
         description,
         images: restaurant.logo_url ? [restaurant.logo_url] : restaurant.cover_url ? [restaurant.cover_url] : [],
       },
-      icons: restaurant.logo_url ? [{ rel: "icon", url: restaurant.logo_url }] : undefined,
+      icons: restaurant.logo_url
+        ? {
+            icon: [
+              { url: restaurant.logo_url },
+              { url: restaurant.logo_url, sizes: '32x32' },
+              { url: restaurant.logo_url, sizes: '192x192' },
+            ],
+            shortcut: [restaurant.logo_url],
+            apple: [
+              { url: restaurant.logo_url },
+              { url: restaurant.logo_url, sizes: '180x180' },
+            ],
+          }
+        : undefined,
     };
   }
 
@@ -48,7 +61,7 @@ export default async function PublicCatalogMenuPage({
   const restaurantSlug = decodeURIComponent(rawSlug);
 
   // 1. Obtener restaurante por slug
-  const { data: restaurant, error: restError } = await supabase
+  const { data: restaurant, error: restError } = await supabaseAdmin
     .from("restaurants")
     .select("*")
     .eq("slug", restaurantSlug)
@@ -78,7 +91,7 @@ export default async function PublicCatalogMenuPage({
   }
 
   // 2. Obtener sucursal principal
-  const { data: branch } = await supabase
+  const { data: branch } = await supabaseAdmin
     .from("branches")
     .select("*")
     .eq("restaurant_id", restaurant.id)
@@ -87,7 +100,7 @@ export default async function PublicCatalogMenuPage({
     .maybeSingle();
 
   // 3. Obtener categorías activas
-  let catQuery = supabase
+  let catQuery = supabaseAdmin
     .from("categories")
     .select("*")
     .eq("restaurant_id", restaurant.id)
@@ -102,7 +115,7 @@ export default async function PublicCatalogMenuPage({
   const categories = categoriesData || [];
 
   // 4. Obtener productos activos
-  let prodQuery = supabase
+  let prodQuery = supabaseAdmin
     .from("products")
     .select("*")
     .eq("restaurant_id", restaurant.id)
@@ -120,7 +133,7 @@ export default async function PublicCatalogMenuPage({
   let subsections: any[] = [];
   if (categories.length > 0) {
     const catIds = categories.map((c) => c.id);
-    const { data: subData } = await supabase
+    const { data: subData } = await supabaseAdmin
       .from("subsections")
       .select("*")
       .in("category_id", catIds)

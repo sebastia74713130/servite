@@ -41,6 +41,35 @@ export default function PublicMenuClient({
     ? true
     : restaurant.enabled_modules.includes('invoices');
 
+  // Actualizar dinámicamente el favicon y apple-touch-icon de la pestaña con el logo del restaurante
+  useEffect(() => {
+    if (!restaurant?.logo_url) return;
+
+    try {
+      const existingIcons = document.querySelectorAll<HTMLLinkElement>(
+        "link[rel*='icon'], link[rel='apple-touch-icon']"
+      );
+      existingIcons.forEach(el => el.remove());
+
+      const linkIcon = document.createElement('link');
+      linkIcon.rel = 'icon';
+      linkIcon.href = restaurant.logo_url;
+      document.head.appendChild(linkIcon);
+
+      const linkShortcut = document.createElement('link');
+      linkShortcut.rel = 'shortcut icon';
+      linkShortcut.href = restaurant.logo_url;
+      document.head.appendChild(linkShortcut);
+
+      const linkApple = document.createElement('link');
+      linkApple.rel = 'apple-touch-icon';
+      linkApple.href = restaurant.logo_url;
+      document.head.appendChild(linkApple);
+    } catch (e) {
+      console.warn("No se pudo actualizar el favicon:", e);
+    }
+  }, [restaurant?.logo_url]);
+
   // Determine if restaurant is currently open based on operating_hours
   const [restaurantStatus, setRestaurantStatus] = useState<'open' | 'closed' | 'closing_soon'>('open');
   const [closingMessage, setClosingMessage] = useState('');
