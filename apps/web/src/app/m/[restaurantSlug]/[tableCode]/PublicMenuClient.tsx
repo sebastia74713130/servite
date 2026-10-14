@@ -1418,13 +1418,18 @@ export default function PublicMenuClient({
         <h2 className="text-3xl font-bold text-gray-900 mb-3">¡Gracias por venir!</h2>
         <p className="text-gray-500 text-lg max-w-sm mb-8">Esperamos que hayas disfrutado tu experiencia en {restaurant?.name || 'nuestro restaurante'}. ¡Vuelve pronto!</p>
         
-        {hasInvoices && cufToDownload && (
+        {hasInvoices && (
           <button
-            onClick={() => window.open('/api/siat/factura/print?cuf=' + cufToDownload, '_blank')}
+            onClick={() => {
+              const url = cufToDownload
+                ? `/api/siat/factura/print?cuf=${cufToDownload}&tableId=${table.id}&restaurantId=${restaurant.id}`
+                : `/api/siat/factura/print?tableId=${table.id}&restaurantId=${restaurant.id}`;
+              window.open(url, '_blank');
+            }}
             className="flex items-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-full font-medium active:scale-95 transition-transform"
           >
             <FileText size={20} />
-            Descargar Factura (PDF)
+            Ver Factura Electrónica
           </button>
         )}
 
@@ -2804,13 +2809,18 @@ export default function PublicMenuClient({
 
                 {/* Footer Éxito */}
                 <div className="p-4 bg-gray-50 border-t border-gray-100 flex flex-col gap-2.5 flex-shrink-0">
-                  {hasInvoices && (autoEmittedCuf || cufToDownload) && (
+                  {hasInvoices && (
                     <button
-                      onClick={() => window.open(`/api/siat/factura/print?cuf=${autoEmittedCuf || cufToDownload}`, '_blank')}
+                      onClick={() => {
+                        const url = (autoEmittedCuf || cufToDownload)
+                          ? `/api/siat/factura/print?cuf=${autoEmittedCuf || cufToDownload}&tableId=${table.id}&restaurantId=${restaurant.id}`
+                          : `/api/siat/factura/print?tableId=${table.id}&restaurantId=${restaurant.id}`;
+                        window.open(url, '_blank');
+                      }}
                       className="w-full py-3 rounded-xl font-bold text-gray-800 bg-white border border-gray-200 shadow-sm hover:bg-gray-50 transition-all active:scale-95 text-sm flex items-center justify-center gap-2"
                     >
                       <FileText size={18} className="text-gray-600" />
-                      <span>Descargar Factura Electrónica</span>
+                      <span>Ver Factura Electrónica</span>
                     </button>
                   )}
 
