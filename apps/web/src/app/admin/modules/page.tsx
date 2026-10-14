@@ -27,15 +27,11 @@ import {
   Tag
 } from "lucide-react";
 
-const MODULE_ICONS: Record<ModuleKey, any> = {
+const MODULE_ICONS: Record<string, any> = {
   menu: UtensilsCrossed,
-  tables: LayoutGrid,
-  takeaway: ShoppingBag,
-  orders: ClipboardList,
+  accounts: LayoutGrid,
+  orders: ShoppingBag,
   kitchen: ChefHat,
-  accounts: Receipt,
-  'orders&accounts': Receipt,
-  'orders&acounts': Receipt,
   invoices: FileText,
   finances: Wallet,
   inventory: Package,
@@ -44,10 +40,10 @@ const MODULE_ICONS: Record<ModuleKey, any> = {
 };
 
 const CATEGORY_INFO: Record<string, { label: string; badge: string }> = {
-  salon: { label: "Salón & Comensales", badge: "bg-blue-50 text-blue-700 border-blue-200" },
+  salon: { label: "Salón & Mostrador", badge: "bg-blue-50 text-blue-700 border-blue-200" },
   cocina: { label: "Cocina & KDS", badge: "bg-orange-50 text-orange-700 border-orange-200" },
   caja: { label: "Caja & Facturación", badge: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-  gestion: { label: "Gestión & Inventario", badge: "bg-purple-50 text-purple-700 border-purple-200" }
+  gestion: { label: "Gestión & Operaciones", badge: "bg-purple-50 text-purple-700 border-purple-200" }
 };
 
 export default function AdminModulesPage() {
@@ -144,11 +140,11 @@ export default function AdminModulesPage() {
                 </div>
 
                 <div className="pt-3 border-t border-slate-100 text-[11px] text-slate-400">
-                  {key === 'MENU_ONLY' && "Ideal para cafeterías pequeñas"}
-                  {key === 'BASIC' && "Para comida rápida y barras"}
-                  {key === 'DINE_IN' && "Para restaurantes de salón"}
-                  {key === 'STANDARD' && "Salón + Cocina + Finanzas"}
-                  {key === 'FULL' && "Operación total enterprise"}
+                  {key === 'MENU_ONLY' && "Menú digital interactivo con QR"}
+                  {key === 'BASIC' && "Para comida rápida, barra y pedidos"}
+                  {key === 'DINE_IN' && "Salón + Mesas y Cuentas + Cocina"}
+                  {key === 'STANDARD' && "Salón + Pedidos + Cocina + Finanzas"}
+                  {key === 'FULL' && "Operación total con facturación e inventario"}
                 </div>
               </div>
             );
@@ -156,12 +152,12 @@ export default function AdminModulesPage() {
         </div>
       </div>
 
-      {/* 11 Individual Modules Catalog */}
+      {/* 9 Canonical Modules Catalog */}
       <div className="space-y-4">
         <div className="flex items-center gap-2">
           <Layers size={18} className="text-indigo-600" />
           <h2 className="text-base font-bold text-slate-900">
-            Los 11 Módulos Individuales del Sistema
+            Los 9 Módulos Oficiales del Sistema
           </h2>
         </div>
 

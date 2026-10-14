@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { 
   AVAILABLE_MODULES, 
   PRESET_MODULE_PLANS, 
+  CanonicalModuleKey,
+  CANONICAL_MODULE_KEYS,
   ModuleKey, 
   SubscriptionPlan 
 } from "@/shared/types";
@@ -42,15 +44,11 @@ interface RestaurantManagerModalProps {
   onSaved: () => void;
 }
 
-const MODULE_ICONS: Record<ModuleKey, any> = {
+const MODULE_ICONS: Record<string, any> = {
   menu: UtensilsCrossed,
-  tables: LayoutGrid,
-  takeaway: ShoppingBag,
-  orders: ClipboardList,
+  accounts: LayoutGrid,
+  orders: ShoppingBag,
   kitchen: ChefHat,
-  accounts: Receipt,
-  'orders&accounts': Receipt,
-  'orders&acounts': Receipt,
   invoices: FileText,
   finances: Wallet,
   inventory: Package,
@@ -59,10 +57,10 @@ const MODULE_ICONS: Record<ModuleKey, any> = {
 };
 
 const CATEGORY_LABELS: Record<string, { label: string; color: string }> = {
-  salon: { label: "Salón & Comensales", color: "bg-blue-50 text-blue-700 border-blue-200" },
+  salon: { label: "Salón & Mostrador", color: "bg-blue-50 text-blue-700 border-blue-200" },
   cocina: { label: "Cocina & KDS", color: "bg-orange-50 text-orange-700 border-orange-200" },
   caja: { label: "Caja & Facturación", color: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-  gestion: { label: "Gestión & Inventario", color: "bg-purple-50 text-purple-700 border-purple-200" }
+  gestion: { label: "Gestión & Operaciones", color: "bg-purple-50 text-purple-700 border-purple-200" }
 };
 
 export function RestaurantManagerModal({
@@ -82,7 +80,7 @@ export function RestaurantManagerModal({
   const [notes, setNotes] = useState<string>("");
 
   // Modules state
-  const [selectedModules, setSelectedModules] = useState<ModuleKey[]>([]);
+  const [selectedModules, setSelectedModules] = useState<CanonicalModuleKey[]>([]);
 
   // UI state
   const [saving, setSaving] = useState(false);
@@ -107,11 +105,22 @@ export function RestaurantManagerModal({
 
       setNotes(restaurant.subscription_notes || "");
 
-      // Modules
-      const mods = Array.isArray(restaurant.enabled_modules) && restaurant.enabled_modules.length > 0
+      // Normalize modules to canonical keys
+      const rawMods = Array.isArray(restaurant.enabled_modules) && restaurant.enabled_modules.length > 0
         ? restaurant.enabled_modules
-        : Object.keys(AVAILABLE_MODULES) as ModuleKey[];
-      setSelectedModules(mods);
+        : CANONICAL_MODULE_KEYS;
+
+      const normalized = new Set<CanonicalModuleKey>();
+      rawMods.forEach((m: string) => {
+        if (m === 'tables' || m === 'accounts' || m === 'orders&accounts' || m === 'orders&acounts') {
+          normalized.add('accounts');
+        } else if (m === 'takeaway' || m === 'orders') {
+          normalized.add('orders');
+        } else if (CANONICAL_MODULE_KEYS.includes(m as CanonicalModuleKey)) {
+          normalized.add(m as CanonicalModuleKey);
+        }
+      });
+      setSelectedModules(Array.from(normalized));
 
       setErrorMsg(null);
       setSuccessMsg(null);
@@ -120,7 +129,7 @@ export function RestaurantManagerModal({
 
   if (!isOpen || !restaurant) return null;
 
-  const toggleModule = (modKey: ModuleKey) => {
+  const toggleModule = (modKey: CanonicalModuleKey) => {
     setSelectedModules(prev => 
       prev.includes(modKey) ? prev.filter(m => m !== modKey) : [...prev, modKey]
     );
@@ -136,7 +145,7 @@ export function RestaurantManagerModal({
   };
 
   const selectAll = () => {
-    setSelectedModules(Object.keys(AVAILABLE_MODULES) as ModuleKey[]);
+    setSelectedModules([...CANONICAL_MODULE_KEYS]);
   };
 
   const deselectAll = () => {
@@ -183,8 +192,8 @@ export function RestaurantManagerModal({
   };
 
   // Agrupar módulos por categoría
-  const modulesByCategory: Record<string, ModuleKey[]> = {
-    salon: ['menu', 'orders&accounts', 'tables', 'takeaway'],
+  const modulesByCategory: Record<string, CanonicalModuleKey[]> = {
+    salon: ['menu', 'accounts', 'orders'],
     cocina: ['kitchen'],
     caja: ['invoices', 'finances'],
     gestion: ['inventory', 'reservations', 'branches']
@@ -233,7 +242,7 @@ export function RestaurantManagerModal({
             <Layers size={16} />
             <span>Módulos Habilitados</span>
             <span className="ml-1 px-2 py-0.5 text-xs rounded-full bg-indigo-100 text-indigo-700">
-              {selectedModules.length}/11
+              {selectedModules.length}/9
             </span>
           </button>
 

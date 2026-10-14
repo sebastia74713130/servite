@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useTransition } from "react";
 import { getAdminRestaurants, toggleRestaurantActive } from "../actions";
-import { AVAILABLE_MODULES, ModuleKey } from "@/shared/types";
+import { AVAILABLE_MODULES, ModuleKey, CanonicalModuleKey } from "@/shared/types";
 import { RestaurantManagerModal } from "./RestaurantManagerModal";
 import { 
   Building2, 
@@ -237,7 +237,14 @@ export default function AdminRestaurantsPage() {
                 </tr>
               ) : (
                 restaurants.map((rest) => {
-                  const mods: ModuleKey[] = Array.isArray(rest.enabled_modules) ? rest.enabled_modules : [];
+                  const rawMods: string[] = Array.isArray(rest.enabled_modules) ? rest.enabled_modules : [];
+                  const modsSet = new Set<CanonicalModuleKey>();
+                  rawMods.forEach((m) => {
+                    if (m === 'tables' || m === 'orders&accounts' || m === 'orders&acounts') modsSet.add('accounts');
+                    else if (m === 'takeaway') modsSet.add('orders');
+                    else if (m in AVAILABLE_MODULES) modsSet.add(m as CanonicalModuleKey);
+                  });
+                  const mods = Array.from(modsSet);
                   const isActive = rest.is_active && rest.subscription_status === "active";
 
                   return (
@@ -352,12 +359,12 @@ export default function AdminRestaurantsPage() {
                         <div className="space-y-1.5">
                           <div className="flex items-center gap-1.5">
                             <span className="text-xs font-bold text-slate-800">
-                              {mods.length}/11 módulos
+                              {mods.length}/9 módulos
                             </span>
                             <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
                               <div
                                 className="h-full bg-indigo-600 rounded-full"
-                                style={{ width: `${(mods.length / 11) * 100}%` }}
+                                style={{ width: `${(mods.length / 9) * 100}%` }}
                               />
                             </div>
                           </div>

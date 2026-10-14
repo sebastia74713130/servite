@@ -1,7 +1,7 @@
 "use server";
 
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { ModuleKey, PlatformAdmin, AVAILABLE_MODULES } from "@/shared/types";
+import { ModuleKey, PlatformAdmin, AVAILABLE_MODULES, CANONICAL_MODULE_KEYS } from "@/shared/types";
 
 // Valida si un usuario específico tiene privilegios de SuperAdmin de la plataforma
 export async function isSuperAdmin(userId: string, email?: string): Promise<boolean> {
@@ -76,15 +76,27 @@ export async function getPlatformMetrics() {
     return sum;
   }, 0);
 
-  // Módulos más contratados
+  // Módulos más contratados (normalizados a los 9 módulos canónicos)
   const moduleCounts: Record<string, number> = {};
   Object.keys(AVAILABLE_MODULES).forEach(key => {
     moduleCounts[key] = 0;
   });
 
   all.forEach(r => {
-    const modules = Array.isArray(r.enabled_modules) ? r.enabled_modules : [];
-    modules.forEach((mod: string) => {
+    const rawModules = Array.isArray(r.enabled_modules) ? r.enabled_modules : [];
+    const normalizedMods = new Set<string>();
+
+    rawModules.forEach((mod: string) => {
+      if (mod === 'tables' || mod === 'orders&accounts' || mod === 'orders&acounts' || mod === 'accounts') {
+        normalizedMods.add('accounts');
+      } else if (mod === 'takeaway' || mod === 'orders') {
+        normalizedMods.add('orders');
+      } else if (AVAILABLE_MODULES[mod as keyof typeof AVAILABLE_MODULES]) {
+        normalizedMods.add(mod);
+      }
+    });
+
+    normalizedMods.forEach((mod: string) => {
       if (moduleCounts[mod] !== undefined) {
         moduleCounts[mod]++;
       }
@@ -152,11 +164,18 @@ export async function getAdminRestaurants(filters?: {
     );
   }
 
-  // Filtro por módulo activo
+  // Filtro por módulo activo (reconociendo llaves canónicas y legadas)
   if (filters?.module && filters.module !== "all") {
+    const target = filters.module;
     list = list.filter(r => {
-      const mods = Array.isArray(r.enabled_modules) ? r.enabled_modules : [];
-      return mods.includes(filters.module);
+      const rawMods = Array.isArray(r.enabled_modules) ? r.enabled_modules : [];
+      if (target === 'accounts') {
+        return rawMods.some(m => m === 'accounts' || m === 'tables' || m === 'orders&accounts' || m === 'orders&acounts');
+      }
+      if (target === 'orders') {
+        return rawMods.some(m => m === 'orders' || m === 'takeaway');
+      }
+      return rawMods.includes(target);
     });
   }
 
@@ -200,9 +219,7 @@ export async function getAdminRestaurants(filters?: {
     ...r,
     branches_count: branchCountMap[r.id] || 0,
     owner_email: ownerByRestMap[r.id] || "No registrado",
-    enabled_modules: Array.isArray(r.enabled_modules) ? r.enabled_modules : [
-      'menu', 'tables', 'takeaway', 'orders', 'kitchen', 'accounts', 'invoices', 'inventory', 'finances', 'reservations', 'branches'
-    ]
+    enabled_modules: Array.isArray(r.enabled_modules) ? r.enabled_modules : [...CANONICAL_MODULE_KEYS]
   }));
 }
 
@@ -238,12 +255,20 @@ export async function updateRestaurantSubscription(
   return { success: true };
 }
 
-// Actualiza de forma atómica los módulos habilitados para un restaurante
-export async function updateRestaurantModules(restaurantId: string, enabledModules: ModuleKey[]) {
+// Actualiza de forma atómica los módulos habilitados para un restaurante (guardando siempre claves canónicas)
+export async function updateRestaurantModules(restaurantId: string, enabledModules: (ModuleKey | string)[]) {
+  const normalized = Array.from(new Set(
+    enabledModules.map(m => {
+      if (m === 'tables' || m === 'orders&accounts' || m === 'orders&acounts') return 'accounts';
+      if (m === 'takeaway') return 'orders';
+      return m;
+    })
+  ));
+
   const { error } = await supabaseAdmin
     .from("restaurants")
     .update({
-      enabled_modules: enabledModules,
+      enabled_modules: normalized,
       updated_at: new Date().toISOString()
     })
     .eq("id", restaurantId);

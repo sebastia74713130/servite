@@ -5,98 +5,85 @@ export type SubscriptionPlan = 'TEST' | 'BASIC' | 'PRO' | 'FULL' | 'CUSTOM';
 export type OrderChannel = 'dine_in' | 'own_delivery' | 'third_party';
 export type MacroCategory = 'food' | 'beverage' | 'dessert' | 'other';
 
-export type ModuleKey = 
+export type CanonicalModuleKey = 
   | 'menu' 
-  | 'tables' 
-  | 'takeaway' 
+  | 'accounts' 
   | 'orders' 
   | 'kitchen' 
-  | 'accounts' 
-  | 'orders&accounts'
-  | 'orders&acounts'
   | 'invoices' 
-  | 'inventory' 
   | 'finances' 
+  | 'inventory' 
   | 'reservations' 
   | 'branches';
 
+export type ModuleKey = 
+  | CanonicalModuleKey
+  | 'tables' 
+  | 'takeaway' 
+  | 'orders&accounts'
+  | 'orders&acounts';
+
 export interface ModuleDefinition {
-  key: ModuleKey;
+  key: CanonicalModuleKey;
   name: string;
   category: 'salon' | 'cocina' | 'caja' | 'gestion';
   description: string;
   routes: string[];
 }
 
-export const AVAILABLE_MODULES: Record<ModuleKey, ModuleDefinition> = {
+export const CANONICAL_MODULE_KEYS: CanonicalModuleKey[] = [
+  'menu',
+  'accounts',
+  'orders',
+  'kitchen',
+  'invoices',
+  'finances',
+  'inventory',
+  'reservations',
+  'branches'
+];
+
+export const AVAILABLE_MODULES: Record<CanonicalModuleKey, ModuleDefinition> = {
   menu: {
     key: 'menu',
     name: 'Menú Digital',
     category: 'salon',
-    description: 'Catálogo digital con fotos, categorías, modificadores y código QR.',
+    description: 'Catálogo digital interactivo con fotos, categorías, modificadores y código QR del menú.',
     routes: ['/menu', '/menu/design']
   },
-  tables: {
-    key: 'tables',
-    name: 'Mesas & Salón',
+  accounts: {
+    key: 'accounts',
+    name: 'Mesas y Cuentas',
     category: 'salon',
-    description: 'Gestión de mesas, QR de mesa, llamados de mesero y cobro con QR dinámico en mesa.',
+    description: 'Control de mesas de salón, QR de mesa, llamados de mesero, pedidos en tiempo real y cobro de cuentas.',
     routes: ['/accounts']
-  },
-  takeaway: {
-    key: 'takeaway',
-    name: 'Barra & Takeaway',
-    category: 'salon',
-    description: 'Atención rápida en barra, pedidos para llevar y aviso sonoro de pedido listo.',
-    routes: ['/orders']
-  },
-  'orders&accounts': {
-    key: 'orders&accounts',
-    name: 'Mesas y Cuentas',
-    category: 'salon',
-    description: 'Control de salón: cuadrícula de mesas, pedidos en tiempo real, estados de platos, cobro y liberación.',
-    routes: ['/accounts', '/orders', '/tables']
-  },
-  'orders&acounts': {
-    key: 'orders&acounts',
-    name: 'Mesas y Cuentas',
-    category: 'salon',
-    description: 'Control de salón: cuadrícula de mesas, pedidos en tiempo real, estados de platos, cobro y liberación.',
-    routes: ['/accounts', '/orders', '/tables']
   },
   orders: {
     key: 'orders',
-    name: 'Gestión de Pedidos',
+    name: 'Pedidos (Takeaway)',
     category: 'salon',
-    description: 'Bandeja en tiempo real de órdenes de salón o barra y asignación a mozos.',
+    description: 'Gestión en tiempo real de órdenes para llevar, mostrador, QR de barra y tiempos estimados.',
     routes: ['/orders']
   },
   kitchen: {
     key: 'kitchen',
     name: 'Cocina & KDS',
     category: 'cocina',
-    description: 'Pantalla de cocina táctil en vivo con separación por estaciones y alertas sonoras.',
+    description: 'Pantalla de cocina táctil en vivo con separación por estaciones, alertas sonoras y tiempos de preparación.',
     routes: ['/kitchen']
-  },
-  accounts: {
-    key: 'accounts',
-    name: 'Mesas y Cuentas',
-    category: 'caja',
-    description: 'Control de mesas de salón, pedidos en tiempo real, cobros y liberación de mesa.',
-    routes: ['/accounts']
   },
   invoices: {
     key: 'invoices',
     name: 'Facturación SIAT',
     category: 'caja',
-    description: 'Facturación electrónica computarizada en línea validada por Impuestos Nacionales.',
+    description: 'Facturación electrónica computarizada en línea validada por Impuestos Nacionales (SIAT).',
     routes: ['/invoices', '/settings/siat']
   },
   finances: {
     key: 'finances',
     name: 'Finanzas & Arqueos',
     category: 'caja',
-    description: 'Cajas chicas, aperturas/cierres de turno, ingresos, egresos y reportes.',
+    description: 'Cajas chicas, aperturas y cierres de turno, ingresos, egresos y reportes contables.',
     routes: ['/finances']
   },
   inventory: {
@@ -122,26 +109,36 @@ export const AVAILABLE_MODULES: Record<ModuleKey, ModuleDefinition> = {
   }
 };
 
-export const PRESET_MODULE_PLANS: Record<string, { name: string; modules: ModuleKey[] }> = {
+export const PRESET_MODULE_PLANS: Record<string, { name: string; modules: CanonicalModuleKey[] }> = {
   MENU_ONLY: {
     name: 'Plan Menú Digital',
     modules: ['menu']
   },
   BASIC: {
-    name: 'Plan Menú & Barra',
-    modules: ['menu', 'takeaway', 'orders']
+    name: 'Plan Barra & Takeaway',
+    modules: ['menu', 'orders']
   },
   DINE_IN: {
     name: 'Plan Salón & Mesas',
-    modules: ['menu', 'tables', 'orders', 'kitchen', 'accounts']
+    modules: ['menu', 'accounts', 'kitchen']
   },
   STANDARD: {
     name: 'Plan Operativo Completo',
-    modules: ['menu', 'tables', 'takeaway', 'orders', 'kitchen', 'accounts', 'finances']
+    modules: ['menu', 'accounts', 'orders', 'kitchen', 'finances']
   },
   FULL: {
     name: 'Plan Total (Todo Incluido)',
-    modules: ['menu', 'tables', 'takeaway', 'orders', 'kitchen', 'accounts', 'invoices', 'inventory', 'finances', 'reservations', 'branches']
+    modules: [
+      'menu',
+      'accounts',
+      'orders',
+      'kitchen',
+      'invoices',
+      'finances',
+      'inventory',
+      'reservations',
+      'branches'
+    ]
   }
 };
 

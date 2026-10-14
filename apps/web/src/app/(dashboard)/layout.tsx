@@ -6,11 +6,11 @@ import { Header } from "@/components/Header";
 import { usePathname } from "next/navigation";
 import { useRestaurantSession } from "@/hooks/useRestaurantSession";
 import { LoadingState } from "@/components/LoadingState";
-import { AVAILABLE_MODULES, ModuleKey } from "@/shared/types";
+import { AVAILABLE_MODULES, ModuleKey, CanonicalModuleKey } from "@/shared/types";
 import { Lock, Sparkles, ArrowLeft, MessageCircle } from "lucide-react";
 import Link from "next/link";
 
-function getRequiredModuleForPath(pathname: string): ModuleKey | null {
+function getRequiredModuleForPath(pathname: string): CanonicalModuleKey | null {
   if (pathname.startsWith('/kitchen')) return 'kitchen';
   if (pathname.startsWith('/orders')) return 'orders';
   if (pathname.startsWith('/accounts') || pathname.startsWith('/tables')) return 'accounts';
@@ -85,8 +85,10 @@ export default function DashboardLayout({
   let isModuleEnabled = true;
 
   if (requiredModule) {
-    if (requiredModule === 'tables') {
-      isModuleEnabled = hasModule('tables') || hasModule('takeaway');
+    if (requiredModule === 'accounts') {
+      isModuleEnabled = hasModule('accounts') || hasModule('tables') || hasModule('orders&accounts');
+    } else if (requiredModule === 'orders') {
+      isModuleEnabled = hasModule('orders') || hasModule('takeaway');
     } else {
       isModuleEnabled = hasModule(requiredModule);
     }
