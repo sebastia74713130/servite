@@ -1430,7 +1430,7 @@ export default function PublicMenuClient({
 
         {!hasInvoices && (
           <button
-            onClick={() => window.open(`/api/receipt/print?tableId=${table.id}&restaurantId=${restaurant.id}&autoPrint=true`, '_blank')}
+            onClick={() => window.open(`/api/receipt/print?tableId=${table.id}&restaurantId=${restaurant.id}`, '_blank')}
             className="flex items-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-full font-medium active:scale-95 transition-transform"
           >
             <FileText size={20} />
@@ -2816,7 +2816,7 @@ export default function PublicMenuClient({
 
                   {!hasInvoices && (
                     <button
-                      onClick={() => window.open(`/api/receipt/print?tableId=${table.id}&restaurantId=${restaurant.id}&autoPrint=true`, '_blank')}
+                      onClick={() => window.open(`/api/receipt/print?tableId=${table.id}&restaurantId=${restaurant.id}`, '_blank')}
                       className="w-full py-3 rounded-xl font-bold text-gray-800 bg-white border border-gray-200 shadow-sm hover:bg-gray-50 transition-all active:scale-95 text-sm flex items-center justify-center gap-2"
                     >
                       <FileText size={18} className="text-gray-600" />
