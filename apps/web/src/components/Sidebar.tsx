@@ -222,7 +222,6 @@ export function Sidebar({ isOpen = true, setIsOpen }: { isOpen?: boolean, setIsO
     { name: "Finanzas", href: "/finances", icon: Wallet, module: 'finances' },
     { name: "Inventario", href: "/inventory", icon: Package, module: 'inventory' },
     { name: "Menú", href: "/menu", icon: UtensilsCrossed, allowedRoles: ['kitchen', 'waitstaff'], module: 'menu' },
-    { name: "Mesas", href: "/tables", icon: Store, allowedRoles: ['waitstaff'], module: 'tables' },
     { name: "Reservas", href: "/reservations", icon: CalendarClock, module: 'reservations' },
     { name: "Sucursales", href: "/branches", icon: Store, module: 'branches' },
     { name: "Configuración", href: "/settings", icon: Settings },
@@ -231,10 +230,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: { isOpen?: boolean, setIsO
   const links = allLinks.filter(link => {
     // 1. Filtrar por módulo contratado
     if (link.module) {
-      if (link.module === 'tables') {
-        // Tanto 'tables' (salón) como 'takeaway' (barra) usan la vista /tables
-        if (!hasModule('tables') && !hasModule('takeaway')) return false;
-      } else if (!hasModule(link.module)) {
+      if (!hasModule(link.module)) {
         return false;
       }
     }

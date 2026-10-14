@@ -41,28 +41,28 @@ export const AVAILABLE_MODULES: Record<ModuleKey, ModuleDefinition> = {
     name: 'Mesas & Salón',
     category: 'salon',
     description: 'Gestión de mesas, QR de mesa, llamados de mesero y cobro con QR dinámico en mesa.',
-    routes: ['/tables']
+    routes: ['/accounts']
   },
   takeaway: {
     key: 'takeaway',
     name: 'Barra & Takeaway',
     category: 'salon',
     description: 'Atención rápida en barra, captura de datos del cliente y aviso sonoro de pedido listo.',
-    routes: ['/tables']
+    routes: ['/accounts']
   },
   'orders&accounts': {
     key: 'orders&accounts',
     name: 'Mesas y Pedidos',
     category: 'salon',
     description: 'Control unificado de salón: cuadrícula de mesas, pedidos en tiempo real, estados de platos, cobro y liberación.',
-    routes: ['/accounts', '/orders']
+    routes: ['/accounts', '/orders', '/tables']
   },
   'orders&acounts': {
     key: 'orders&acounts',
     name: 'Mesas y Pedidos',
     category: 'salon',
     description: 'Control unificado de salón: cuadrícula de mesas, pedidos en tiempo real, estados de platos, cobro y liberación.',
-    routes: ['/accounts', '/orders']
+    routes: ['/accounts', '/orders', '/tables']
   },
   orders: {
     key: 'orders',

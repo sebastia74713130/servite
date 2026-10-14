@@ -16,7 +16,8 @@ import {
   Plus,
   QrCode,
   Clock,
-  ArrowLeft
+  ArrowLeft,
+  Trash2
 } from 'lucide-react';
 import { RestaurantTable, OrderStatus } from '@shared/types';
 import { useOrders } from '@/hooks/useOrders';
@@ -235,6 +236,19 @@ export default function AccountsPage() {
       }
     } finally {
       setUpdatingOrderId(null);
+    }
+  };
+
+  const handleDeleteTable = async (tableId: string) => {
+    if (!confirm('¿Estás seguro de que deseas eliminar esta mesa de forma permanente?')) return;
+    try {
+      const { error } = await supabase.from('tables').delete().eq('id', tableId);
+      if (error) throw error;
+      setSelectedTable(null);
+      setTableOrders([]);
+      fetchTables();
+    } catch (err: any) {
+      alert('Error al eliminar la mesa: ' + (err.message || err));
     }
   };
 
@@ -791,6 +805,18 @@ export default function AccountsPage() {
                   <QrCode size={16} />
                   <span className="hidden sm:inline">QR Mesa</span>
                 </button>
+
+                {/* Delete Table button (only available if table has no active orders) */}
+                {flatItems.length === 0 && (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteTable(selectedTable.id)}
+                    className="w-10 h-10 flex items-center justify-center bg-gray-100 hover:bg-red-50 text-gray-400 hover:text-red-600 rounded-full transition-colors"
+                    title="Eliminar mesa permanentemente"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                )}
 
                 <button
                   type="button"

@@ -12,14 +12,13 @@ import Link from "next/link";
 
 function getRequiredModuleForPath(pathname: string): ModuleKey | null {
   if (pathname.startsWith('/kitchen')) return 'kitchen';
-  if (pathname.startsWith('/orders') || pathname.startsWith('/accounts')) return 'orders&accounts';
+  if (pathname.startsWith('/orders') || pathname.startsWith('/accounts') || pathname.startsWith('/tables')) return 'orders&accounts';
   if (pathname.startsWith('/invoices') || pathname.startsWith('/settings/siat')) return 'invoices';
   if (pathname.startsWith('/finances')) return 'finances';
   if (pathname.startsWith('/inventory')) return 'inventory';
   if (pathname.startsWith('/menu')) return 'menu';
   if (pathname.startsWith('/reservations') || pathname.startsWith('/settings/reservations')) return 'reservations';
   if (pathname.startsWith('/branches')) return 'branches';
-  if (pathname.startsWith('/tables')) return 'tables';
   return null;
 }
 
