@@ -1149,16 +1149,16 @@ export default function PublicMenuClient({
         .from('tables')
         .update({ 
           service_status: 'requesting_bill',
-          siat_customer_nit: omit ? '99002' : customerNit,
-          siat_customer_name: omit ? 'CONTROL TRIBUTARIO' : customerName,
-          siat_customer_email: omit ? null : customerEmail,
+          siat_customer_nit: hasInvoices ? (omit ? '99002' : customerNit) : null,
+          siat_customer_name: hasInvoices ? (omit ? 'CONTROL TRIBUTARIO' : customerName) : null,
+          siat_customer_email: hasInvoices ? (omit ? null : customerEmail) : null,
           requested_payment_method: requestedPaymentMethod,
           updated_at: new Date().toISOString()
         })
         .eq('id', table.id);
       if (error) throw error;
       
-      if (!omit) {
+      if (hasInvoices && !omit) {
         if (customerName.trim()) localStorage.setItem('customer_name', customerName.trim());
         if (customerNit.trim()) localStorage.setItem('customer_nit', customerNit.trim());
       }

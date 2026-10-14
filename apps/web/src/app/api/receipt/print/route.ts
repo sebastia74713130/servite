@@ -55,10 +55,28 @@ export async function GET(req: Request) {
       .from('orders')
       .select('*, order_items(*)')
       .eq('table_id', tableId)
+      .neq('status', 'cancelled')
       .order('created_at', { ascending: false })
-      .limit(10);
+      .limit(20);
 
-    orders = tableOrders || [];
+    if (tableOrders && tableOrders.length > 0) {
+      const latestOrder = tableOrders[0];
+      if (latestOrder.paid_at) {
+        const latestPaidTime = new Date(latestOrder.paid_at).getTime();
+        orders = tableOrders.filter((o) => {
+          if (!o.paid_at) return false;
+          const diff = Math.abs(new Date(o.paid_at).getTime() - latestPaidTime);
+          return diff < 5 * 60 * 1000;
+        });
+      } else {
+        orders = tableOrders.filter((o) => !o.is_paid);
+      }
+      if (orders.length === 0) {
+        orders = [latestOrder];
+      }
+    } else {
+      orders = [];
+    }
   }
 
   const restaurantName = restaurant?.name || 'Servido';
@@ -71,27 +89,32 @@ export async function GET(req: Request) {
   let totalAmount = 0;
   let customerName = '';
   let paymentMethod = 'Efectivo';
-  let createdAt = new Date();
+
+  // Momento de emisión del comprobante (hora Bolivia UTC -4: America/La_Paz)
+  const paidOrder = orders.find((o) => o.paid_at);
+  const emissionDate = paidOrder?.paid_at ? new Date(paidOrder.paid_at) : new Date();
 
   orders.forEach((o) => {
     totalAmount += Number(o.total || 0);
     if (o.customer_name) customerName = o.customer_name;
     if (o.payment_method) paymentMethod = o.payment_method;
-    if (o.created_at) createdAt = new Date(o.created_at);
 
     (o.order_items || []).forEach((item: any) => {
       allItems.push(item);
     });
   });
 
-  const formattedDate = createdAt.toLocaleDateString('es-BO', {
+  const formattedDate = emissionDate.toLocaleDateString('es-BO', {
+    timeZone: 'America/La_Paz',
     day: '2-digit',
     month: '2-digit',
     year: 'numeric'
   });
-  const formattedTime = createdAt.toLocaleTimeString('es-BO', {
+  const formattedTime = emissionDate.toLocaleTimeString('es-BO', {
+    timeZone: 'America/La_Paz',
     hour: '2-digit',
-    minute: '2-digit'
+    minute: '2-digit',
+    second: '2-digit'
   });
 
   const orderCode = orderId ? `#${orderId.slice(-6).toUpperCase()}` : `LOTE-${orders[0]?.id?.slice(-4).toUpperCase() || '01'}`;

@@ -462,7 +462,7 @@ export default function AccountsPage() {
           </div>
           <div class="footer">
             ¡Gracias por su visita!<br/>
-            ${new Date().toLocaleString()}
+            ${new Date().toLocaleString('es-BO', { timeZone: 'America/La_Paz' })}
           </div>
           <script>
             window.onload = function() { window.print(); window.close(); }
@@ -591,13 +591,13 @@ export default function AccountsPage() {
               )}
 
               {/* SIAT Billing Data Display */}
-              {selectedTable.service_status === 'requesting_bill' && (
+              {hasInvoices && selectedTable.service_status === 'requesting_bill' && selectedTable.siat_customer_name && (
                 <div className="mb-6 bg-blue-50 border border-blue-200 rounded-xl p-4">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3 text-blue-900">
                       <Receipt size={24} />
                       <h3 className="font-bold">
-                        {selectedTable.siat_customer_name ? 'El cliente solicitó Factura (SIAT):' : 'El cliente solicitó la cuenta'}
+                        El cliente solicitó Factura (SIAT):
                       </h3>
                     </div>
                     {tableOrders.length === 0 && (
@@ -610,15 +610,13 @@ export default function AccountsPage() {
                       </button>
                     )}
                   </div>
-                  {selectedTable.siat_customer_name && (
-                    <div className="text-sm text-blue-800 grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-4 bg-white/50 p-3 rounded-lg">
-                      <p><span className="font-semibold text-blue-900">NIT/CI:</span> {selectedTable.siat_customer_nit}</p>
-                      <p><span className="font-semibold text-blue-900">Razón Social:</span> {selectedTable.siat_customer_name}</p>
-                      {selectedTable.siat_customer_email && (
-                        <p className="col-span-1 sm:col-span-2"><span className="font-semibold text-blue-900">Correo:</span> {selectedTable.siat_customer_email}</p>
-                      )}
-                    </div>
-                  )}
+                  <div className="text-sm text-blue-800 grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-4 bg-white/50 p-3 rounded-lg">
+                    <p><span className="font-semibold text-blue-900">NIT/CI:</span> {selectedTable.siat_customer_nit}</p>
+                    <p><span className="font-semibold text-blue-900">Razón Social:</span> {selectedTable.siat_customer_name}</p>
+                    {selectedTable.siat_customer_email && (
+                      <p className="col-span-1 sm:col-span-2"><span className="font-semibold text-blue-900">Correo:</span> {selectedTable.siat_customer_email}</p>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -631,6 +629,13 @@ export default function AccountsPage() {
                   <p className="text-sm text-gray-400 mt-1 max-w-xs text-center">
                     No existen pedidos abiertos para esta mesa. Puedes liberarla para dejarla lista para nuevos clientes.
                   </p>
+                  <button
+                    onClick={() => handleReleaseTable(selectedTable.id)}
+                    disabled={isClosingBill}
+                    className="mt-4 px-4 py-2 bg-gray-900 hover:bg-black text-white font-bold rounded-xl text-sm transition-colors"
+                  >
+                    Liberar Mesa
+                  </button>
                 </div>
               ) : (
                 <div className="space-y-4">
