@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { RefreshCw, ShoppingCart, X, Plus, Minus, FileText, LayoutGrid, ChevronLeft, Search, CheckCircle, CheckCircle2, AlertCircle, ChevronRight, Download, Trash2, Clock, AlertTriangle, QrCode, Banknote, CreditCard, ArrowRight, ArrowLeft, Check, Bell, Loader2 } from 'lucide-react';
+import { RefreshCw, ShoppingCart, X, Plus, Minus, FileText, LayoutGrid, ChevronLeft, Search, CheckCircle, CheckCircle2, AlertCircle, ChevronRight, Download, Trash2, Clock, AlertTriangle, QrCode, Banknote, CreditCard, ArrowRight, ArrowLeft, Check, Bell, Loader2, UtensilsCrossed } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -40,6 +40,28 @@ export default function PublicMenuClient({
   const hasInvoices = !Array.isArray(restaurant?.enabled_modules) || restaurant.enabled_modules.length === 0
     ? true
     : restaurant.enabled_modules.includes('invoices');
+
+  // Verificación de módulos habilitados para restringir pedidos interactivos o activar modo catálogo/solo lectura
+  const enabledMods: string[] = Array.isArray(restaurant?.enabled_modules)
+    ? restaurant.enabled_modules
+    : [];
+
+  const isModulesConfigured = Array.isArray(restaurant?.enabled_modules) && restaurant.enabled_modules.length > 0;
+
+  // Módulo de Salón & Mesas (Mesas y Cuentas)
+  const hasAccounts = !isModulesConfigured || enabledMods.some(m => 
+    m === 'accounts' || m === 'tables' || m === 'orders&accounts' || m === 'orders&acounts'
+  );
+
+  // Módulo de Pedidos (Barra & Takeaway)
+  const hasOrders = !isModulesConfigured || enabledMods.some(m => 
+    m === 'orders' || m === 'takeaway' || m === 'orders&accounts' || m === 'orders&acounts'
+  );
+
+  const isTakeaway = table?.type === 'takeaway';
+  const isRestaurantActive = restaurant?.is_active !== false && restaurant?.subscription_status !== 'suspended';
+  // Si la mesa es takeaway requiere 'orders'; si es de salón requiere 'accounts'
+  const isOrderingAllowed = isRestaurantActive && (isTakeaway ? hasOrders : hasAccounts);
 
   // Actualizar dinámicamente el favicon y apple-touch-icon de la pestaña con el logo del restaurante
   useEffect(() => {
@@ -360,17 +382,17 @@ export default function PublicMenuClient({
       const params = new URLSearchParams(window.location.search);
       const tab = params.get('tab');
       const cat = params.get('cat');
-      if (tab === 'cart') {
+      if (tab === 'cart' && isOrderingAllowed) {
         setShowCart(true);
         setShowBill(false);
       }
-      else if (tab === 'bill') {
+      else if (tab === 'bill' && isOrderingAllowed && hasAccounts) {
         setShowBill(true);
         setShowCart(false);
       }
       if (cat) setSelectedCatId(cat);
     }
-  }, []);
+  }, [isOrderingAllowed, hasAccounts]);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && !isPreviewMode) {
@@ -630,6 +652,10 @@ export default function PublicMenuClient({
   // Load cart from localStorage on mount
   useEffect(() => {
     if (isPreviewMode) return;
+    if (!isOrderingAllowed) {
+      setCartItems([]);
+      return;
+    }
     const code = table?.table_code || '';
     const savedCart = localStorage.getItem(`cart_${code}`) ||
       (code.startsWith('BARRA-') ? localStorage.getItem(`cart_${code.replace('BARRA-', 'MESA-')}`) : null);
@@ -638,15 +664,15 @@ export default function PublicMenuClient({
         setCartItems(JSON.parse(savedCart));
       } catch (e) {}
     }
-  }, [table?.table_code, isPreviewMode]);
+  }, [table?.table_code, isPreviewMode, isOrderingAllowed]);
 
   // Save cart to localStorage when it changes
   useEffect(() => {
-    if (isPreviewMode) return;
+    if (isPreviewMode || !isOrderingAllowed) return;
     if (table?.table_code) {
       localStorage.setItem(`cart_${table.table_code}`, JSON.stringify(cartItems));
     }
-  }, [cartItems, table?.table_code, isPreviewMode]);
+  }, [cartItems, table?.table_code, isPreviewMode, isOrderingAllowed]);
 
   const rawTableNumber = table?.table_number ? String(table.table_number) : (table?.table_code ? String(table.table_code) : '1');
   const tableDisplayName = table?.type === 'takeaway'
@@ -694,6 +720,7 @@ export default function PublicMenuClient({
   };
 
   const handleAddToCart = () => {
+    if (!isOrderingAllowed) return;
     if (!selectedProduct) return;
     const newItem: CartItem = {
       id: Math.random().toString(36).substring(7),
@@ -710,6 +737,10 @@ export default function PublicMenuClient({
   };
 
   const handleSubmitOrder = async (isPaid: boolean = false) => {
+    if (!isOrderingAllowed) {
+      alert("Los pedidos digitales están deshabilitados para este restaurante.");
+      return;
+    }
     if (cartItems.length === 0) return;
     
     // Validar si la mesa ha sido bloqueada por otro comensal (dine_in)
@@ -959,6 +990,7 @@ export default function PublicMenuClient({
   };
 
   const handleFetchBill = async (isRefresh = false) => {
+    if (!isOrderingAllowed) return;
     setIsFetchingBill(true);
     if (!isRefresh) {
       setShowBill(true);
@@ -1021,6 +1053,7 @@ export default function PublicMenuClient({
 
 
   const handleRepeatOrder = (order: any) => {
+    if (!isOrderingAllowed) return;
     const newCartItems: CartItem[] = [];
     order.order_items.forEach((item: any) => {
       const originalProduct = products.find((p: any) => p.id === item.product_id);
@@ -1082,6 +1115,14 @@ export default function PublicMenuClient({
   };
 
   const handleServiceRequest = async (status: 'calling_waiter' | 'requesting_bill') => {
+    if (status === 'calling_waiter' && !hasAccounts) {
+      alert("El llamado al mesero no está disponible.");
+      return;
+    }
+    if (status === 'requesting_bill' && !hasAccounts) {
+      alert("La solicitud de cuenta no está disponible.");
+      return;
+    }
     setServiceRequestLoading(true);
     try {
       if (status === 'requesting_bill') {
@@ -1513,13 +1554,37 @@ export default function PublicMenuClient({
                     {restaurant?.name}
                   </h1>
                 )}
-                <p className="text-sm font-medium opacity-70 mt-1" style={{ color: pageTextColor }}>
-                  {tableDisplayName}
+                <p className="text-sm font-medium opacity-70 mt-1 flex items-center gap-2" style={{ color: pageTextColor }}>
+                  <span>{tableDisplayName}</span>
+                  {!isOrderingAllowed && (
+                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-900 border border-amber-500/20">
+                      Menú Digital
+                    </span>
+                  )}
                 </p>
               </div>
             </div>
           ) : (
             <div className={`w-full ${coverUrl ? 'h-8' : 'h-2'}`}></div>
+          )}
+
+          {/* Banner informativo de modo catálogo (pedidos deshabilitados) */}
+          {!isOrderingAllowed && (
+            <div className="px-6 pb-3">
+              <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/25 backdrop-blur-sm flex items-start gap-3">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-800 flex items-center justify-center shrink-0 mt-0.5">
+                  <UtensilsCrossed size={16} />
+                </div>
+                <div className="text-xs">
+                  <p className="font-bold text-amber-950">Menú Digital (Solo consulta)</p>
+                  <p className="text-amber-900/80 mt-0.5 leading-snug">
+                    {isTakeaway
+                      ? "Los pedidos digitales para llevar no están disponibles actualmente. Por favor realiza tu pedido directamente en el mostrador."
+                      : "Este restaurante toma los pedidos en mesa directamente con el personal. Puedes explorar toda la carta y precios libremente."}
+                  </p>
+                </div>
+              </div>
+            </div>
           )}
 
       {/* ── Sticky Navigation (Search + Categories) ── */}
@@ -1600,7 +1665,7 @@ export default function PublicMenuClient({
       </div>
 
       {/* Products Display */}
-      <div className="px-6 mt-6 pb-32 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+      <div className={`px-6 mt-6 ${isOrderingAllowed ? 'pb-32' : 'pb-12'} animate-fade-in-up`} style={{ animationDelay: '0.2s' }}>
         {(() => {
           const renderProductCard = (prod: any, layout: 'grid' | 'list' = 'grid') => {
             const cBg = prod.card_background_color || '#FFFFFF';
@@ -1625,12 +1690,14 @@ export default function PublicMenuClient({
                     )}
                     
                     {/* Add button floating on image */}
-                    <div 
-                      className={`absolute bottom-2 right-2 w-8 h-8 rounded-full flex items-center justify-center ${showShadows ? 'shadow-md' : ''} flex-shrink-0 z-10`} 
-                      style={prod.is_available ? { backgroundColor: brandColor, color: isLightBrand ? '#1F2933' : '#FFF', border: isLightBrand ? '1px solid #E5E7EB' : 'none' } : { backgroundColor: '#F3F4F6', color: '#9CA3AF' }}
-                    >
-                      <Plus size={18} />
-                    </div>
+                    {isOrderingAllowed && (
+                      <div 
+                        className={`absolute bottom-2 right-2 w-8 h-8 rounded-full flex items-center justify-center ${showShadows ? 'shadow-md' : ''} flex-shrink-0 z-10`} 
+                        style={prod.is_available ? { backgroundColor: brandColor, color: isLightBrand ? '#1F2933' : '#FFF', border: isLightBrand ? '1px solid #E5E7EB' : 'none' } : { backgroundColor: '#F3F4F6', color: '#9CA3AF' }}
+                      >
+                        <Plus size={18} />
+                      </div>
+                    )}
                     
                     {!prod.is_available && (
                       <div className="absolute inset-0 bg-white/60 flex items-center justify-center backdrop-blur-[1px] rounded-2xl">
@@ -1669,7 +1736,7 @@ export default function PublicMenuClient({
                     <p className="font-bold text-[15px]" style={{ color: cText }}>
                       Bs {prod.price.toLocaleString('es-BO')}
                     </p>
-                    {!prod.image_url && (
+                    {!prod.image_url && isOrderingAllowed && (
                       <div 
                         className={`w-8 h-8 rounded-full flex items-center justify-center ${showShadows ? 'shadow-sm' : ''} z-10 flex-shrink-0`} 
                         style={prod.is_available ? { backgroundColor: brandColor, color: isLightBrand ? '#1F2933' : '#FFF' } : { backgroundColor: '#F3F4F6', color: '#9CA3AF' }}
@@ -1682,12 +1749,14 @@ export default function PublicMenuClient({
                 {prod.image_url && (
                   <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-xl relative flex-shrink-0 bg-gray-50 overflow-hidden">
                     <img src={prod.image_url} alt={prod.name} className="w-full h-full object-cover" />
-                    <div 
-                      className={`absolute -bottom-1 -right-1 w-8 h-8 rounded-full flex items-center justify-center ${showShadows ? 'shadow-md' : ''} z-10`} 
-                      style={prod.is_available ? { backgroundColor: brandColor, color: isLightBrand ? '#1F2933' : '#FFF' } : { backgroundColor: '#F3F4F6', color: '#9CA3AF' }}
-                    >
-                      <Plus size={18} />
-                    </div>
+                    {isOrderingAllowed && (
+                      <div 
+                        className={`absolute -bottom-1 -right-1 w-8 h-8 rounded-full flex items-center justify-center ${showShadows ? 'shadow-md' : ''} z-10`} 
+                        style={prod.is_available ? { backgroundColor: brandColor, color: isLightBrand ? '#1F2933' : '#FFF' } : { backgroundColor: '#F3F4F6', color: '#9CA3AF' }}
+                      >
+                        <Plus size={18} />
+                      </div>
+                    )}
                     {!prod.is_available && (
                       <div className="absolute inset-0 bg-white/60 flex items-center justify-center backdrop-blur-[1px]">
                         <span className="bg-gray-800 text-white text-[10px] font-bold px-2 py-1 rounded-full">Agotado</span>
@@ -1786,7 +1855,7 @@ export default function PublicMenuClient({
       </div>
 
       {/* Floating Cart Bar */}
-      {cartItems.length > 0 && (
+      {cartItems.length > 0 && isOrderingAllowed && (
         <div className={`${isPreviewMode ? 'absolute' : 'fixed'} bottom-[100px] left-4 right-4 z-40 animate-in slide-in-from-bottom-10 fade-in duration-300`}>
           <div
             onClick={() => { setShowCart(true); setShowBill(false); }}
@@ -1840,49 +1909,66 @@ export default function PublicMenuClient({
               </div>
               <p className="text-gray-600 mb-8">{selectedProduct.description || 'Sin descripción.'}</p>
 
-              <div className="space-y-6">
-                <div>
-                  <label className="flex items-center gap-2 text-sm font-bold text-gray-900 mb-3">
-                    <FileText size={16} /> Instrucciones especiales
-                  </label>
-                  <textarea 
-                    value={notes}
-                    onChange={e => setNotes(e.target.value)}
-                    onFocus={(e) => {
-                      setTimeout(() => {
-                        e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                      }, 300);
-                    }}
-                    placeholder="Ej. Sin cebolla, extra picante..."
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm resize-none h-24 focus:ring-2 focus:outline-none"
-                    style={{ '--tw-ring-color': brandColor } as React.CSSProperties}
-                  />
-                </div>
+              {isOrderingAllowed && (
+                <div className="space-y-6">
+                  <div>
+                    <label className="flex items-center gap-2 text-sm font-bold text-gray-900 mb-3">
+                      <FileText size={16} /> Instrucciones especiales
+                    </label>
+                    <textarea 
+                      value={notes}
+                      onChange={e => setNotes(e.target.value)}
+                      onFocus={(e) => {
+                        setTimeout(() => {
+                          e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }, 300);
+                      }}
+                      placeholder="Ej. Sin cebolla, extra picante..."
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm resize-none h-24 focus:ring-2 focus:outline-none"
+                      style={{ '--tw-ring-color': brandColor } as React.CSSProperties}
+                    />
+                  </div>
 
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-gray-900">Cantidad</span>
-                  <div className="flex items-center gap-4 bg-gray-50 rounded-full border border-gray-200 p-1">
-                    <button 
-                      onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                      className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm text-gray-600 disabled:opacity-50"
-                      disabled={quantity <= 1}
-                    >
-                      <Minus size={18} />
-                    </button>
-                    <span className="w-4 text-center font-bold text-lg">{quantity}</span>
-                    <button 
-                      onClick={() => setQuantity(quantity + 1)}
-                      className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm text-gray-900"
-                    >
-                      <Plus size={18} />
-                    </button>
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-gray-900">Cantidad</span>
+                    <div className="flex items-center gap-4 bg-gray-50 rounded-full border border-gray-200 p-1">
+                      <button 
+                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                        className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm text-gray-600 disabled:opacity-50"
+                        disabled={quantity <= 1}
+                      >
+                        <Minus size={18} />
+                      </button>
+                      <span className="w-4 text-center font-bold text-lg">{quantity}</span>
+                      <button 
+                        onClick={() => setQuantity(quantity + 1)}
+                        className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm text-gray-900"
+                      >
+                        <Plus size={18} />
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
 
             <div className="p-6 bg-white border-t border-gray-100 flex-shrink-0" style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))' }}>
-              {tableStatus !== 'requesting_bill' ? (
+              {!isOrderingAllowed ? (
+                <div className="space-y-2.5">
+                  <div className="text-center py-2 px-3 bg-amber-50 border border-amber-200/80 rounded-xl text-xs text-amber-800 font-medium">
+                    {isTakeaway 
+                      ? "Pedidos digitales no disponibles. Consulta y ordena directamente en el mostrador." 
+                      : "Menú digital informativo. Por favor realiza tu pedido directamente con el mesero."}
+                  </div>
+                  <button
+                    onClick={() => setSelectedProduct(null)}
+                    className="w-full text-white py-3 rounded-xl font-bold shadow-md transition-opacity hover:opacity-90 active:scale-95 text-sm"
+                    style={{ backgroundColor: brandColor }}
+                  >
+                    Cerrar
+                  </button>
+                </div>
+              ) : tableStatus !== 'requesting_bill' ? (
                   <button
                     onClick={handleAddToCart}
                     className="w-full text-white py-3 rounded-lg font-medium shadow-md transition-opacity hover:opacity-90 active:scale-95"
@@ -1904,7 +1990,7 @@ export default function PublicMenuClient({
       )}
 
       {/* Cart Modal */}
-      {showCart && (
+      {showCart && isOrderingAllowed && (
         <div className="fixed inset-0 z-50 flex flex-col bg-white animate-in slide-in-from-bottom-full duration-300">
           <div className="flex items-center justify-between p-6 border-b border-gray-100">
             <h2 className="text-2xl font-bold text-gray-900">Tu Pedido</h2>
@@ -3045,49 +3131,51 @@ export default function PublicMenuClient({
       )}
 
       {/* ── Bottom Navigation Bar ── */}
-      <nav className={`${isPreviewMode ? 'absolute' : 'fixed'} bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-t border-gray-200/60 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]`} style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-        <div className="flex items-end justify-around h-[48px] max-w-lg mx-auto relative px-6">
-          {/* Cuenta (Left) */}
-          <button 
-            onClick={() => { if (!isPreviewMode) handleFetchBill(); }}
-            className="flex flex-col items-center justify-center gap-0.5 pt-1 transition-colors w-16"
-            style={{ color: showBill ? (isLightBrand ? '#1F2933' : brandColor) : '#9CA3AF' }}
-          >
-            <FileText size={20} />
-            <span className="text-[10px] font-semibold">Cuenta</span>
-          </button>
-
-          {/* Menú (Center - Elevated FAB) */}
-          <div className="flex flex-col items-center -mt-4 relative">
+      {isOrderingAllowed && (
+        <nav className={`${isPreviewMode ? 'absolute' : 'fixed'} bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-t border-gray-200/60 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]`} style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+          <div className="flex items-end justify-around h-[48px] max-w-lg mx-auto relative px-6">
+            {/* Cuenta (Left) */}
             <button 
-              onClick={() => { setShowCart(false); setShowBill(false); setSelectedCatId(null); onCategoryChange?.(null); setSearchQuery(''); }}
-              className={`w-12 h-12 rounded-full flex items-center justify-center shadow-[0_4px_20px_rgba(0,0,0,0.15)] border-[3px] ${isLightBrand ? 'border-gray-100' : 'border-white'} active:scale-90 transition-transform`}
-              style={{ backgroundColor: brandColor }}
+              onClick={() => { if (!isPreviewMode) handleFetchBill(); }}
+              className="flex flex-col items-center justify-center gap-0.5 pt-1 transition-colors w-16"
+              style={{ color: showBill ? (isLightBrand ? '#1F2933' : brandColor) : '#9CA3AF' }}
             >
-              <LayoutGrid size={22} style={{ color: isLightBrand ? '#1F2933' : '#FFF' }} />
+              <FileText size={20} />
+              <span className="text-[10px] font-semibold">Cuenta</span>
             </button>
-            <span className="text-[10px] font-semibold mt-0.5" style={{ color: (!showCart && !showBill) ? brandColor : '#9CA3AF' }}>Menú</span>
-          </div>
 
-          {/* Pedido (Right) */}
-          <button 
-            onClick={() => { if (!isPreviewMode) { setShowCart(true); setShowBill(false); } }}
-            className="flex flex-col items-center justify-center gap-0.5 pt-1 relative transition-colors w-16"
-            style={{ color: showCart ? (isLightBrand ? '#1F2933' : brandColor) : '#9CA3AF' }}
-          >
-            <ShoppingCart size={20} />
-            <span className="text-[10px] font-semibold">Pedido</span>
-            {cartCount > 0 && (
-              <span 
-                className="absolute top-0 right-1 min-w-[16px] h-[16px] rounded-full text-white text-[9px] font-bold flex items-center justify-center px-1"
+            {/* Menú (Center - Elevated FAB) */}
+            <div className="flex flex-col items-center -mt-4 relative">
+              <button 
+                onClick={() => { setShowCart(false); setShowBill(false); setSelectedCatId(null); onCategoryChange?.(null); setSearchQuery(''); }}
+                className={`w-12 h-12 rounded-full flex items-center justify-center shadow-[0_4px_20px_rgba(0,0,0,0.15)] border-[3px] ${isLightBrand ? 'border-gray-100' : 'border-white'} active:scale-90 transition-transform`}
                 style={{ backgroundColor: brandColor }}
               >
-                {cartCount}
-              </span>
-            )}
-          </button>
-        </div>
-      </nav>
+                <LayoutGrid size={22} style={{ color: isLightBrand ? '#1F2933' : '#FFF' }} />
+              </button>
+              <span className="text-[10px] font-semibold mt-0.5" style={{ color: (!showCart && !showBill) ? brandColor : '#9CA3AF' }}>Menú</span>
+            </div>
+
+            {/* Pedido (Right) */}
+            <button 
+              onClick={() => { if (!isPreviewMode) { setShowCart(true); setShowBill(false); } }}
+              className="flex flex-col items-center justify-center gap-0.5 pt-1 relative transition-colors w-16"
+              style={{ color: showCart ? (isLightBrand ? '#1F2933' : brandColor) : '#9CA3AF' }}
+            >
+              <ShoppingCart size={20} />
+              <span className="text-[10px] font-semibold">Pedido</span>
+              {cartCount > 0 && (
+                <span 
+                  className="absolute top-0 right-1 min-w-[16px] h-[16px] rounded-full text-white text-[9px] font-bold flex items-center justify-center px-1"
+                  style={{ backgroundColor: brandColor }}
+                >
+                  {cartCount}
+                </span>
+              )}
+            </button>
+          </div>
+        </nav>
+      )}
     </div>
   );
 }

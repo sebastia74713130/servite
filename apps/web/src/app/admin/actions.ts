@@ -255,6 +255,50 @@ export async function updateRestaurantSubscription(
   return { success: true };
 }
 
+// Actualiza de forma atómica tanto la suscripción como los módulos habilitados para un restaurante
+export async function updateRestaurantFullDetails(
+  restaurantId: string,
+  payload: {
+    enabled_modules?: (ModuleKey | string)[];
+    plan?: string;
+    status?: 'active' | 'inactive' | 'expired' | 'suspended';
+    expires_at?: string | null;
+    monthly_price?: number;
+    billing_period?: 'monthly' | 'semiannual' | 'annual';
+    notes?: string | null;
+  }
+) {
+  const updateData: any = {
+    updated_at: new Date().toISOString()
+  };
+
+  if (payload.enabled_modules !== undefined) {
+    const normalized = Array.from(new Set(
+      payload.enabled_modules.map(m => {
+        if (m === 'tables' || m === 'orders&accounts' || m === 'orders&acounts') return 'accounts';
+        if (m === 'takeaway') return 'orders';
+        return m;
+      })
+    ));
+    updateData.enabled_modules = normalized;
+  }
+
+  if (payload.plan !== undefined) updateData.subscription_plan = payload.plan;
+  if (payload.status !== undefined) updateData.subscription_status = payload.status;
+  if (payload.expires_at !== undefined) updateData.subscription_expires_at = payload.expires_at;
+  if (payload.monthly_price !== undefined) updateData.monthly_price = payload.monthly_price;
+  if (payload.billing_period !== undefined) updateData.billing_period = payload.billing_period;
+  if (payload.notes !== undefined) updateData.subscription_notes = payload.notes;
+
+  const { error } = await supabaseAdmin
+    .from("restaurants")
+    .update(updateData)
+    .eq("id", restaurantId);
+
+  if (error) throw new Error(error.message);
+  return { success: true };
+}
+
 // Actualiza de forma atómica los módulos habilitados para un restaurante (guardando siempre claves canónicas)
 export async function updateRestaurantModules(restaurantId: string, enabledModules: (ModuleKey | string)[]) {
   const normalized = Array.from(new Set(

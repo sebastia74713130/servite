@@ -11,7 +11,8 @@ import {
 } from "@/shared/types";
 import { 
   updateRestaurantSubscription, 
-  updateRestaurantModules 
+  updateRestaurantModules,
+  updateRestaurantFullDetails 
 } from "../actions";
 import { 
   X, 
@@ -88,6 +89,7 @@ export function RestaurantManagerModal({
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   useEffect(() => {
+    setSaving(false);
     if (restaurant) {
       setPlan(restaurant.subscription_plan || "BASIC");
       setStatus(restaurant.subscription_status || "active");
@@ -95,10 +97,16 @@ export function RestaurantManagerModal({
       setBillingPeriod(restaurant.billing_period || "monthly");
       
       if (restaurant.subscription_expires_at) {
-        // Format to YYYY-MM-DD for date input
-        const d = new Date(restaurant.subscription_expires_at);
-        const iso = d.toISOString().split("T")[0];
-        setExpiresAt(iso);
+        try {
+          const d = new Date(restaurant.subscription_expires_at);
+          if (!isNaN(d.getTime())) {
+            setExpiresAt(d.toISOString().split("T")[0]);
+          } else {
+            setExpiresAt("");
+          }
+        } catch {
+          setExpiresAt("");
+        }
       } else {
         setExpiresAt("");
       }
@@ -162,26 +170,58 @@ export function RestaurantManagerModal({
   };
 
   const handleSave = async () => {
+    if (saving) return;
     setSaving(true);
     setErrorMsg(null);
     setSuccessMsg(null);
 
-    try {
-      // 1. Guardar módulos
-      await updateRestaurantModules(restaurant.id, selectedModules);
+    // Parse expiresAt safely to UTC end-of-day
+    let parsedExpiresAt: string | null = null;
+    if (expiresAt && expiresAt.trim()) {
+      try {
+        const parts = expiresAt.trim().split("-");
+        if (parts.length === 3) {
+          const year = parseInt(parts[0], 10);
+          const month = parseInt(parts[1], 10) - 1;
+          const day = parseInt(parts[2], 10);
+          const d = new Date(Date.UTC(year, month, day, 23, 59, 59));
+          if (!isNaN(d.getTime())) {
+            parsedExpiresAt = d.toISOString();
+          }
+        } else {
+          const d = new Date(expiresAt);
+          if (!isNaN(d.getTime())) {
+            parsedExpiresAt = d.toISOString();
+          }
+        }
+      } catch (e) {
+        console.error("Error parsing expiresAt:", e);
+      }
+    }
 
-      // 2. Guardar suscripción
-      await updateRestaurantSubscription(restaurant.id, {
-        plan,
-        status,
-        monthly_price: Number(monthlyPrice),
-        billing_period: billingPeriod,
-        expires_at: expiresAt ? new Date(expiresAt + "T23:59:59").toISOString() : null,
-        notes: notes.trim() || null
-      });
+    // 15 seconds timeout
+    const timeoutPromise = new Promise<never>((_, reject) => 
+      setTimeout(() => reject(new Error("La operación tardó demasiado tiempo en responder (tiempo de espera agotado)")), 15000)
+    );
+
+    try {
+      // Guardar de forma atómica módulos y suscripción en una única llamada
+      await Promise.race([
+        updateRestaurantFullDetails(restaurant.id, {
+          enabled_modules: selectedModules,
+          plan,
+          status,
+          monthly_price: Number(monthlyPrice) || 0,
+          billing_period: billingPeriod,
+          expires_at: parsedExpiresAt,
+          notes: notes.trim() || null
+        }),
+        timeoutPromise
+      ]);
 
       setSuccessMsg("¡Cambios guardados con éxito!");
       setTimeout(() => {
+        setSaving(false);
         onSaved();
         onClose();
       }, 700);
@@ -610,7 +650,7 @@ export function RestaurantManagerModal({
         {/* Modal Footer */}
         <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
           <div className="text-xs text-slate-500">
-            {selectedModules.length} de 11 módulos activos para este restaurante
+            {selectedModules.length} de {CANONICAL_MODULE_KEYS.length} módulos activos para este restaurante
           </div>
 
           <div className="flex items-center gap-3">
