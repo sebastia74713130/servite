@@ -60,6 +60,17 @@ export function useRestaurantSession() {
     const enabled = restaurant.enabled_modules;
     // Si no está definido (restaurantes previos), se asume habilitado para retrocompatibilidad
     if (!Array.isArray(enabled) || enabled.length === 0) return true;
+
+    // Unificación de módulo orders & accounts
+    if (modKey === 'orders&accounts' || modKey === 'orders&acounts' || modKey === 'accounts' || modKey === 'orders') {
+      return (
+        enabled.includes('orders&accounts') ||
+        enabled.includes('orders&acounts') ||
+        enabled.includes('accounts') ||
+        enabled.includes('orders')
+      );
+    }
+
     return enabled.includes(modKey);
   }, [restaurant]);
 

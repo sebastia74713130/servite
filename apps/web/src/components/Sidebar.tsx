@@ -216,14 +216,13 @@ export function Sidebar({ isOpen = true, setIsOpen }: { isOpen?: boolean, setIsO
 
   const allLinks: SidebarLink[] = [
     { name: "Dashboard", href: "/", icon: Home },
-    { name: "Pedidos", href: "/orders", icon: ClipboardList, allowedRoles: ['kitchen', 'waitstaff'], module: 'orders' },
+    { name: "Mesas y Pedidos", href: "/accounts", icon: LayoutGrid, allowedRoles: ['kitchen', 'waitstaff'], module: 'orders&accounts' },
     { name: "Cocina", href: "/kitchen", icon: ChefHat, allowedRoles: ['kitchen'], module: 'kitchen' },
-    { name: "Cuentas", href: "/accounts", icon: Receipt, allowedRoles: ['waitstaff'], module: 'accounts' },
     { name: "Facturas", href: "/invoices", icon: FileText, module: 'invoices' },
     { name: "Finanzas", href: "/finances", icon: Wallet, module: 'finances' },
     { name: "Inventario", href: "/inventory", icon: Package, module: 'inventory' },
     { name: "Menú", href: "/menu", icon: UtensilsCrossed, allowedRoles: ['kitchen', 'waitstaff'], module: 'menu' },
-    { name: "Mesas", href: "/tables", icon: LayoutGrid, allowedRoles: ['waitstaff'], module: 'tables' },
+    { name: "Mesas", href: "/tables", icon: Store, allowedRoles: ['waitstaff'], module: 'tables' },
     { name: "Reservas", href: "/reservations", icon: CalendarClock, module: 'reservations' },
     { name: "Sucursales", href: "/branches", icon: Store, module: 'branches' },
     { name: "Configuración", href: "/settings", icon: Settings },

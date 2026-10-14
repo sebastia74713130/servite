@@ -21,12 +21,13 @@ export function useOrders(restaurantId: string | undefined, branchId?: string, o
         order_items (*)
       `)
       .eq("restaurant_id", restaurantId)
-      .gte("created_at", today.toISOString())
       .order("created_at", { ascending: false });
     if (branchId) query = query.eq("branch_id", branchId);
 
     if (options.onlyUnpaid) {
-      query = query.eq("is_paid", false);
+      query = query.eq("is_paid", false).neq("status", "cancelled");
+    } else {
+      query = query.gte("created_at", today.toISOString());
     }
 
     const { data, error } = await query;
@@ -62,7 +63,7 @@ export function useOrders(restaurantId: string | undefined, branchId?: string, o
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [restaurantId, branchId]);
+  }, [restaurantId, branchId, options.onlyUnpaid]);
 
-  return { orders, loading };
+  return { orders, loading, refreshOrders: fetchOrders };
 }

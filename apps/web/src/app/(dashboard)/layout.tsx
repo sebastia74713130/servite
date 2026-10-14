@@ -12,8 +12,7 @@ import Link from "next/link";
 
 function getRequiredModuleForPath(pathname: string): ModuleKey | null {
   if (pathname.startsWith('/kitchen')) return 'kitchen';
-  if (pathname.startsWith('/orders')) return 'orders';
-  if (pathname.startsWith('/accounts')) return 'accounts';
+  if (pathname.startsWith('/orders') || pathname.startsWith('/accounts')) return 'orders&accounts';
   if (pathname.startsWith('/invoices') || pathname.startsWith('/settings/siat')) return 'invoices';
   if (pathname.startsWith('/finances')) return 'finances';
   if (pathname.startsWith('/inventory')) return 'inventory';

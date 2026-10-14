@@ -49,6 +49,8 @@ const MODULE_ICONS: Record<ModuleKey, any> = {
   orders: ClipboardList,
   kitchen: ChefHat,
   accounts: Receipt,
+  'orders&accounts': Receipt,
+  'orders&acounts': Receipt,
   invoices: FileText,
   finances: Wallet,
   inventory: Package,
@@ -182,9 +184,9 @@ export function RestaurantManagerModal({
 
   // Agrupar módulos por categoría
   const modulesByCategory: Record<string, ModuleKey[]> = {
-    salon: ['menu', 'tables', 'takeaway', 'orders'],
+    salon: ['menu', 'orders&accounts', 'tables', 'takeaway'],
     cocina: ['kitchen'],
-    caja: ['accounts', 'invoices', 'finances'],
+    caja: ['invoices', 'finances'],
     gestion: ['inventory', 'reservations', 'branches']
   };
 

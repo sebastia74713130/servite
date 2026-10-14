@@ -12,6 +12,8 @@ export type ModuleKey =
   | 'orders' 
   | 'kitchen' 
   | 'accounts' 
+  | 'orders&accounts'
+  | 'orders&acounts'
   | 'invoices' 
   | 'inventory' 
   | 'finances' 
@@ -47,6 +49,20 @@ export const AVAILABLE_MODULES: Record<ModuleKey, ModuleDefinition> = {
     category: 'salon',
     description: 'Atención rápida en barra, captura de datos del cliente y aviso sonoro de pedido listo.',
     routes: ['/tables']
+  },
+  'orders&accounts': {
+    key: 'orders&accounts',
+    name: 'Mesas y Pedidos',
+    category: 'salon',
+    description: 'Control unificado de salón: cuadrícula de mesas, pedidos en tiempo real, estados de platos, cobro y liberación.',
+    routes: ['/accounts', '/orders']
+  },
+  'orders&acounts': {
+    key: 'orders&acounts',
+    name: 'Mesas y Pedidos',
+    category: 'salon',
+    description: 'Control unificado de salón: cuadrícula de mesas, pedidos en tiempo real, estados de platos, cobro y liberación.',
+    routes: ['/accounts', '/orders']
   },
   orders: {
     key: 'orders',

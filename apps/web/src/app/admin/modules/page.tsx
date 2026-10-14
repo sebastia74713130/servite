@@ -34,6 +34,8 @@ const MODULE_ICONS: Record<ModuleKey, any> = {
   orders: ClipboardList,
   kitchen: ChefHat,
   accounts: Receipt,
+  'orders&accounts': Receipt,
+  'orders&acounts': Receipt,
   invoices: FileText,
   finances: Wallet,
   inventory: Package,
