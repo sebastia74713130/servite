@@ -402,51 +402,55 @@ export default function AccountsPage() {
           if (result.success) {
             generatedCuf = result.cuf;
 
-            // Automatically open printable factura
-            const printWindow = window.open('', '_blank');
-            if (printWindow) {
-              const html = `
-                <html>
-                  <head>
-                    <title>Factura SIAT</title>
-                    <style>
-                      body { font-family: monospace; padding: 20px; color: #000; width: 300px; margin: 0 auto; text-align: center;}
-                      h1 { font-size: 20px; margin-bottom: 5px; }
-                      h2 { font-size: 16px; margin-top: 0; margin-bottom: 20px;}
-                      .items { text-align: left; margin-top: 20px; margin-bottom: 20px;}
-                      .footer { font-size: 11px; margin-top: 20px; text-align: center;}
-                    </style>
-                  </head>
-                  <body>
-                    <h1>FACTURA ELECTRÓNICA</h1>
-                    <h2>${restaurant?.name || 'Servido'}</h2>
-                    <div style="text-align:left; font-size:12px; margin-bottom: 10px;">
-                      NIT/CI: ${nitCi}<br/>
-                      Razón Social: ${rznSocial}
-                    </div>
-                    <div class="items">
-                      ${tableOrders.flatMap(o => (o.order_items || [])).map(item => `
-                        <div style="margin-bottom: 5px; display: flex; justify-content: space-between; font-size: 12px;">
-                          <span>${item.quantity}x ${item.product_name}</span>
-                          <span>Bs ${item.total_price.toLocaleString('es-BO')}</span>
-                        </div>
-                      `).join('')}
-                    </div>
-                    <div style="text-align: right; font-weight: bold; font-size: 16px; border-top: 1px dashed #000; padding-top: 10px;">
-                      TOTAL: Bs ${totalBillAmount.toLocaleString('es-BO')}
-                    </div>
-                    <div class="footer">
-                      CUF: ${generatedCuf}<br/><br/>
-                      "ESTA FACTURA CONTRIBUYE AL DESARROLLO DEL PAÍS, EL USO ILÍCITO SERÁ SANCIONADO PENALMENTE DE ACUERDO A LEY"
-                    </div>
-                    <script>
-                      window.onload = function() { window.print(); window.close(); }
-                    </script>
-                  </body>
-                </html>
-              `;
-              printWindow.document.write(html);
-              printWindow.document.close();
+            // Automatically open printable factura (con QR oficial si está disponible)
+            if (result.ticketUrl) {
+              window.open(result.ticketUrl, '_blank');
+            } else {
+              const printWindow = window.open('', '_blank');
+              if (printWindow) {
+                const html = `
+                  <html>
+                    <head>
+                      <title>Factura SIAT</title>
+                      <style>
+                        body { font-family: monospace; padding: 20px; color: #000; width: 300px; margin: 0 auto; text-align: center;}
+                        h1 { font-size: 20px; margin-bottom: 5px; }
+                        h2 { font-size: 16px; margin-top: 0; margin-bottom: 20px;}
+                        .items { text-align: left; margin-top: 20px; margin-bottom: 20px;}
+                        .footer { font-size: 11px; margin-top: 20px; text-align: center;}
+                      </style>
+                    </head>
+                    <body>
+                      <h1>FACTURA ELECTRÓNICA</h1>
+                      <h2>${restaurant?.name || 'Servido'}</h2>
+                      <div style="text-align:left; font-size:12px; margin-bottom: 10px;">
+                        NIT/CI: ${nitCi}<br/>
+                        Razón Social: ${rznSocial}
+                      </div>
+                      <div class="items">
+                        ${tableOrders.flatMap(o => (o.order_items || [])).map(item => `
+                          <div style="margin-bottom: 5px; display: flex; justify-content: space-between; font-size: 12px;">
+                            <span>${item.quantity}x ${item.product_name}</span>
+                            <span>Bs ${item.total_price.toLocaleString('es-BO')}</span>
+                          </div>
+                        `).join('')}
+                      </div>
+                      <div style="text-align: right; font-weight: bold; font-size: 16px; border-top: 1px dashed #000; padding-top: 10px;">
+                        TOTAL: Bs ${totalBillAmount.toLocaleString('es-BO')}
+                      </div>
+                      <div class="footer">
+                        CUF: ${generatedCuf}<br/><br/>
+                        "ESTA FACTURA CONTRIBUYE AL DESARROLLO DEL PAÍS, EL USO ILÍCITO SERÁ SANCIONADO PENALMENTE DE ACUERDO A LEY"
+                      </div>
+                      <script>
+                        window.onload = function() { window.print(); window.close(); }
+                      </script>
+                    </body>
+                  </html>
+                `;
+                printWindow.document.write(html);
+                printWindow.document.close();
+              }
             }
 
             setSiatResult({

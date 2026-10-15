@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { tendaiApiClient } from '@/lib/siat/tendaiApiClient';
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -427,6 +428,12 @@ export async function GET(req: Request) {
         </div>
 
         <div class="actions">
+          ${invoiceCuf ? `
+          <a href="${tendaiApiClient.getTicketUrl(invoiceCuf)}" target="_blank" class="btn-action" style="background: #E76F51; color: #FFFFFF; text-decoration: none; margin-bottom: 4px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px;"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><rect x="7" y="7" width="10" height="10"/></svg>
+            <span>Ver Ticket Oficial con QR (80mm)</span>
+          </a>
+          ` : ''}
           <button id="btnDownload" class="btn-action btn-download" onclick="downloadInvoice()">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             <span>Descargar Factura</span>

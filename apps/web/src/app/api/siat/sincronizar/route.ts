@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { sincronizarCatalogosSIAT } from "@/lib/siat/services/sincronizarCatalogos";
 import { resolveBranchId } from "@/lib/siat/branchHelper";
-import { siatConfig } from "@/lib/siat/config";
+import { tendaiApiClient } from "@/lib/siat/tendaiApiClient";
 
 export async function POST(req: Request) {
   try {
@@ -14,60 +13,73 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Falta el ID del restaurante" }, { status: 400 });
     }
 
-    const { data: siatSettings, error: dbError } = await supabaseAdmin
+    const { data: siatSettings } = await supabaseAdmin
       .from('restaurant_siat_settings')
       .select('*')
       .eq('restaurant_id', restaurantId)
       .single();
 
-    const { data: branchData, error: branchError } = await supabaseAdmin
-      .from('branches')
-      .select('siat_codigo_sucursal, siat_codigo_punto_venta, siat_cuis')
-      .eq('id', branchId)
-      .single();
+    let sucursal = siatSettings?.siat_codigo_sucursal || 0;
+    let puntoVenta = siatSettings?.siat_codigo_punto_venta || 0;
 
-    if (branchError || !branchData) {
-      return NextResponse.json({ error: "No se encontró la configuración de la sucursal" }, { status: 404 });
+    if (branchId) {
+      const { data: branchData } = await supabaseAdmin
+        .from('branches')
+        .select('siat_codigo_sucursal, siat_codigo_punto_venta')
+        .eq('id', branchId)
+        .single();
+
+      if (branchData) {
+        if (branchData.siat_codigo_sucursal !== null && branchData.siat_codigo_sucursal !== undefined) {
+          sucursal = parseInt(branchData.siat_codigo_sucursal, 10) || 0;
+        }
+        if (branchData.siat_codigo_punto_venta !== null && branchData.siat_codigo_punto_venta !== undefined) {
+          puntoVenta = parseInt(branchData.siat_codigo_punto_venta, 10) || 0;
+        }
+      }
     }
 
-    if (dbError || !siatSettings) {
-      return NextResponse.json({ error: "El restaurante no tiene configurado el SIAT" }, { status: 404 });
+    const apiKey = siatSettings?.siat_api_key || process.env.FACTURACION_API_KEY;
+
+    // Delegar sincronización al microservicio
+    const resp = await tendaiApiClient.sincronizarCatalogos(sucursal, puntoVenta, apiKey);
+
+    if (!resp.success) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Error al sincronizar catálogos",
+          error: resp.error || resp.message || "Fallo al comunicar con SIAT",
+        },
+        { status: 500 }
+      );
     }
 
-    if (!branchData.siat_cuis) {
-      return NextResponse.json({ error: "Falta el CUIS. Solicite el CUIS primero." }, { status: 400 });
-    }
-
-    const catalogos = await sincronizarCatalogosSIAT({
-      codigoAmbiente: siatConfig.ambiente,
-      codigoPuntoVenta: parseInt(branchData.siat_codigo_punto_venta) || 0,
-      codigoSistema: siatConfig.codigoSistema,
-      codigoSucursal: parseInt(branchData.siat_codigo_sucursal) || 0,
-      cuis: branchData.siat_cuis,
-      nit: parseInt(siatSettings.siat_nit, 10),
-    });
+    const actividad = resp.data?.actividad || resp.data?.actividades?.[0]?.codigoCaeb || siatSettings?.siat_actividad_economica || "6201000";
+    const producto = resp.data?.producto || resp.data?.productos?.[0]?.codigoProducto || siatSettings?.siat_codigo_producto_sin || 1003913;
 
     await supabaseAdmin
       .from('restaurant_siat_settings')
       .update({
-        siat_actividad_economica: catalogos.actividad.toString(),
-        siat_codigo_producto_sin: parseInt(catalogos.producto)
+        siat_actividad_economica: actividad.toString(),
+        siat_codigo_producto_sin: parseInt(producto, 10) || 1003913,
       })
       .eq('restaurant_id', restaurantId);
 
     return NextResponse.json({
       success: true,
       message: "Catálogos sincronizados exitosamente.",
-      actividad: catalogos.actividad,
-      producto: catalogos.producto
+      actividad,
+      producto,
+      data: resp.data,
     });
 
   } catch (error: any) {
-    console.error("Error en sincronizar catálogos:", error);
+    console.error("Error en /api/siat/sincronizar:", error);
     return NextResponse.json(
       {
         success: false,
-        message: "Error al sincronizar catálogos.",
+        message: "Error interno al sincronizar catálogos",
         error: error.message || error.toString(),
       },
       { status: 500 }
