@@ -143,11 +143,11 @@ export default function DashboardLayout({
                 className="w-full sm:w-auto px-5 py-3 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 font-semibold text-sm transition-colors flex items-center justify-center gap-2"
               >
                 <ArrowLeft size={16} />
-                <span>Volver al Dashboard</span>
+                <span>Volver al Inicio</span>
               </Link>
 
               <a
-                href="https://wa.me/59170000000?text=Hola,%20deseo%20activar%20el%20módulo%20de%20mi%20restaurante"
+                href="https://wa.me/59160520338?text=Hola,%20deseo%20activar%20el%20módulo%20de%20mi%20restaurante"
                 target="_blank"
                 rel="noreferrer"
                 className="w-full sm:w-auto px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm transition-colors shadow-sm flex items-center justify-center gap-2"

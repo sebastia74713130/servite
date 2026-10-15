@@ -10,7 +10,8 @@ export function useDashboardStats(restaurantId: string | undefined, branchId?: s
     nuevos: 0,
     preparacion: 0,
     listos: 0,
-    ventas: 0
+    ventas: 0,
+    productosVendidos: 0
   });
 
   useEffect(() => {
@@ -25,7 +26,7 @@ export function useDashboardStats(restaurantId: string | undefined, branchId?: s
 
       let query = supabase
         .from("orders")
-        .select("status, total, created_at, is_paid, table_id, customer_session_id")
+        .select("status, total, created_at, is_paid, table_id, customer_session_id, order_items(quantity)")
         .eq("restaurant_id", restaurantId)
         .gte("created_at", today.toISOString());
       if (branchId) query = query.eq("branch_id", branchId);
@@ -36,6 +37,7 @@ export function useDashboardStats(restaurantId: string | undefined, branchId?: s
         const preparacion = new Set<string>();
         const listos = new Set<string>();
         let ventas = 0;
+        let productosVendidos = 0;
 
         orders.forEach((o: any) => {
           // El contador de "Nuevos" en el sidebar debe reflejar lo que ve la cocina (OrdersPage)
@@ -49,12 +51,20 @@ export function useDashboardStats(restaurantId: string | undefined, branchId?: s
 
           // Sum all orders for total sales
           ventas += Number(o.total || 0);
+
+          // Sum all order items quantity
+          if (Array.isArray(o.order_items)) {
+            o.order_items.forEach((item: any) => {
+              productosVendidos += Number(item.quantity || 1);
+            });
+          }
         });
         setStats({ 
           nuevos: nuevos.size, 
           preparacion: preparacion.size, 
           listos: listos.size, 
-          ventas 
+          ventas,
+          productosVendidos
         });
       }
       setLoading(false);

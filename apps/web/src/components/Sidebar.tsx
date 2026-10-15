@@ -215,7 +215,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: { isOpen?: boolean, setIsO
   }
 
   const allLinks: SidebarLink[] = [
-    { name: "Dashboard", href: "/", icon: Home },
+    { name: "Inicio", href: "/", icon: Home },
     { name: "Mesas y Cuentas", href: "/accounts", icon: LayoutGrid, allowedRoles: ['kitchen', 'waitstaff'], module: 'accounts' },
     { name: "Pedidos", href: "/orders", icon: ClipboardList, allowedRoles: ['kitchen', 'waitstaff'], module: 'orders' },
     { name: "Cocina", href: "/kitchen", icon: ChefHat, allowedRoles: ['kitchen'], module: 'kitchen' },
