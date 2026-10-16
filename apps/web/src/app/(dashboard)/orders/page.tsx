@@ -26,13 +26,18 @@ import {
   ArrowRight
 } from "lucide-react";
 
+// Module-level cache for takeaway table lookup
+let cachedOrdersTables: RestaurantTable[] | null = null;
+
 export default function OrdersPage() {
   const { restaurant, branch, loading: sessionLoading } = useRestaurantSession();
   const { orders, loading: ordersLoading, refreshOrders } = useOrders(restaurant?.id, branch?.id);
   const { updateStatus, loading: updatingStatus } = useUpdateOrderStatus();
 
-  const [tables, setTables] = useState<RestaurantTable[]>([]);
-  const [takeawayTable, setTakeawayTable] = useState<RestaurantTable | null>(null);
+  const [tables, setTables] = useState<RestaurantTable[]>(cachedOrdersTables || []);
+  const [takeawayTable, setTakeawayTable] = useState<RestaurantTable | null>(
+    cachedOrdersTables?.find((t) => t.type === "takeaway") || null
+  );
   const [showQrModal, setShowQrModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"all" | "received" | "preparing" | "ready" | "delivered">("all");
@@ -51,8 +56,9 @@ export default function OrdersPage() {
 
       const { data, error } = await query;
       if (!error && data) {
-        setTables(data as RestaurantTable[]);
-        const found = data.find((t) => t.type === "takeaway");
+        cachedOrdersTables = data as RestaurantTable[];
+        setTables(cachedOrdersTables);
+        const found = cachedOrdersTables.find((t) => t.type === "takeaway");
         if (found) {
           setTakeawayTable(found as RestaurantTable);
         }
@@ -183,7 +189,9 @@ export default function OrdersPage() {
     }
   };
 
-  if (sessionLoading || ordersLoading) return <LoadingState />;
+  if (sessionLoading || (ordersLoading && orders.length === 0)) {
+    return <LoadingState />;
+  }
 
   return (
     <div className="p-8 h-full flex flex-col">

@@ -16,7 +16,9 @@ export default function KitchenPage() {
   const { stations, loading: stationsLoading } = useKitchenStations(restaurant?.id, branch?.id);
   const [selectedStationId, setSelectedStationId] = useState<string>("all");
 
-  if (sessionLoading || ordersLoading || stationsLoading) return <LoadingState />;
+  if (sessionLoading || (ordersLoading && orders.length === 0) || (stationsLoading && stations.length === 0)) {
+    return <LoadingState />;
+  }
 
   // Filter orders to only show those that have items for the selected station
   // If no station is selected ("all"), show all active orders

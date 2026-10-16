@@ -1,13 +1,19 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useContext } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { getUserRestaurant } from '@/app/actions';
 import { isSuperAdmin } from '@/app/admin/actions';
 import { ModuleKey } from '@/shared/types';
+import { RestaurantSessionContext } from '@/contexts/RestaurantSessionContext';
 
 export function useRestaurantSession() {
+  const context = useContext(RestaurantSessionContext);
+  if (context) {
+    return context;
+  }
+
   const router = useRouter();
   const [restaurant, setRestaurant] = useState<any>(null);
   const [branch, setBranch] = useState<any>(null);

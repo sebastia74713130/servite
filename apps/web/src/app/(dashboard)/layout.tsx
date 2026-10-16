@@ -9,6 +9,7 @@ import { LoadingState } from "@/components/LoadingState";
 import { AVAILABLE_MODULES, ModuleKey, CanonicalModuleKey } from "@/shared/types";
 import { Lock, Sparkles, ArrowLeft, MessageCircle } from "lucide-react";
 import Link from "next/link";
+import { RestaurantSessionProvider } from "@/contexts/RestaurantSessionContext";
 
 function getRequiredModuleForPath(pathname: string): CanonicalModuleKey | null {
   if (pathname.startsWith('/kitchen')) return 'kitchen';
@@ -24,6 +25,18 @@ function getRequiredModuleForPath(pathname: string): CanonicalModuleKey | null {
 }
 
 export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <RestaurantSessionProvider>
+      <DashboardContent>{children}</DashboardContent>
+    </RestaurantSessionProvider>
+  );
+}
+
+function DashboardContent({
   children,
 }: {
   children: React.ReactNode;

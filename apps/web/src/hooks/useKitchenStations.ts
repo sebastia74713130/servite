@@ -1,20 +1,28 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { KitchenStation } from '@shared/types';
 
-export function useKitchenStations(restaurantId?: string, branchId?: string) {
-  const [stations, setStations] = useState<KitchenStation[]>([]);
-  const [loading, setLoading] = useState(true);
+// Module-level cache for kitchen stations
+const stationsCache = new Map<string, KitchenStation[]>();
 
-  const fetchStations = async () => {
-    if (!restaurantId) {
+export function useKitchenStations(restaurantId?: string, branchId?: string) {
+  const cacheKey = restaurantId ? `${restaurantId}_${branchId || 'all'}` : null;
+  const initialStations = cacheKey ? stationsCache.get(cacheKey) || [] : [];
+  const [stations, setStations] = useState<KitchenStation[]>(initialStations);
+  const [loading, setLoading] = useState<boolean>(!cacheKey || !stationsCache.has(cacheKey));
+
+  const fetchStations = useCallback(async (isSilent = false) => {
+    if (!restaurantId || !cacheKey) {
       setLoading(false);
       return;
     }
 
-    setLoading(true);
+    if (!isSilent && !stationsCache.has(cacheKey)) {
+      setLoading(true);
+    }
+
     let query = supabase
       .from('kitchen_stations')
       .select('*')
@@ -29,16 +37,19 @@ export function useKitchenStations(restaurantId?: string, branchId?: string) {
     const { data, error } = await query;
 
     if (!error && data) {
-      setStations(data as KitchenStation[]);
-    } else {
+      const fetched = data as KitchenStation[];
+      stationsCache.set(cacheKey, fetched);
+      setStations(fetched);
+    } else if (error) {
       console.error('Error fetching kitchen stations:', error);
     }
     setLoading(false);
-  };
+  }, [restaurantId, branchId, cacheKey]);
 
   useEffect(() => {
-    fetchStations();
-  }, [restaurantId, branchId]);
+    const hasCache = cacheKey && stationsCache.has(cacheKey);
+    fetchStations(Boolean(hasCache));
+  }, [fetchStations, cacheKey]);
 
-  return { stations, loading, refetch: fetchStations };
+  return { stations, loading, refetch: () => fetchStations(true) };
 }

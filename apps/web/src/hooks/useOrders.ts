@@ -1,45 +1,77 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { Order } from "@shared/types";
 
-export function useOrders(restaurantId: string | undefined, branchId?: string, options: { onlyUnpaid?: boolean } = { onlyUnpaid: false }) {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
+// Module-level global cache for instant hydration across pages
+const ordersCache = new Map<string, Order[]>();
 
-  const fetchOrders = async () => {
-    if (!restaurantId) return;
-    
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+export function useOrders(
+  restaurantId: string | undefined,
+  branchId?: string,
+  options: { onlyUnpaid?: boolean } = { onlyUnpaid: false }
+) {
+  const cacheKey = restaurantId
+    ? `${restaurantId}_${branchId || "all"}_${Boolean(options.onlyUnpaid)}`
+    : null;
 
-    let query = supabase
-      .from("orders")
-      .select(`
-        *,
-        order_items (*)
-      `)
-      .eq("restaurant_id", restaurantId)
-      .order("created_at", { ascending: false });
-    if (branchId) query = query.eq("branch_id", branchId);
+  const initialOrders = cacheKey ? ordersCache.get(cacheKey) || [] : [];
+  const [orders, setOrders] = useState<Order[]>(initialOrders);
+  const [loading, setLoading] = useState<boolean>(!cacheKey || !ordersCache.has(cacheKey));
 
-    if (options.onlyUnpaid) {
-      query = query.eq("is_paid", false).neq("status", "cancelled");
-    } else {
-      query = query.gte("created_at", today.toISOString());
+  // If cacheKey changes or cached data exists, sync state
+  useEffect(() => {
+    if (cacheKey && ordersCache.has(cacheKey)) {
+      setOrders(ordersCache.get(cacheKey)!);
+      setLoading(false);
     }
+  }, [cacheKey]);
 
-    const { data, error } = await query;
+  const fetchOrders = useCallback(
+    async (isSilent = false) => {
+      if (!restaurantId || !cacheKey) return;
 
-    if (!error && data) {
-      setOrders(data as Order[]);
-    }
-    setLoading(false);
-  };
+      if (!isSilent && !ordersCache.has(cacheKey)) {
+        setLoading(true);
+      }
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      let query = supabase
+        .from("orders")
+        .select(`
+          *,
+          order_items (*)
+        `)
+        .eq("restaurant_id", restaurantId)
+        .order("created_at", { ascending: false });
+
+      if (branchId) query = query.eq("branch_id", branchId);
+
+      if (options.onlyUnpaid) {
+        query = query.eq("is_paid", false).neq("status", "cancelled");
+      } else {
+        query = query.gte("created_at", today.toISOString());
+      }
+
+      const { data, error } = await query;
+
+      if (!error && data) {
+        const fetchedOrders = data as Order[];
+        ordersCache.set(cacheKey, fetchedOrders);
+        setOrders(fetchedOrders);
+      }
+      setLoading(false);
+    },
+    [restaurantId, branchId, options.onlyUnpaid, cacheKey]
+  );
 
   useEffect(() => {
-    fetchOrders();
+    // Stale-while-revalidate: if we already have cache, fetch in background silently
+    const hasCache = cacheKey && ordersCache.has(cacheKey);
+    fetchOrders(Boolean(hasCache));
 
     if (!restaurantId) return;
 
@@ -55,7 +87,7 @@ export function useOrders(restaurantId: string | undefined, branchId?: string, o
           filter: `restaurant_id=eq.${restaurantId}`,
         },
         () => {
-          fetchOrders();
+          fetchOrders(true);
         }
       )
       .subscribe();
@@ -63,7 +95,7 @@ export function useOrders(restaurantId: string | undefined, branchId?: string, o
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [restaurantId, branchId, options.onlyUnpaid]);
+  }, [fetchOrders, restaurantId, cacheKey]);
 
-  return { orders, loading, refreshOrders: fetchOrders };
+  return { orders, loading, refreshOrders: () => fetchOrders(true) };
 }

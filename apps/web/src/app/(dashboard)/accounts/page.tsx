@@ -38,12 +38,16 @@ import {
 import { KanbanCard, FlatOrderItem } from './KanbanCard';
 import { KanbanColumn } from './KanbanColumn';
 
+// Module-level caches to avoid re-fetching on navigation between sections
+let cachedTables: RestaurantTable[] | null = null;
+let cachedActiveRegister: any = null;
+
 export default function AccountsPage() {
   const { restaurant, branch, loading: sessionLoading, hasModule } = useRestaurantSession();
   const hasInvoices = hasModule('invoices');
   const { orders, refreshOrders } = useOrders(restaurant?.id, branch?.id, { onlyUnpaid: true });
-  const [tables, setTables] = useState<RestaurantTable[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [tables, setTables] = useState<RestaurantTable[]>(cachedTables || []);
+  const [loading, setLoading] = useState(!cachedTables);
   const [selectedTable, setSelectedTable] = useState<RestaurantTable | null>(null);
 
   // Modal steps: 'details' (order strips & statuses) | 'checkout' (payment & release)
@@ -87,7 +91,7 @@ export default function AccountsPage() {
   const [cashierNit, setCashierNit] = useState('');
   const [cashierName, setCashierName] = useState('');
   const [generateInvoice, setGenerateInvoice] = useState(false);
-  const [activeRegister, setActiveRegister] = useState<any>(null);
+  const [activeRegister, setActiveRegister] = useState<any>(cachedActiveRegister);
 
   useEffect(() => {
     if (restaurant?.id) {
@@ -110,9 +114,27 @@ export default function AccountsPage() {
   useEffect(() => {
     if (selectedTable) {
       setModalStep('details');
-      fetchTableBill(selectedTable.id);
+      const cached = orders.filter(
+        (o) => o.table_id === selectedTable.id && o.status !== 'cancelled' && !o.is_paid
+      );
+      if (cached.length > 0) {
+        setTableOrders(cached);
+        fetchTableBill(selectedTable.id, true);
+      } else {
+        fetchTableBill(selectedTable.id, false);
+      }
     }
   }, [selectedTable]);
+
+  // Keep open table orders in sync with Realtime useOrders updates
+  useEffect(() => {
+    if (selectedTable) {
+      const liveOrders = orders.filter(
+        (o) => o.table_id === selectedTable.id && o.status !== 'cancelled' && !o.is_paid
+      );
+      setTableOrders(liveOrders);
+    }
+  }, [orders, selectedTable?.id]);
 
   useEffect(() => {
     if (selectedTable?.requested_payment_method) {
@@ -152,7 +174,8 @@ export default function AccountsPage() {
 
       const { data, error } = await query.order('table_number');
       if (error) throw error;
-      setTables(data || []);
+      cachedTables = data || [];
+      setTables(cachedTables);
     } catch (err) {
       console.error('Error fetching tables:', err);
     } finally {
@@ -160,8 +183,10 @@ export default function AccountsPage() {
     }
   };
 
-  const fetchTableBill = async (tableId: string) => {
-    setIsFetchingBill(true);
+  const fetchTableBill = async (tableId: string, hasCachedData = false) => {
+    if (!hasCachedData) {
+      setIsFetchingBill(true);
+    }
     try {
       const { data, error } = await supabase
         .from('orders')
@@ -194,7 +219,8 @@ export default function AccountsPage() {
         .order('opened_at', { ascending: false })
         .limit(1)
         .single();
-      setActiveRegister(data || null);
+      cachedActiveRegister = data || null;
+      setActiveRegister(cachedActiveRegister);
     } catch (err) {
       // It's ok if there's no open register
     }
@@ -857,7 +883,7 @@ export default function AccountsPage() {
     });
   }, [salonTables, activeTabFilter, activeTableIdsWithOrders, newOrdersByTableId]);
 
-  if (sessionLoading || loading) return <LoadingState />;
+  if (sessionLoading || (loading && tables.length === 0)) return <LoadingState />;
 
   return (
     <div className="p-8 h-full flex flex-col">
@@ -992,6 +1018,10 @@ export default function AccountsPage() {
               <div
                 key={table.id}
                 onClick={() => {
+                  const cachedForTable = orders.filter(
+                    (o) => o.table_id === table.id && o.status !== 'cancelled' && !o.is_paid
+                  );
+                  setTableOrders(cachedForTable);
                   setSelectedTable(table);
                   setModalStep('details');
                 }}
@@ -1103,6 +1133,12 @@ export default function AccountsPage() {
                       {flatItems.length} {flatItems.length === 1 ? 'producto' : 'productos'}
                     </span>
                   )}
+                  {isFetchingBill && (
+                    <span className="flex items-center gap-1.5 text-xs text-gray-400 font-medium ml-1">
+                      <Loader2 size={13} className="animate-spin text-gray-400" />
+                      <span className="hidden sm:inline">Sincronizando...</span>
+                    </span>
+                  )}
                 </div>
                 <p className="text-sm text-gray-500 mt-1 font-medium">
                   {modalStep === 'details' ? 'Tablero Kanban de preparación y cobranza' : 'Cobro y liquidación de cuenta'}
@@ -1194,7 +1230,7 @@ export default function AccountsPage() {
                 </div>
 
                 {/* Main Kanban Columns Container */}
-                {isFetchingBill ? (
+                {isFetchingBill && flatItems.length === 0 ? (
                   <div className="flex-1 flex items-center justify-center text-gray-500 font-medium">
                     <Loader2 className="animate-spin mr-2 text-gray-400" size={24} />
                     <span>Cargando pedidos...</span>
