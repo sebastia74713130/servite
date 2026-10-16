@@ -52,18 +52,18 @@ export function KanbanCard({ item, onAdvance, isUpdating, isOverlay = false }: K
       }`}
     >
       {/* Top row: Quantity, Product Name, and Drag Handle */}
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex items-start gap-2 min-w-0">
-          <span className="flex-shrink-0 w-6 h-6 rounded-lg bg-gray-100 text-gray-900 font-black text-xs flex items-center justify-center">
+      <div className="flex items-start justify-between gap-1.5">
+        <div className="flex items-start gap-1.5 sm:gap-2 min-w-0 flex-1">
+          <span className="flex-shrink-0 w-5 h-5 sm:w-6 sm:h-6 rounded-lg bg-gray-100 text-gray-900 font-black text-[11px] sm:text-xs flex items-center justify-center">
             {item.quantity}x
           </span>
-          <div className="min-w-0">
-            <h4 className="font-bold text-gray-900 text-sm leading-snug line-clamp-2">
+          <div className="min-w-0 flex-1">
+            <h4 className="font-bold text-gray-900 text-xs sm:text-sm leading-snug line-clamp-2">
               {item.product_name}
             </h4>
-            <div className="flex items-center gap-1.5 text-[11px] text-gray-400 font-medium mt-0.5">
-              <Clock size={11} />
-              <span>
+            <div className="flex items-center gap-1 text-[10px] sm:text-[11px] text-gray-400 font-medium mt-0.5">
+              <Clock size={11} className="flex-shrink-0" />
+              <span className="truncate">
                 {new Date(item.order_created_at).toLocaleTimeString('es-BO', {
                   hour: '2-digit',
                   minute: '2-digit',
@@ -82,21 +82,21 @@ export function KanbanCard({ item, onAdvance, isUpdating, isOverlay = false }: K
             className="text-gray-300 hover:text-gray-600 cursor-grab active:cursor-grabbing p-1 -mr-1 rounded-md hover:bg-gray-50 transition-colors flex-shrink-0"
             title="Arrastra para mover de columna"
           >
-            <GripVertical size={16} />
+            <GripVertical size={15} />
           </div>
         )}
       </div>
 
       {/* Notes if any */}
       {item.notes && (
-        <p className="text-[11px] text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md mt-2 font-medium border border-amber-100 line-clamp-2">
+        <p className="text-[10px] sm:text-[11px] text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded-md mt-1.5 font-medium border border-amber-100 line-clamp-2">
           Nota: {item.notes}
         </p>
       )}
 
       {/* Bottom row: Price and 1-Click Action Button */}
-      <div className="flex items-center justify-between gap-2 mt-3 pt-2.5 border-t border-gray-100">
-        <span className="font-extrabold text-gray-900 text-xs">
+      <div className="flex items-center justify-between gap-1.5 mt-2.5 pt-2 border-t border-gray-100">
+        <span className="font-black text-gray-900 text-xs whitespace-nowrap">
           Bs {item.total_price.toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </span>
 
@@ -108,7 +108,7 @@ export function KanbanCard({ item, onAdvance, isUpdating, isOverlay = false }: K
             e.stopPropagation();
             onAdvance(item);
           }}
-          className={`text-[11px] font-bold px-2.5 py-1 rounded-xl border transition-all active:scale-95 flex items-center gap-1 cursor-pointer disabled:opacity-50 ${
+          className={`text-[10px] sm:text-[11px] font-bold px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-xl border transition-all active:scale-95 flex items-center gap-1 cursor-pointer disabled:opacity-50 whitespace-nowrap ${
             status === 'received'
               ? 'bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200'
               : status === 'preparing'

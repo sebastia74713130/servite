@@ -1083,7 +1083,7 @@ export default function AccountsPage() {
       {/* Bill & Orders Details Modal */}
       {selectedTable && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-2 sm:p-4 md:p-6 animate-in fade-in duration-200 backdrop-blur-xs">
-          <div className="bg-white w-full max-w-6xl rounded-3xl shadow-2xl flex flex-col h-[90vh] max-h-[92vh] overflow-hidden">
+          <div className="bg-white w-full max-w-7xl rounded-3xl shadow-2xl flex flex-col h-[90vh] max-h-[92vh] overflow-hidden">
             {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-white flex-shrink-0">
               <div>
@@ -1146,14 +1146,14 @@ export default function AccountsPage() {
               </div>
             </div>
 
-            {/* Split View Body: Left 70% Kanban / Right 30% Account & Checkout */}
+            {/* Split View Body: Left ~75% Kanban / Right ~25% Account & Checkout */}
             <div className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0 bg-gray-50">
               
               {/* LEFT SIDE: KANBAN BOARD */}
-              <div className="flex-1 flex flex-col overflow-hidden min-h-0 p-4 sm:p-5">
+              <div className="flex-1 flex flex-col overflow-hidden min-h-0 p-3 sm:p-4 lg:p-5">
                 
                 {/* Service Status Banners (Waiter call, SIAT invoice request) */}
-                <div className="space-y-3 mb-4 flex-shrink-0">
+                <div className="space-y-3 mb-3 sm:mb-4 flex-shrink-0">
                   {/* Waiter call banner */}
                   {selectedTable.service_status === 'calling_waiter' && (
                     <div className="bg-orange-100 border border-orange-200 rounded-2xl p-3 sm:p-4 flex justify-between items-center shadow-xs">
@@ -1222,104 +1222,106 @@ export default function AccountsPage() {
                     onDragStart={handleDragStart}
                     onDragEnd={handleDragEnd}
                   >
-                    <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3.5 overflow-y-auto lg:overflow-x-auto min-h-0 pb-1">
-                      {/* Column 1: Recibidos */}
-                      <KanbanColumn
-                        id="received"
-                        title="Recibidos"
-                        icon={<Clock className="w-4 h-4 text-blue-600" />}
-                        count={receivedItems.length}
-                        theme={{
-                          headerBg: 'bg-blue-50/70',
-                          border: 'border-blue-100',
-                          badgeBg: 'bg-blue-100',
-                          badgeText: 'text-blue-800'
-                        }}
-                        batchAction={receivedItems.length > 0 ? {
-                          label: 'Pasar a Prep',
-                          onClick: handleStartAllPreparation,
-                          loading: isStartingPrep,
-                          icon: <ChefHat size={13} />
-                        } : undefined}
-                      >
-                        {receivedItems.map(item => (
-                          <KanbanCard
-                            key={item.id}
-                            item={item}
-                            onAdvance={handleUpdateItemStatus}
-                            isUpdating={updatingItemId === item.id}
-                          />
-                        ))}
-                      </KanbanColumn>
+                    <div className="flex-1 overflow-x-auto overflow-y-hidden min-h-0 pb-1">
+                      <div className="grid grid-cols-4 gap-3 h-full w-full min-w-[700px]">
+                        {/* Column 1: Recibidos */}
+                        <KanbanColumn
+                          id="received"
+                          title="Recibidos"
+                          icon={<Clock className="w-4 h-4 text-blue-600" />}
+                          count={receivedItems.length}
+                          theme={{
+                            headerBg: 'bg-blue-50/70',
+                            border: 'border-blue-100',
+                            badgeBg: 'bg-blue-100',
+                            badgeText: 'text-blue-800'
+                          }}
+                          batchAction={receivedItems.length > 0 ? {
+                            label: 'Pasar a Prep',
+                            onClick: handleStartAllPreparation,
+                            loading: isStartingPrep,
+                            icon: <ChefHat size={13} />
+                          } : undefined}
+                        >
+                          {receivedItems.map(item => (
+                            <KanbanCard
+                              key={item.id}
+                              item={item}
+                              onAdvance={handleUpdateItemStatus}
+                              isUpdating={updatingItemId === item.id}
+                            />
+                          ))}
+                        </KanbanColumn>
 
-                      {/* Column 2: En Preparación */}
-                      <KanbanColumn
-                        id="preparing"
-                        title="En Preparación"
-                        icon={<ChefHat className="w-4 h-4 text-amber-600" />}
-                        count={preparingItems.length}
-                        theme={{
-                          headerBg: 'bg-amber-50/70',
-                          border: 'border-amber-100',
-                          badgeBg: 'bg-amber-100',
-                          badgeText: 'text-amber-800'
-                        }}
-                      >
-                        {preparingItems.map(item => (
-                          <KanbanCard
-                            key={item.id}
-                            item={item}
-                            onAdvance={handleUpdateItemStatus}
-                            isUpdating={updatingItemId === item.id}
-                          />
-                        ))}
-                      </KanbanColumn>
+                        {/* Column 2: En Preparación */}
+                        <KanbanColumn
+                          id="preparing"
+                          title="En Preparación"
+                          icon={<ChefHat className="w-4 h-4 text-amber-600" />}
+                          count={preparingItems.length}
+                          theme={{
+                            headerBg: 'bg-amber-50/70',
+                            border: 'border-amber-100',
+                            badgeBg: 'bg-amber-100',
+                            badgeText: 'text-amber-800'
+                          }}
+                        >
+                          {preparingItems.map(item => (
+                            <KanbanCard
+                              key={item.id}
+                              item={item}
+                              onAdvance={handleUpdateItemStatus}
+                              isUpdating={updatingItemId === item.id}
+                            />
+                          ))}
+                        </KanbanColumn>
 
-                      {/* Column 3: Listos en Cocina */}
-                      <KanbanColumn
-                        id="ready"
-                        title="Listos"
-                        icon={<BellRing className="w-4 h-4 text-emerald-600" />}
-                        count={readyItems.length}
-                        theme={{
-                          headerBg: 'bg-emerald-50/70',
-                          border: 'border-emerald-100',
-                          badgeBg: 'bg-emerald-100',
-                          badgeText: 'text-emerald-800'
-                        }}
-                      >
-                        {readyItems.map(item => (
-                          <KanbanCard
-                            key={item.id}
-                            item={item}
-                            onAdvance={handleUpdateItemStatus}
-                            isUpdating={updatingItemId === item.id}
-                          />
-                        ))}
-                      </KanbanColumn>
+                        {/* Column 3: Listos en Cocina */}
+                        <KanbanColumn
+                          id="ready"
+                          title="Listos"
+                          icon={<BellRing className="w-4 h-4 text-emerald-600" />}
+                          count={readyItems.length}
+                          theme={{
+                            headerBg: 'bg-emerald-50/70',
+                            border: 'border-emerald-100',
+                            badgeBg: 'bg-emerald-100',
+                            badgeText: 'text-emerald-800'
+                          }}
+                        >
+                          {readyItems.map(item => (
+                            <KanbanCard
+                              key={item.id}
+                              item={item}
+                              onAdvance={handleUpdateItemStatus}
+                              isUpdating={updatingItemId === item.id}
+                            />
+                          ))}
+                        </KanbanColumn>
 
-                      {/* Column 4: Entregados */}
-                      <KanbanColumn
-                        id="delivered"
-                        title="Entregados"
-                        icon={<UtensilsCrossed className="w-4 h-4 text-gray-500" />}
-                        count={deliveredItems.length}
-                        theme={{
-                          headerBg: 'bg-gray-100/70',
-                          border: 'border-gray-200',
-                          badgeBg: 'bg-gray-200',
-                          badgeText: 'text-gray-800'
-                        }}
-                      >
-                        {deliveredItems.map(item => (
-                          <KanbanCard
-                            key={item.id}
-                            item={item}
-                            onAdvance={handleUpdateItemStatus}
-                            isUpdating={updatingItemId === item.id}
-                          />
-                        ))}
-                      </KanbanColumn>
+                        {/* Column 4: Entregados */}
+                        <KanbanColumn
+                          id="delivered"
+                          title="Entregados"
+                          icon={<UtensilsCrossed className="w-4 h-4 text-gray-500" />}
+                          count={deliveredItems.length}
+                          theme={{
+                            headerBg: 'bg-gray-100/70',
+                            border: 'border-gray-200',
+                            badgeBg: 'bg-gray-200',
+                            badgeText: 'text-gray-800'
+                          }}
+                        >
+                          {deliveredItems.map(item => (
+                            <KanbanCard
+                              key={item.id}
+                              item={item}
+                              onAdvance={handleUpdateItemStatus}
+                              isUpdating={updatingItemId === item.id}
+                            />
+                          ))}
+                        </KanbanColumn>
+                      </div>
                     </div>
 
                     {/* Drag Overlay for smooth preview while dragging */}
@@ -1338,7 +1340,7 @@ export default function AccountsPage() {
               </div>
 
               {/* RIGHT SIDE: ACCOUNT SUMMARY & CHECKOUT (Fixed Sticky Panel) */}
-              <div className="w-full lg:w-80 xl:w-96 flex-shrink-0 bg-white border-t lg:border-t-0 lg:border-l border-gray-200 flex flex-col justify-between overflow-y-auto">
+              <div className="w-full lg:w-72 xl:w-80 flex-shrink-0 bg-white border-t lg:border-t-0 lg:border-l border-gray-200 flex flex-col justify-between overflow-y-auto">
                 {modalStep === 'details' ? (
                   <div className="p-5 flex flex-col h-full justify-between gap-6">
                     <div className="space-y-4">

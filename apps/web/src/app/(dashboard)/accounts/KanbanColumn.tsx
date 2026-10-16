@@ -40,20 +40,20 @@ export function KanbanColumn({
   return (
     <div
       ref={setNodeRef}
-      className={`flex flex-col rounded-2xl border transition-all h-full min-w-[220px] max-w-full flex-1 ${theme.border} ${
+      className={`flex flex-col rounded-2xl border transition-all h-full w-full min-w-0 ${theme.border} ${
         isOver ? 'bg-orange-50/70 ring-2 ring-orange-400 border-orange-300' : 'bg-gray-50/70'
       }`}
     >
       {/* Column Header */}
-      <div className={`p-3 border-b flex items-center justify-between rounded-t-2xl ${theme.headerBg} ${theme.border}`}>
-        <div className="flex items-center gap-2 min-w-0">
+      <div className={`p-2.5 sm:p-3 border-b flex items-center justify-between rounded-t-2xl ${theme.headerBg} ${theme.border}`}>
+        <div className="flex items-center gap-1.5 min-w-0">
           <span className="flex-shrink-0">{icon}</span>
-          <h3 className="font-extrabold text-xs text-gray-800 uppercase tracking-wider truncate">
+          <h3 className="font-black text-[11px] sm:text-xs text-gray-800 uppercase tracking-wide truncate">
             {title}
           </h3>
         </div>
 
-        <span className={`px-2 py-0.5 rounded-full text-xs font-black flex-shrink-0 ${theme.badgeBg} ${theme.badgeText}`}>
+        <span className={`px-2 py-0.5 rounded-full text-[11px] sm:text-xs font-black flex-shrink-0 ${theme.badgeBg} ${theme.badgeText}`}>
           {count}
         </span>
       </div>
