@@ -429,7 +429,7 @@ function CategoryModal({
     setSaving(true);
     setError('');
 
-    const payload = {
+    const payload: any = {
       name: name.trim(),
       macro_category: macroCategory,
       description: description.trim() || null,
@@ -442,12 +442,23 @@ function CategoryModal({
       page_text_color: pageTextColor,
     };
 
-    if (category) {
-      const { error: err } = await supabase.from('categories').update(payload).eq('id', category.id);
-      if (err) { setError(err.message); setSaving(false); return; }
-    } else {
-      const { error: err } = await supabase.from('categories').insert(payload);
-      if (err) { setError(err.message); setSaving(false); return; }
+    let { error: err } = category
+      ? await supabase.from('categories').update(payload).eq('id', category.id)
+      : await supabase.from('categories').insert(payload);
+
+    // Fallback: si la columna macro_category no existe aún en la base de datos, reintentar sin ella
+    if (err && (err.message?.includes('macro_category') || err.details?.includes('macro_category'))) {
+      delete payload.macro_category;
+      const retry = category
+        ? await supabase.from('categories').update(payload).eq('id', category.id)
+        : await supabase.from('categories').insert(payload);
+      err = retry.error;
+    }
+
+    if (err) {
+      setError(err.message || 'Error al guardar la categoría');
+      setSaving(false);
+      return;
     }
 
     setSaving(false);
@@ -650,7 +661,13 @@ function ProductModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) { setError('El nombre es obligatorio'); return; }
-    if (!price || parseFloat(price) <= 0) { setError('El precio debe ser mayor a 0'); return; }
+    
+    const cleanPrice = (price || '').toString().replace(',', '.').trim();
+    const numericPrice = parseFloat(cleanPrice);
+    if (!cleanPrice || isNaN(numericPrice) || numericPrice <= 0) { 
+      setError('El precio debe ser un número válido mayor a 0'); 
+      return; 
+    }
     if (!categoryId) { setError('Selecciona una categoría'); return; }
 
     setSaving(true);
@@ -678,7 +695,7 @@ function ProductModal({
     const payload = {
       name: name.trim(),
       description: description.trim() || null,
-      price: parseFloat(price),
+      price: numericPrice,
       category_id: categoryId,
       subsection_id: subsectionId || null,
       station_id: stationId || null,

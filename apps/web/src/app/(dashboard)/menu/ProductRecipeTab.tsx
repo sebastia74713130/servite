@@ -49,7 +49,7 @@ export function ProductRecipeTab({ product, restaurantId }: Props) {
         .insert({
           product_id: product.id,
           inventory_item_id: selectedItemId,
-          quantity_required: parseFloat(quantity)
+          quantity_required: parseFloat(quantity.toString().replace(',', '.'))
         })
         .select()
         .single();

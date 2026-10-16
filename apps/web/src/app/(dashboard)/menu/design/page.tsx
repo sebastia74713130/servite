@@ -240,7 +240,7 @@ export default function MenuDesignPage() {
       }
 
       // 3. Update restaurant global settings
-      await supabase.from('restaurants').update({
+      const { error: restError } = await supabase.from('restaurants').update({
         cover_url: finalCover,
         brand_color: brandColor,
         menu_background_color: menuShadows ? menuBgColor : `${menuBgColor}|noshadow`,
@@ -248,11 +248,16 @@ export default function MenuDesignPage() {
         menu_text_color: menuTextColor,
       }).eq('id', restaurant.id);
 
+      if (restError) {
+        throw new Error("Error al guardar la configuración del restaurante: " + restError.message);
+      }
+
       // 4. Update categories: upsert and delete
       const categoryIdsToKeep = editorCategories.map(c => c.id).filter(id => !id.startsWith('temp_'));
       
       const upsertCategories = [];
-      for (const cat of editorCategories) {
+      for (let i = 0; i < editorCategories.length; i++) {
+        const cat = editorCategories[i];
         let finalCatCover = cat.cover_url;
         if (cat._pendingCoverFile) {
           const fileExt = cat._pendingCoverFile.name.split('.').pop();
@@ -281,9 +286,9 @@ export default function MenuDesignPage() {
           id: cat.id,
           restaurant_id: restaurant.id,
           branch_id: branch.id,
-          name: cat.name,
-          sort_order: cat.sort_order,
-          is_active: cat.is_active,
+          name: (cat.name || '').trim() || 'Categoría',
+          sort_order: cat.sort_order ?? i,
+          is_active: cat.is_active ?? true,
           page_background_color: cat.page_background_color,
           page_text_color: cat.page_text_color,
           background_color: cat.background_color,
@@ -292,24 +297,27 @@ export default function MenuDesignPage() {
         });
       }
       
-      // Get existing categories to find which ones to delete
-      const existingCatsRes = await supabase.from('categories').select('id').eq('branch_id', branch.id);
-      const existingCatIds = existingCatsRes.data?.map(c => c.id) || [];
-      const catsToDelete = existingCatIds.filter(id => !editorCategories.find(c => c.id === id));
-      
-      if (catsToDelete.length > 0) {
-        const { error } = await supabase.from('categories').delete().in('id', catsToDelete);
-        if (error) throw new Error("Error deleting categories: " + error.message);
+      // Get existing categories to find which ones to delete (solo si hay categorías cargadas en el editor)
+      if (editorCategories.length > 0) {
+        const existingCatsRes = await supabase.from('categories').select('id').eq('branch_id', branch.id);
+        const existingCatIds = existingCatsRes.data?.map(c => c.id) || [];
+        const catsToDelete = existingCatIds.filter(id => !editorCategories.find(c => c.id === id));
+        
+        if (catsToDelete.length > 0) {
+          const { error } = await supabase.from('categories').delete().in('id', catsToDelete);
+          if (error) throw new Error("Error al eliminar categorías: " + error.message);
+        }
       }
       
       if (upsertCategories.length > 0) {
         const { error } = await supabase.from('categories').upsert(upsertCategories);
-        if (error) throw new Error("Error upserting categories: " + error.message);
+        if (error) throw new Error("Error al guardar secciones: " + error.message);
       }
 
       // 5. Update subsections: upsert and delete
       const upsertSubsections = [];
-      for (const sub of editorSubsections) {
+      for (let j = 0; j < editorSubsections.length; j++) {
+        const sub = editorSubsections[j];
         let finalSubImage = sub.image_url;
         if (sub._pendingImageFile) {
           const fileExt = sub._pendingImageFile.name.split('.').pop();
@@ -324,8 +332,8 @@ export default function MenuDesignPage() {
         upsertSubsections.push({
           id: sub.id,
           category_id: sub.category_id,
-          name: sub.name,
-          sort_order: sub.sort_order,
+          name: (sub.name || '').trim() || 'Subsección',
+          sort_order: sub.sort_order ?? j,
           background_color: sub.background_color || null,
           text_color: sub.text_color || null,
           typography: sub.typography || 'sans',
@@ -334,20 +342,20 @@ export default function MenuDesignPage() {
       }
       
       const categoryIds = editorCategories.map(c => c.id);
-      const existingSubsRes = categoryIds.length > 0 
-        ? await supabase.from('subsections').select('id').in('category_id', categoryIds)
-        : { data: [] };
-      const existingSubIds = existingSubsRes.data?.map(s => s.id) || [];
-      const subsToDelete = existingSubIds.filter(id => !editorSubsections.find(s => s.id === id));
-      
-      if (subsToDelete.length > 0) {
-        const { error } = await supabase.from('subsections').delete().in('id', subsToDelete);
-        if (error) throw new Error("Error deleting subsections: " + error.message);
+      if (categoryIds.length > 0) {
+        const existingSubsRes = await supabase.from('subsections').select('id').in('category_id', categoryIds);
+        const existingSubIds = existingSubsRes.data?.map(s => s.id) || [];
+        const subsToDelete = existingSubIds.filter(id => !editorSubsections.find(s => s.id === id));
+        
+        if (subsToDelete.length > 0) {
+          const { error } = await supabase.from('subsections').delete().in('id', subsToDelete);
+          if (error) throw new Error("Error al eliminar subsecciones: " + error.message);
+        }
       }
       
       if (upsertSubsections.length > 0) {
         const { error } = await supabase.from('subsections').upsert(upsertSubsections);
-        if (error) throw new Error("Error upserting subsections: " + error.message);
+        if (error) throw new Error("Error al guardar subsecciones: " + error.message);
       }
 
       // 6. Update product colors
@@ -363,11 +371,12 @@ export default function MenuDesignPage() {
         }));
 
       if (upsertProducts.length > 0) {
-        for(const p of upsertProducts) {
-           await supabase.from('products').update({ 
-             card_background_color: p.card_background_color, 
-             card_text_color: p.card_text_color 
-           }).eq('id', p.id);
+        for (const p of upsertProducts) {
+          const { error: prodError } = await supabase.from('products').update({ 
+            card_background_color: p.card_background_color, 
+            card_text_color: p.card_text_color 
+          }).eq('id', p.id);
+          if (prodError) console.error("Error al actualizar color de producto:", prodError);
         }
       }
 

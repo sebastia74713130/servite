@@ -156,18 +156,18 @@ export default function PublicCatalogMenuClient({
 
         {/* Info Wrapper */}
         <div className="max-w-4xl mx-auto px-4 sm:px-6 relative pb-6 pt-0">
-          <div className="flex flex-col sm:flex-row sm:items-end gap-4 -mt-14 sm:-mt-16 mb-4">
+          <div className="flex flex-row items-start gap-4 mb-4">
             {/* Logo */}
-            <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl bg-white p-1.5 shadow-xl border-2 border-white shrink-0 overflow-hidden flex items-center justify-center">
+            <div className="-mt-12 sm:-mt-16 w-20 h-20 sm:w-28 sm:h-28 rounded-2xl sm:rounded-3xl bg-white p-1.5 shadow-xl border-2 border-white shrink-0 overflow-hidden flex items-center justify-center relative z-10">
               {restaurant.logo_url ? (
                 <img 
                   src={restaurant.logo_url} 
                   alt={restaurant.name} 
-                  className="w-full h-full object-cover rounded-2xl" 
+                  className="w-full h-full object-cover rounded-xl sm:rounded-2xl" 
                 />
               ) : (
                 <div 
-                  className="w-full h-full rounded-2xl flex items-center justify-center text-white font-extrabold text-2xl"
+                  className="w-full h-full rounded-xl sm:rounded-2xl flex items-center justify-center text-white font-extrabold text-2xl"
                   style={{ backgroundColor: brandColor }}
                 >
                   {restaurant.name?.slice(0, 2).toUpperCase() || "RS"}
@@ -176,7 +176,7 @@ export default function PublicCatalogMenuClient({
             </div>
 
             {/* Restaurant Title & Slogan */}
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 pt-2 sm:pt-3">
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
                   {restaurant.name}
