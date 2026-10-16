@@ -608,6 +608,32 @@ export default function PublicMenuClient({
     }
   };
 
+  const [isCancellingTakeawayQR, setIsCancellingTakeawayQR] = useState(false);
+
+  const handleCancelTakeawayQR = async () => {
+    setIsCancellingTakeawayQR(true);
+    if (generatedQrId) {
+      try {
+        await fetch('/api/qr/cancel', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ qrId: generatedQrId })
+        });
+      } catch (err) {
+        console.error('Error cancelando QR de takeaway:', err);
+      }
+    }
+    setGeneratedQrBase64(null);
+    setGeneratedQrId(null);
+    setQrStatus('pending');
+    setQrTimer(0);
+    setQrError('');
+    setShowTakeawayPaymentQR(false);
+    setShowCustomerDataStep(false);
+    setShowCart(false);
+    setIsCancellingTakeawayQR(false);
+  };
+
   const handleGenerateQR = async () => {
     setQrLoading(true);
     setQrError('');
@@ -2021,8 +2047,14 @@ export default function PublicMenuClient({
           <div className="flex items-center justify-between p-6 border-b border-gray-100">
             <h2 className="text-2xl font-bold text-gray-900">Tu Pedido</h2>
             <button 
-              onClick={() => setShowCart(false)}
-              className="w-10 h-10 bg-gray-100 text-gray-600 rounded-full flex items-center justify-center"
+              onClick={() => {
+                if (showTakeawayPaymentQR) {
+                  handleCancelTakeawayQR();
+                } else {
+                  setShowCart(false);
+                }
+              }}
+              className="w-10 h-10 bg-gray-100 text-gray-600 rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors"
             >
               <X size={20} />
             </button>
@@ -2135,7 +2167,7 @@ export default function PublicMenuClient({
               </div>
             ) : showTakeawayPaymentQR ? (
               <div className="flex flex-col items-center">
-                <p className="text-sm text-gray-600 mb-4 text-center">Escanea el QR para pagar desde tu aplicación bancaria.</p>
+                <p className="text-sm text-gray-600 mb-3 text-center">Escanea el QR para pagar desde tu aplicación bancaria.</p>
                 <div className="p-4 bg-white border border-gray-200 rounded-2xl shadow-sm mb-4 min-h-[200px] flex items-center justify-center w-full">
                   {qrLoading ? (
                     <div className="flex flex-col items-center gap-3">
@@ -2150,7 +2182,26 @@ export default function PublicMenuClient({
                     </div>
                   ) : generatedQrBase64 ? (
                     <div className="flex flex-col items-center gap-3 w-full">
-                      <img src={`data:image/png;base64,${generatedQrBase64}`} alt="QR de Pago" className="w-[200px] h-[200px] object-contain" />
+                      <img src={`data:image/png;base64,${generatedQrBase64}`} alt="QR de Pago" className="w-[200px] h-[200px] object-contain rounded-xl" />
+
+                      {/* Temporizador de pago (10 minutos) */}
+                      {qrTimer > 0 && qrStatus === 'pending' ? (
+                        <div className="flex items-center justify-center gap-2 text-xs font-semibold py-1.5 px-3.5 rounded-full bg-orange-50 border border-orange-200 text-orange-950 shadow-2xs">
+                          <Clock size={15} className="text-[#E76F51]" />
+                          <span>Válido por: <strong className="font-mono text-sm text-[#E76F51]">{Math.floor(qrTimer / 60)}:{(qrTimer % 60).toString().padStart(2, '0')}</strong> min</span>
+                        </div>
+                      ) : qrStatus === 'expired' ? (
+                        <div className="w-full p-3 bg-amber-50 border border-amber-200 rounded-xl text-center text-xs text-amber-900 font-medium">
+                          <span>El código QR ha expirado (límite de 10 minutos).</span>
+                          <button 
+                            onClick={handleGenerateQR}
+                            className="block mx-auto mt-1 font-bold underline text-amber-950"
+                          >
+                            Generar nuevo código QR
+                          </button>
+                        </div>
+                      ) : null}
+
                       <a 
                         href={`data:image/png;base64,${generatedQrBase64}`}
                         download="pago_servido_qr.png"
@@ -2166,13 +2217,32 @@ export default function PublicMenuClient({
                   ) : null}
                 </div>
                 <button
-                  disabled={isSubmitting || isVerifyingPayment || !!qrError}
+                  disabled={isSubmitting || isVerifyingPayment || !!qrError || qrStatus === 'expired' || isCancellingTakeawayQR}
                   onClick={handleManualVerify}
-                  className="w-full py-3 rounded-xl font-bold text-white flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-50"
+                  className="w-full py-3.5 rounded-xl font-bold text-white flex items-center justify-center gap-2 active:scale-95 transition-transform disabled:opacity-50 shadow-md"
                   style={{ backgroundColor: brandColor }}
                 >
                   <RefreshCw size={20} className={isVerifyingPayment ? "animate-spin" : ""} />
                   {isSubmitting ? 'Enviando a cocina...' : isVerifyingPayment ? 'Verificando con el banco...' : 'Ya realicé el pago'}
+                </button>
+
+                {/* Botón de cancelación: Cancelar y volver al menú */}
+                <button
+                  disabled={isSubmitting || isVerifyingPayment || isCancellingTakeawayQR}
+                  onClick={handleCancelTakeawayQR}
+                  className="w-full mt-2.5 py-3 rounded-xl font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 active:scale-95 transition-all text-sm flex items-center justify-center gap-2 border border-gray-200"
+                >
+                  {isCancellingTakeawayQR ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin text-gray-500" />
+                      <span>Cancelando pedido...</span>
+                    </>
+                  ) : (
+                    <>
+                      <X size={16} className="text-gray-500" />
+                      <span>Cancelar y volver al menú</span>
+                    </>
+                  )}
                 </button>
               </div>
             ) : (
