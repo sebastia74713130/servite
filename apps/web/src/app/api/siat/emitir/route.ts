@@ -96,7 +96,21 @@ export async function POST(req: Request) {
     };
 
     // 4. Delegar la emisión al microservicio centralizado
-    const resp = await tendaiApiClient.emitirFactura(payload, apiKey);
+    let resp = await tendaiApiClient.emitirFactura(payload, apiKey);
+
+    // Auto-recuperación si el CUFD en caché del microservicio quedó desincronizado con el SIN (Códigos 1002 / 1003)
+    const detallesStr = JSON.stringify(resp.detalles || resp.error || '');
+    if (!resp.success && (detallesStr.includes('1003') || detallesStr.includes('CUFD ENVIADO EN EL XML ES INVALIDO'))) {
+      console.warn('CUFD desincronizado detectado (Código 1003). Renovando CUFD en el microservicio y reintentando emisión...');
+      const cufdSync = await tendaiApiClient.sincronizarCufd(
+        payload.codigoSucursal || 0,
+        payload.codigoPuntoVenta || 0,
+        apiKey
+      );
+      if (cufdSync.success) {
+        resp = await tendaiApiClient.emitirFactura(payload, apiKey);
+      }
+    }
 
     if (resp.success && resp.invoice) {
       const inv = resp.invoice;

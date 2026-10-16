@@ -112,7 +112,7 @@ export default function FinancesPage() {
           const cufdRes = await fetch('/api/siat/cufd', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ restaurantId: restaurant.id, branchId: branch?.id || undefined })
+            body: JSON.stringify({ restaurantId: restaurant.id, branchId: branch?.id || undefined, force: false })
           });
           const cufdData = await cufdRes.json();
           

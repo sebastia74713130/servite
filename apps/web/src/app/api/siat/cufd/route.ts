@@ -41,9 +41,10 @@ export async function POST(req: Request) {
     }
 
     const apiKey = siatSettings?.siat_api_key || process.env.FACTURACION_API_KEY;
+    const force = body.force !== undefined ? Boolean(body.force) : true;
 
     // 2. Solicitar CUFD al microservicio
-    const resp = await tendaiApiClient.sincronizarCufd(sucursal, puntoVenta, apiKey);
+    const resp = await tendaiApiClient.sincronizarCufd(sucursal, puntoVenta, apiKey, force);
 
     if (!resp.success || !resp.data?.cufd) {
       return NextResponse.json(

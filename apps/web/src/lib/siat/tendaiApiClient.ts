@@ -229,7 +229,7 @@ export class TendaiApiClient {
   /**
    * 6. Sincronizar / Solicitar CUFD
    */
-  async sincronizarCufd(sucursal = 0, puntoVenta = 0, apiKey?: string): Promise<SyncCufdResponse> {
+  async sincronizarCufd(sucursal = 0, puntoVenta = 0, apiKey?: string, force = true): Promise<SyncCufdResponse> {
     const url = `${this.baseUrl}/api/v1/pos/sync-cufd`;
     const res = await fetch(url, {
       method: 'POST',
@@ -237,6 +237,7 @@ export class TendaiApiClient {
       body: JSON.stringify({
         codigoSucursal: sucursal,
         codigoPuntoVenta: puntoVenta,
+        force,
       }),
     });
 
