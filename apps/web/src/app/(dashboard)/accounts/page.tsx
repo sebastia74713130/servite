@@ -18,7 +18,8 @@ import {
   Clock,
   ArrowLeft,
   Trash2,
-  ChefHat
+  ChefHat,
+  Loader2
 } from 'lucide-react';
 import { RestaurantTable, OrderStatus } from '@shared/types';
 import { useOrders } from '@/hooks/useOrders';
@@ -56,6 +57,7 @@ export default function AccountsPage() {
   const [isFetchingBill, setIsFetchingBill] = useState(false);
   const [isClosingBill, setIsClosingBill] = useState(false);
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
+  const [updatingItemId, setUpdatingItemId] = useState<string | null>(null);
 
   // Table grid filters
   const [activeTabFilter, setActiveTabFilter] = useState<'all' | 'new_orders' | 'occupied' | 'free' | 'calling'>('all');
@@ -246,17 +248,41 @@ export default function AccountsPage() {
     setIsStartingPrep(true);
     try {
       const pendingOrders = tableOrders.filter(o => 
-        o.status === 'sent' || o.status === 'received' || (o.status as string) === 'pending' || !o.status
+        o.status === 'sent' || 
+        o.status === 'received' || 
+        (o.status as string) === 'pending' || 
+        !o.status ||
+        (o.order_items && o.order_items.some((oi: any) => oi.status === 'sent' || oi.status === 'received' || !oi.status))
       );
       if (pendingOrders.length === 0) return;
 
       const pendingOrderIds = pendingOrders.map(o => o.id);
 
-      // Optimistic UI update
-      setTableOrders(prev => prev.map(o => 
-        pendingOrderIds.includes(o.id) ? { ...o, status: 'preparing' } : o
-      ));
+      // Optimistic UI update: All orders and all products move to preparing
+      setTableOrders(prev => prev.map(o => {
+        if (!pendingOrderIds.includes(o.id)) return o;
+        const updatedItems = (o.order_items || []).map((item: any) => ({
+          ...item,
+          status: 'preparing'
+        }));
+        return {
+          ...o,
+          status: 'preparing',
+          order_items: updatedItems
+        };
+      }));
 
+      // 1. Update order_items status in parallel
+      try {
+        await supabase
+          .from('order_items')
+          .update({ status: 'preparing' })
+          .in('order_id', pendingOrderIds);
+      } catch (e) {
+        console.warn('order_items batch status update warning:', e);
+      }
+
+      // 2. Update orders status
       const { error } = await supabase
         .from('orders')
         .update({
@@ -278,6 +304,121 @@ export default function AccountsPage() {
       }
     } finally {
       setIsStartingPrep(false);
+    }
+  };
+
+  const ITEM_NEXT_STATUS: Record<string, OrderStatus> = {
+    sent: 'preparing',
+    received: 'preparing',
+    preparing: 'ready',
+    ready: 'delivered',
+    delivered: 'received'
+  };
+
+  const handleUpdateItemStatus = async (item: FlatOrderItem) => {
+    setUpdatingItemId(item.id);
+    const currentStatus = (item.order_status === 'sent' ? 'received' : item.order_status) || 'received';
+    const nextStatus = ITEM_NEXT_STATUS[currentStatus] || 'preparing';
+
+    // 1. Optimistic UI update for the single product in tableOrders
+    setTableOrders(prevOrders => {
+      return prevOrders.map(order => {
+        if (order.id !== item.order_id) return order;
+
+        if (item.id.startsWith('order-')) {
+          return { ...order, status: nextStatus };
+        }
+
+        const updatedItems = (order.order_items || []).map((oi: any) => {
+          if (oi.id === item.id) {
+            return { ...oi, status: nextStatus };
+          }
+          return oi;
+        });
+
+        const allPreparingOrHigher = updatedItems.every((oi: any) => 
+          oi.status === 'preparing' || oi.status === 'ready' || oi.status === 'delivered'
+        );
+        const allReadyOrHigher = updatedItems.every((oi: any) => 
+          oi.status === 'ready' || oi.status === 'delivered'
+        );
+        const allDelivered = updatedItems.every((oi: any) => 
+          oi.status === 'delivered'
+        );
+
+        let newOrderStatus = order.status;
+        if (allDelivered) {
+          newOrderStatus = 'delivered';
+        } else if (allReadyOrHigher) {
+          newOrderStatus = 'ready';
+        } else if (allPreparingOrHigher) {
+          newOrderStatus = 'preparing';
+        }
+
+        return {
+          ...order,
+          status: newOrderStatus,
+          order_items: updatedItems
+        };
+      });
+    });
+
+    try {
+      // 2. Persist in order_items table in Supabase
+      if (!item.id.startsWith('order-')) {
+        const { error: itemError } = await supabase
+          .from('order_items')
+          .update({ status: nextStatus })
+          .eq('id', item.id);
+
+        if (itemError) {
+          console.warn('Could not update order_items status:', itemError.message);
+        }
+      }
+
+      // 3. Update parent order status in Supabase if all items have advanced
+      const currentOrder = tableOrders.find(o => o.id === item.order_id);
+      if (currentOrder) {
+        const currentItems = (currentOrder.order_items || []).map((oi: any) => 
+          oi.id === item.id ? { ...oi, status: nextStatus } : oi
+        );
+        const allPreparingOrHigher = currentItems.every((oi: any) => 
+          oi.status === 'preparing' || oi.status === 'ready' || oi.status === 'delivered'
+        );
+        const allReadyOrHigher = currentItems.every((oi: any) => 
+          oi.status === 'ready' || oi.status === 'delivered'
+        );
+        const allDelivered = currentItems.every((oi: any) => 
+          oi.status === 'delivered'
+        );
+
+        let targetOrderStatus: string | null = null;
+        if (allDelivered) {
+          targetOrderStatus = 'delivered';
+        } else if (allReadyOrHigher) {
+          targetOrderStatus = 'ready';
+        } else if (allPreparingOrHigher) {
+          targetOrderStatus = 'preparing';
+        }
+
+        if (targetOrderStatus && targetOrderStatus !== currentOrder.status) {
+          await supabase
+            .from('orders')
+            .update({
+              status: targetOrderStatus,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', item.order_id);
+        }
+      }
+
+      if (refreshOrders) {
+        await refreshOrders();
+      }
+    } catch (err) {
+      console.error('Error actualizando estado del producto:', err);
+    } finally {
+      setUpdatingItemId(null);
     }
   };
 
@@ -600,7 +741,7 @@ export default function AccountsPage() {
         unit_price: Number(item.unit_price || 0),
         total_price: Number(item.total_price || 0),
         notes: item.notes,
-        order_status: (order.status || 'received') as OrderStatus,
+        order_status: (item.status || order.status || 'received') as OrderStatus,
         order_created_at: order.created_at
       }));
     });
@@ -621,12 +762,12 @@ export default function AccountsPage() {
   const newOrdersByTableId = useMemo(() => {
     const map: Record<string, any[]> = {};
     orders.forEach(order => {
-      const isPendingPrep = 
-        order.status === 'sent' || 
-        order.status === 'received' || 
-        (order.status as string) === 'pending' || 
-        !order.status;
-      if (isPendingPrep && order.table_id) {
+      const items = order.order_items || [];
+      const hasPendingItems = items.length > 0
+        ? items.some((item: any) => !item.status || item.status === 'sent' || item.status === 'received' || (item.status as string) === 'pending')
+        : (order.status === 'sent' || order.status === 'received' || (order.status as string) === 'pending' || !order.status);
+
+      if (hasPendingItems && order.table_id) {
         if (!map[order.table_id]) {
           map[order.table_id] = [];
         }
@@ -977,7 +1118,7 @@ export default function AccountsPage() {
                   )}
 
                   {/* New orders pending preparation banner */}
-                  {tableOrders.some(o => o.status === 'sent' || o.status === 'received' || (o.status as string) === 'pending' || !o.status) && (
+                  {flatItems.some(i => i.order_status === 'sent' || i.order_status === 'received') && (
                     <div className="bg-[#FFF8F6] border border-[#E76F51]/30 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
                       <div className="flex items-center gap-3 text-orange-950">
                         <span className="relative flex h-3 w-3 flex-shrink-0">
@@ -1059,25 +1200,42 @@ export default function AccountsPage() {
                             <span className="font-bold text-gray-900 text-sm whitespace-nowrap">
                               Bs {item.total_price.toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </span>
-                            <select
-                              value={item.order_status === 'sent' ? 'received' : item.order_status}
-                              disabled={updatingOrderId === item.order_id}
-                              onChange={e => handleUpdateOrderStatus(item.order_id, e.target.value)}
-                              className={`text-xs font-bold px-3 py-1.5 rounded-xl border cursor-pointer focus:outline-none transition-all ${
+                            <button
+                              type="button"
+                              disabled={updatingItemId === item.id}
+                              onClick={() => handleUpdateItemStatus(item)}
+                              className={`text-xs font-bold px-3.5 py-1.5 rounded-xl border transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-50 select-none ${
                                 item.order_status === 'preparing'
-                                  ? 'bg-orange-100 text-orange-800 border-orange-300 hover:bg-orange-200'
+                                  ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300'
                                   : item.order_status === 'ready'
-                                  ? 'bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-200'
+                                  ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300'
                                   : item.order_status === 'delivered'
-                                  ? 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200'
-                                  : 'bg-blue-100 text-blue-800 border-blue-300 hover:bg-blue-200'
+                                  ? 'bg-gray-100 hover:bg-gray-200 text-gray-700 border-gray-300'
+                                  : 'bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200'
                               }`}
+                              title="Haz clic para avanzar de estado (Recibido -> En preparación -> Listo -> Entregado)"
                             >
-                              <option value="received">Recibido</option>
-                              <option value="preparing">En preparación</option>
-                              <option value="ready">Listo</option>
-                              <option value="delivered">Entregado</option>
-                            </select>
+                              {updatingItemId === item.id ? (
+                                <Loader2 size={13} className="animate-spin text-current" />
+                              ) : item.order_status === 'preparing' ? (
+                                <ChefHat size={13} className="text-amber-600" />
+                              ) : item.order_status === 'ready' ? (
+                                <CheckCircle size={13} className="text-emerald-600" />
+                              ) : item.order_status === 'delivered' ? (
+                                <CheckCircle size={13} className="text-gray-500" />
+                              ) : (
+                                <Clock size={13} className="text-blue-500" />
+                              )}
+                              <span>
+                                {item.order_status === 'preparing'
+                                  ? 'En preparación'
+                                  : item.order_status === 'ready'
+                                  ? 'Listo'
+                                  : item.order_status === 'delivered'
+                                  ? 'Entregado'
+                                  : 'Recibido'}
+                              </span>
+                            </button>
                           </div>
                         </div>
                       ))}
