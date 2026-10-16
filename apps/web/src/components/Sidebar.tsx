@@ -54,15 +54,33 @@ export function Sidebar({ isOpen = true, setIsOpen }: { isOpen?: boolean, setIsO
     };
   }, []);
 
-  const playSound = (type: 'order' | 'call' | 'ready' | 'reservation') => {
+  const playSound = (
+    type: 'order' | 'order_takeaway' | 'order_dine_in' | 'call' | 'ready' | 'reservation',
+    extra?: string
+  ) => {
     try {
       if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
         let msg = 'Revisa tu panel de Servido.';
         let title = 'Notificación';
-        if (type === 'order') title = '🍔 ¡Nuevo Pedido!';
-        else if (type === 'call') title = '🛎️ ¡Llamado de Mesa!';
-        else if (type === 'ready') title = '✅ ¡Pedido Listo!';
-        else if (type === 'reservation') title = '📅 ¡Nueva Reserva!';
+        if (type === 'order_dine_in') {
+          title = `🍽️ ¡Nuevo Pedido en Mesa ${extra || ''}!`.trim();
+          msg = 'Nuevo pedido registrado en Mesas y Cuentas.';
+        } else if (type === 'order_takeaway') {
+          title = '🛍️ ¡Nuevo Pedido para Llevar!';
+          msg = 'Nuevo pedido registrado en la sección Pedidos.';
+        } else if (type === 'order') {
+          title = '🍔 ¡Nuevo Pedido!';
+          msg = 'Nuevo pedido registrado en Servido.';
+        } else if (type === 'call') {
+          title = '🛎️ ¡Llamado de Mesa!';
+          msg = 'Un cliente está solicitando atención o la cuenta.';
+        } else if (type === 'ready') {
+          title = `✅ ¡Pedido Listo${extra ? ` (${extra})` : ''}!`;
+          msg = 'Cocina ha marcado un pedido listo para entrega.';
+        } else if (type === 'reservation') {
+          title = '📅 ¡Nueva Reserva!';
+          msg = 'Se ha registrado una nueva reserva pendiente.';
+        }
         
         new Notification(title, { body: msg });
       }
@@ -74,10 +92,19 @@ export function Sidebar({ isOpen = true, setIsOpen }: { isOpen?: boolean, setIsO
         }
         
         let speechText = '';
-        if (type === 'order') speechText = 'Nuevo pedido';
-        else if (type === 'call') speechText = 'Llamada en mesa';
-        else if (type === 'ready') speechText = 'Pedido listo';
-        else if (type === 'reservation') speechText = 'Nueva reserva';
+        if (type === 'order_dine_in') {
+          speechText = extra ? `Nuevo pedido en mesa ${extra}` : 'Nuevo pedido en mesa';
+        } else if (type === 'order_takeaway') {
+          speechText = 'Nuevo pedido para llevar';
+        } else if (type === 'order') {
+          speechText = 'Nuevo pedido';
+        } else if (type === 'call') {
+          speechText = 'Llamada en mesa';
+        } else if (type === 'ready') {
+          speechText = extra ? `Pedido listo para mesa ${extra}` : 'Pedido listo';
+        } else if (type === 'reservation') {
+          speechText = 'Nueva reserva';
+        }
 
         globalUtterance = new SpeechSynthesisUtterance(speechText);
         globalUtterance.rate = 1.1;
@@ -140,7 +167,27 @@ export function Sidebar({ isOpen = true, setIsOpen }: { isOpen?: boolean, setIsO
         async (payload: any) => {
           // Disparar sonido si entra un pedido nuevo (INSERT siempre trae toda la fila)
           if (payload.eventType === 'INSERT' && payload.new && payload.new.restaurant_id === restaurant.id) {
-            playSound('order');
+            let isTakeaway = 
+              payload.new.order_channel === 'own_delivery' ||
+              (payload.new.table_number && payload.new.table_number.toUpperCase().startsWith('BARRA'));
+
+            if (!isTakeaway && payload.new.table_id) {
+              const { data: tableData } = await supabase
+                .from('tables')
+                .select('type, table_number')
+                .eq('id', payload.new.table_id)
+                .single();
+              if (tableData?.type === 'takeaway') {
+                isTakeaway = true;
+              }
+            }
+
+            if (isTakeaway) {
+              playSound('order_takeaway');
+            } else {
+              const cleanTableNumber = (payload.new.table_number || '').replace(/^(Mesa|Barra)\s*/i, '').trim();
+              playSound('order_dine_in', cleanTableNumber);
+            }
           }
           // Disparar sonido si cocina marca un pedido como listo
           if (payload.eventType === 'UPDATE' && payload.new?.id) {
@@ -148,12 +195,13 @@ export function Sidebar({ isOpen = true, setIsOpen }: { isOpen?: boolean, setIsO
             // Fetch the full order row to guarantee we have restaurant_id
             const { data } = await supabase
               .from('orders')
-              .select('restaurant_id, status')
+              .select('restaurant_id, status, table_number')
               .eq('id', payload.new.id)
               .single();
               
             if (data && data.restaurant_id === restaurant.id && payload.new.status === 'ready') {
-              playSound('ready');
+              const cleanTableNumber = (data.table_number || '').replace(/^(Mesa|Barra)\s*/i, '').trim();
+              playSound('ready', cleanTableNumber);
             }
           }
         }
@@ -197,7 +245,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: { isOpen?: boolean, setIsO
       supabase.removeChannel(channelOrders);
       supabase.removeChannel(channelReservations);
     };
-  }, [restaurant?.id]);
+  }, [restaurant?.id, branch?.id]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -276,8 +324,11 @@ export function Sidebar({ isOpen = true, setIsOpen }: { isOpen?: boolean, setIsO
           const isActive = pathname === link.href;
           
           let badgeCount = 0;
-          if (link.name === "Pedidos" || link.name === "Cocina") badgeCount = stats?.nuevos || 0;
-          if (link.name === "Mesas y Cuentas" || link.name === "Cuentas") badgeCount = callingTablesCount;
+          if (link.name === "Pedidos") badgeCount = stats?.nuevosTakeaway || 0;
+          if (link.name === "Cocina") badgeCount = stats?.nuevos || 0;
+          if (link.name === "Mesas y Cuentas" || link.name === "Cuentas") {
+            badgeCount = callingTablesCount + (stats?.nuevosDineIn || 0);
+          }
           if (link.name === "Reservas") badgeCount = pendingReservationsCount;
 
           return (

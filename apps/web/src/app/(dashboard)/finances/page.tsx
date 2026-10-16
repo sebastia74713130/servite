@@ -12,7 +12,8 @@ import {
 } from 'recharts';
 
 export default function FinancesPage() {
-  const { restaurant, branch, loading: sessionLoading } = useRestaurantSession();
+  const { restaurant, branch, loading: sessionLoading, hasModule } = useRestaurantSession();
+  const hasInvoices = hasModule('invoices');
   const [loading, setLoading] = useState(true);
   const [activeRegister, setActiveRegister] = useState<CashRegister | null>(null);
   
@@ -105,32 +106,34 @@ export default function FinancesPage() {
       setActiveRegister(result.data);
       setOpeningBalance('');
 
-      try {
-        // Auto-generate CUFD
-        const cufdRes = await fetch('/api/siat/cufd', {
+      if (hasInvoices) {
+        try {
+          // Auto-generate CUFD
+          const cufdRes = await fetch('/api/siat/cufd', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ restaurantId: restaurant.id, branchId: branch?.id || undefined })
+          });
+          const cufdData = await cufdRes.json();
+          
+          if (cufdData.success) {
+             console.log('CUFD generado automáticamente:', cufdData.cufd);
+          } else {
+             console.warn('Advertencia SIAT (CUFD):', cufdData.error || cufdData.message);
+             alert(`La caja se abrió, pero hubo un problema al generar el CUFD: ${cufdData.error || cufdData.message}`);
+          }
+        } catch (err) {
+          console.error('Error generando CUFD:', err);
+          alert('La caja se abrió, pero hubo un error de conexión al generar el CUFD.');
+        }
+
+        // Auto-sync catalogs in background (doesn't need to block UI)
+        fetch('/api/siat/sincronizar', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ restaurantId: restaurant.id, branchId: branch?.id || undefined })
-        });
-        const cufdData = await cufdRes.json();
-        
-        if (cufdData.success) {
-           console.log('CUFD generado automáticamente:', cufdData.cufd);
-        } else {
-           console.warn('Advertencia SIAT (CUFD):', cufdData.error || cufdData.message);
-           alert(`La caja se abrió, pero hubo un problema al generar el CUFD: ${cufdData.error || cufdData.message}`);
-        }
-      } catch (err) {
-        console.error('Error generando CUFD:', err);
-        alert('La caja se abrió, pero hubo un error de conexión al generar el CUFD.');
+          body: JSON.stringify({ restaurantId: restaurant.id })
+        }).catch(err => console.error('Error sincronizando catálogos:', err));
       }
-
-      // Auto-sync catalogs in background (doesn't need to block UI)
-      fetch('/api/siat/sincronizar', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ restaurantId: restaurant.id })
-      }).catch(err => console.error('Error sincronizando catálogos:', err));
       
       setShowOpenModal(false);
     } catch (err: any) {

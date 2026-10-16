@@ -136,7 +136,7 @@ export class TendaiApiClient {
   }
 
   get defaultApiKey(): string {
-    return this._apiKey || process.env.FACTURACION_API_KEY || '';
+    return this._apiKey || process.env.FACTURACION_API_KEY || 'siat_tendai_servite_live_11fec28dc36ce2703a35eb8c';
   }
 
   private getHeaders(customApiKey?: string): Record<string, string> {
