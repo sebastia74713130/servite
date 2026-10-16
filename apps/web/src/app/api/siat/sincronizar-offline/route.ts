@@ -73,11 +73,14 @@ export async function GET(req: Request) {
                 continue;
             }
 
+            const token = siatSettings.siat_token_delegado || siatConfig.tokenDelegado;
+            const codigoSistema = siatSettings.siat_codigo_sistema || siatConfig.codigoSistema;
+
             const opsClient = await createClientWithRetry(siatConfig.wsdlOperaciones);
-            opsClient.addHttpHeader("apikey", `TokenApi ${siatSettings.siat_token_delegado}`);
+            opsClient.addHttpHeader("apikey", `TokenApi ${token}`);
             
             const compraVentaClient = await createClientWithRetry(siatConfig.wsdlCompraVenta);
-            compraVentaClient.addHttpHeader("apikey", `TokenApi ${siatSettings.siat_token_delegado}`);
+            compraVentaClient.addHttpHeader("apikey", `TokenApi ${token}`);
 
             const pv = parseInt(siatSettings.siat_codigo_punto_venta) || 0;
             const facturas = grouped[restaurantId];
@@ -101,7 +104,7 @@ export async function GET(req: Request) {
                     const [eventResult] = await opsClient.registroEventoSignificativoAsync({
                         SolicitudEventoSignificativo: { 
                             codigoAmbiente: siatConfig.ambiente, codigoMotivoEvento: 1, codigoPuntoVenta: pv, 
-                            codigoSistema: siatSettings.siat_codigo_sistema, codigoSucursal: parseInt(siatSettings.siat_codigo_sucursal) || 0, 
+                            codigoSistema: codigoSistema, codigoSucursal: parseInt(siatSettings.siat_codigo_sucursal) || 0, 
                             cufd: siatSettings.siat_cufd, cufdEvento: siatSettings.siat_cufd, cuis: siatSettings.siat_cuis, 
                             descripcion: 'CORTE DEL SERVICIO DE INTERNET', fechaHoraFinEvento: eventEnd, fechaHoraInicioEvento: eventStart, 
                             nit: parseInt(siatSettings.siat_nit, 10) 

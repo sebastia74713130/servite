@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRestaurantSession } from '@/hooks/useRestaurantSession';
 import { supabase } from '@/lib/supabase';
 import { LoadingState } from '@/components/LoadingState';
-import { FileText, AlertCircle, CheckCircle, XCircle, Search } from 'lucide-react';
+import { FileText, AlertCircle, CheckCircle, XCircle, Search, RefreshCw, WifiOff, CloudUpload } from 'lucide-react';
 
 export default function InvoicesPage() {
   const { restaurant, branch, loading: sessionLoading } = useRestaurantSession();
@@ -13,6 +13,7 @@ export default function InvoicesPage() {
   const [search, setSearch] = useState('');
   
   const [isAnulling, setIsAnulling] = useState<string | null>(null);
+  const [isSyncingOffline, setIsSyncingOffline] = useState(false);
 
   useEffect(() => {
     if (restaurant?.id && branch?.id) {
@@ -31,6 +32,27 @@ export default function InvoicesPage() {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSyncOffline = async () => {
+    setIsSyncingOffline(true);
+    try {
+      // 1. Enviar facturas offline en paquete al SIAT
+      const syncRes = await fetch('/api/siat/sincronizar-offline');
+      const syncData = await syncRes.json();
+      
+      // 2. Validar paquetes pendientes
+      const valRes = await fetch('/api/siat/validar-paquetes');
+      const valData = await valRes.json();
+
+      await fetchInvoices();
+      alert(`Sincronización completada:\n- Envío: ${syncData.message || (syncData.logs?.join('\n') || 'Procesado')}\n- Validación: ${valData.message || (valData.logs?.join('\n') || 'Procesado')}`);
+    } catch (err: any) {
+      console.error('Error sincronizando facturas fuera de línea:', err);
+      alert('Error al conectar con el servicio de sincronización offline.');
+    } finally {
+      setIsSyncingOffline(false);
     }
   };
 
@@ -98,24 +120,111 @@ export default function InvoicesPage() {
     inv.numero_factura?.toString().includes(search)
   );
 
+  const offlineCount = invoices.filter(inv => inv.siat_estado?.includes('OFFLINE')).length;
+  const packageCount = invoices.filter(inv => inv.siat_estado === 'PAQUETE_ENVIADO').length;
+  const validatedCount = invoices.filter(inv => inv.siat_estado === 'VALIDADA').length;
+  const annuledCount = invoices.filter(inv => inv.siat_estado === 'ANULADA').length;
+
   return (
     <div className="p-8 max-w-7xl mx-auto h-[100vh] overflow-y-auto pb-32">
-      <div className="flex justify-between items-end mb-8">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-6">
         <div>
           <h1 className="text-3xl font-black text-gray-900 tracking-tight">Facturas SIAT</h1>
-          <p className="text-gray-500 mt-1">Historial de emisiones y anulaciones</p>
+          <p className="text-gray-500 mt-1">Historial de emisiones, contingencias y anulaciones</p>
         </div>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-          <input 
-            type="text" 
-            placeholder="Buscar por Nro o CUF..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-10 pr-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E76F51]/20 focus:border-[#E76F51] w-64"
-          />
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          <button
+            onClick={handleSyncOffline}
+            disabled={isSyncingOffline}
+            className="px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white rounded-xl text-sm font-bold flex items-center gap-2 transition-colors disabled:opacity-50 shadow-sm"
+          >
+            <RefreshCw size={16} className={isSyncingOffline ? 'animate-spin' : ''} />
+            <span>{isSyncingOffline ? 'Sincronizando...' : 'Sincronizar Offline'}</span>
+          </button>
+          <div className="relative flex-1 md:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+            <input 
+              type="text" 
+              placeholder="Buscar por Nro o CUF..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E76F51]/20 focus:border-[#E76F51]"
+            />
+          </div>
         </div>
       </div>
+
+      {/* Resumen de métricas de facturación */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
+          <div>
+            <p className="text-xs text-gray-500 font-medium">Validadas en SIAT</p>
+            <p className="text-2xl font-black text-green-600 mt-1">{validatedCount}</p>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center text-green-600">
+            <CheckCircle size={20} />
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
+          <div>
+            <p className="text-xs text-gray-500 font-medium">Pendientes Offline</p>
+            <p className="text-2xl font-black text-amber-600 mt-1">{offlineCount}</p>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600">
+            <WifiOff size={20} />
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
+          <div>
+            <p className="text-xs text-gray-500 font-medium">En Paquetes SIAT</p>
+            <p className="text-2xl font-black text-blue-600 mt-1">{packageCount}</p>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
+            <CloudUpload size={20} />
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
+          <div>
+            <p className="text-xs text-gray-500 font-medium">Anuladas</p>
+            <p className="text-2xl font-black text-red-600 mt-1">{annuledCount}</p>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center text-red-600">
+            <XCircle size={20} />
+          </div>
+        </div>
+      </div>
+
+      {/* Alerta de contingencia */}
+      {(offlineCount > 0 || packageCount > 0) && (
+        <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-200 rounded-2xl p-4 mb-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center flex-shrink-0">
+              <AlertCircle size={20} />
+            </div>
+            <div>
+              <h3 className="font-bold text-gray-900 text-sm">
+                {offlineCount > 0
+                  ? `Tienes ${offlineCount} factura(s) emitida(s) en contingencia (Offline)`
+                  : `Tienes ${packageCount} paquete(s) en espera de confirmación del SIAT`}
+              </h3>
+              <p className="text-xs text-gray-600 mt-0.5">
+                Vercel Cron las transmite automáticamente a medianoche, o puedes sincronizarlas de inmediato.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={handleSyncOffline}
+            disabled={isSyncingOffline}
+            className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-sm font-bold flex items-center gap-2 transition-colors disabled:opacity-50 whitespace-nowrap shadow-sm"
+          >
+            <RefreshCw size={16} className={isSyncingOffline ? 'animate-spin' : ''} />
+            <span>{isSyncingOffline ? 'Transmitiendo...' : 'Sincronizar con SIAT Ahora'}</span>
+          </button>
+        </div>
+      )}
 
       <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
         <table className="w-full text-left border-collapse">

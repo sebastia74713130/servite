@@ -58,8 +58,11 @@ export async function GET(req: Request) {
                 continue;
             }
 
+            const token = siatSettings.siat_token_delegado || siatConfig.tokenDelegado;
+            const codigoSistema = siatSettings.siat_codigo_sistema || siatConfig.codigoSistema;
+
             const compraVentaClient = await createClientWithRetry(siatConfig.wsdlCompraVenta);
-            compraVentaClient.addHttpHeader("apikey", `TokenApi ${siatSettings.siat_token_delegado}`);
+            compraVentaClient.addHttpHeader("apikey", `TokenApi ${token}`);
 
             const pv = parseInt(siatSettings.siat_codigo_punto_venta) || 0;
 
@@ -72,7 +75,7 @@ export async function GET(req: Request) {
                     const [valResult] = await compraVentaClient.validacionRecepcionPaqueteFacturaAsync({
                         SolicitudServicioValidacionRecepcionPaquete: {
                             codigoAmbiente: siatConfig.ambiente, codigoDocumentoSector: 1, codigoEmision: 2, codigoModalidad: 1, codigoPuntoVenta: pv,
-                            codigoSistema: siatSettings.siat_codigo_sistema, codigoSucursal: parseInt(siatSettings.siat_codigo_sucursal) || 0,
+                            codigoSistema: codigoSistema, codigoSucursal: parseInt(siatSettings.siat_codigo_sucursal) || 0,
                             cufd: siatSettings.siat_cufd, cuis: siatSettings.siat_cuis, nit: parseInt(siatSettings.siat_nit, 10),
                             tipoFacturaDocumento: 1, codigoRecepcion: codigoRecepcion
                         }
