@@ -1087,24 +1087,24 @@ export default function AccountsPage() {
             {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-white flex-shrink-0">
               <div>
-                <div className="flex items-center gap-2.5">
-                  <h2 className="text-2xl font-black text-gray-900 tracking-tight">{selectedTable.table_number}</h2>
+                <div className="flex items-center gap-3">
+                  <h2 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">{selectedTable.table_number}</h2>
                   {selectedTable.type === 'takeaway' ? (
-                    <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-purple-100 text-purple-700">
+                    <span className="text-xs sm:text-sm px-3 py-1 rounded-full font-bold bg-purple-100 text-purple-700">
                       Barra / Para llevar
                     </span>
                   ) : (
-                    <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                    <span className="text-xs sm:text-sm px-3 py-1 rounded-full font-bold bg-blue-50 text-blue-700 border border-blue-200">
                       Mesa de Salón
                     </span>
                   )}
                   {flatItems.length > 0 && (
-                    <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-gray-100 text-gray-700">
+                    <span className="text-xs sm:text-sm px-3 py-1 rounded-full font-bold bg-gray-100 text-gray-700">
                       {flatItems.length} {flatItems.length === 1 ? 'producto' : 'productos'}
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-gray-400 mt-0.5 font-medium">
+                <p className="text-sm text-gray-500 mt-1 font-medium">
                   {modalStep === 'details' ? 'Tablero Kanban de preparación y cobranza' : 'Cobro y liquidación de cuenta'}
                 </p>
               </div>
@@ -1345,33 +1345,33 @@ export default function AccountsPage() {
                   <div className="p-5 flex flex-col h-full justify-between gap-6">
                     <div className="space-y-4">
                       <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-                        <span className="text-xs font-black uppercase text-gray-400 tracking-wider">
+                        <span className="text-sm font-black uppercase text-gray-500 tracking-wider">
                           Resumen de Cuenta
                         </span>
-                        <span className="text-xs font-bold text-gray-500">
+                        <span className="text-sm font-bold text-gray-600">
                           {flatItems.length} {flatItems.length === 1 ? 'ítem' : 'ítems'}
                         </span>
                       </div>
 
                       {/* Big total display */}
                       <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 text-center">
-                        <span className="text-xs font-bold text-gray-500 block mb-1">
+                        <span className="text-sm font-bold text-gray-500 block mb-1">
                           Total a Pagar
                         </span>
-                        <span className="text-3xl font-black text-gray-900 tracking-tight">
+                        <span className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight">
                           Bs {totalAmount.toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
                       </div>
 
                       {/* Items mini list */}
-                      <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
+                      <div className="max-h-60 overflow-y-auto space-y-2.5 pr-1">
                         {flatItems.map((item) => (
-                          <div key={item.id} className="flex items-center justify-between text-xs py-1.5 border-b border-gray-50">
+                          <div key={item.id} className="flex items-center justify-between text-sm py-2 border-b border-gray-50">
                             <div className="flex items-center gap-2 min-w-0 pr-2">
-                              <span className="font-black text-gray-800 flex-shrink-0">{item.quantity}x</span>
-                              <span className="text-gray-700 truncate font-medium">{item.product_name}</span>
+                              <span className="font-black text-gray-900 flex-shrink-0">{item.quantity}x</span>
+                              <span className="text-gray-800 truncate font-semibold">{item.product_name}</span>
                             </div>
-                            <span className="font-bold text-gray-900 flex-shrink-0">
+                            <span className="font-extrabold text-gray-900 flex-shrink-0">
                               Bs {item.total_price.toFixed(2)}
                             </span>
                           </div>
@@ -1385,9 +1385,9 @@ export default function AccountsPage() {
                         <button
                           type="button"
                           onClick={() => setModalStep('checkout')}
-                          className="w-full py-3.5 px-4 bg-[#2E7D32] hover:bg-[#256629] text-white font-bold rounded-2xl transition-all shadow-sm active:scale-[0.98] text-sm flex items-center justify-center gap-2 cursor-pointer"
+                          className="w-full py-3.5 px-4 bg-[#2E7D32] hover:bg-[#256629] text-white font-bold rounded-2xl transition-all shadow-sm active:scale-[0.98] text-base flex items-center justify-center gap-2 cursor-pointer"
                         >
-                          <Receipt size={18} />
+                          <Receipt size={20} />
                           <span>Cobrar Cuenta</span>
                         </button>
                       )}
@@ -1403,7 +1403,7 @@ export default function AccountsPage() {
                           }
                           handleReleaseTable(selectedTable.id);
                         }}
-                        className="w-full py-2.5 px-3 border border-gray-200 hover:bg-gray-50 text-gray-600 hover:text-gray-900 font-semibold rounded-xl transition-colors text-xs text-center disabled:opacity-50 cursor-pointer"
+                        className="w-full py-2.5 px-3 border border-gray-200 hover:bg-gray-50 text-gray-600 hover:text-gray-900 font-semibold rounded-xl transition-colors text-sm text-center disabled:opacity-50 cursor-pointer"
                       >
                         {isClosingBill ? 'Liberando...' : 'Liberar mesa sin cobrar'}
                       </button>
@@ -1416,24 +1416,24 @@ export default function AccountsPage() {
                       <button
                         type="button"
                         onClick={() => setModalStep('details')}
-                        className="inline-flex items-center gap-1.5 text-xs font-bold text-gray-600 hover:text-gray-900 transition-colors cursor-pointer"
+                        className="inline-flex items-center gap-1.5 text-sm font-bold text-gray-600 hover:text-gray-900 transition-colors cursor-pointer"
                       >
-                        <ArrowLeft size={14} />
+                        <ArrowLeft size={16} />
                         <span>Volver al Tablero</span>
                       </button>
 
                       <div className="bg-emerald-50/60 rounded-2xl p-4 border border-emerald-100 text-center">
-                        <span className="text-xs font-bold text-emerald-800 block mb-1">
+                        <span className="text-sm font-bold text-emerald-800 block mb-1">
                           Total a Liquidar
                         </span>
-                        <span className="text-2xl font-black text-gray-900">
+                        <span className="text-3xl font-black text-gray-900">
                           Bs {totalAmount.toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
                       </div>
 
                       {/* Payment Method Selector */}
                       <div>
-                        <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                        <label className="block text-sm font-bold text-gray-700 mb-1.5">
                           {selectedTable.requested_payment_method
                             ? `Método solicitado: ${selectedTable.requested_payment_method}`
                             : 'Método de pago:'}
@@ -1450,7 +1450,7 @@ export default function AccountsPage() {
 
                         {paymentMethod === 'Tarjeta' && (
                           <div className="mt-2.5">
-                            <label className="block text-[11px] font-semibold text-gray-600 mb-1">
+                            <label className="block text-xs font-semibold text-gray-600 mb-1">
                               Número de Tarjeta (Primeros 4 y últimos 4):
                             </label>
                             <input
@@ -1458,7 +1458,7 @@ export default function AccountsPage() {
                               value={cardNumber}
                               onChange={e => setCardNumber(e.target.value)}
                               placeholder="1234000000005678"
-                              className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32] text-xs"
+                              className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32] text-sm"
                             />
                           </div>
                         )}
@@ -1474,37 +1474,37 @@ export default function AccountsPage() {
                               onChange={e => setGenerateInvoice(e.target.checked)}
                               className="w-4 h-4 text-[#2E7D32] rounded focus:ring-[#2E7D32]"
                             />
-                            <span className="font-bold text-gray-800 text-xs">Generar Factura (SIAT)</span>
+                            <span className="font-bold text-gray-800 text-sm">Generar Factura (SIAT)</span>
                           </label>
 
                           {generateInvoice && (
                             <div className="space-y-2.5 bg-gray-50 p-3 rounded-xl border border-gray-200">
                               <div>
-                                <label className="block text-[11px] font-semibold text-gray-600 mb-0.5">NIT / CI</label>
+                                <label className="block text-xs font-semibold text-gray-600 mb-0.5">NIT / CI</label>
                                 <input
                                   type="text"
                                   value={cashierNit}
                                   onChange={e => setCashierNit(e.target.value)}
                                   placeholder="Ej. 1234567"
-                                  className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32] text-xs"
+                                  className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32] text-sm"
                                 />
                               </div>
                               <div>
-                                <label className="block text-[11px] font-semibold text-gray-600 mb-0.5">Razón Social</label>
+                                <label className="block text-xs font-semibold text-gray-600 mb-0.5">Razón Social</label>
                                 <input
                                   type="text"
                                   value={cashierName}
                                   onChange={e => setCashierName(e.target.value)}
                                   placeholder="Nombre o Razón Social"
-                                  className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32] text-xs"
+                                  className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32] text-sm"
                                 />
                               </div>
                               <div>
-                                <label className="block text-[11px] font-semibold text-gray-600 mb-0.5">Punto de Venta SIAT</label>
+                                <label className="block text-xs font-semibold text-gray-600 mb-0.5">Punto de Venta SIAT</label>
                                 <select
                                   value={siatPuntoVenta}
                                   onChange={e => setSiatPuntoVenta(e.target.value)}
-                                  className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32] text-xs"
+                                  className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32] text-sm"
                                 >
                                   <option value="0">Punto de Venta 0</option>
                                   <option value="1">Punto de Venta 1</option>
@@ -1518,10 +1518,10 @@ export default function AccountsPage() {
                       ) : (
                         <div className="pt-2 border-t border-gray-100">
                           <div className="bg-amber-50 border border-amber-200/80 rounded-xl p-3 flex items-start gap-2 text-xs text-amber-900">
-                            <AlertCircle className="w-3.5 h-3.5 text-amber-600 flex-shrink-0 mt-0.5" />
+                            <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
                             <div>
-                              <p className="font-bold text-amber-950 text-[11px]">Régimen RTS</p>
-                              <p className="text-amber-800 text-[10px] mt-0.5 leading-relaxed">
+                              <p className="font-bold text-amber-950 text-xs">Régimen RTS</p>
+                              <p className="text-amber-800 text-xs mt-0.5 leading-relaxed">
                                 Emisión de comprobante térmico simplificado.
                               </p>
                             </div>
@@ -1530,7 +1530,7 @@ export default function AccountsPage() {
                       )}
 
                       {!activeRegister && (
-                        <p className="text-[11px] text-orange-600 font-medium leading-tight">
+                        <p className="text-xs text-orange-600 font-medium leading-tight">
                           Nota: La caja diaria no está abierta. El cobro no sumará a un arqueo de turno.
                         </p>
                       )}
@@ -1541,16 +1541,16 @@ export default function AccountsPage() {
                       <button
                         disabled={isClosingBill}
                         onClick={handleCloseBill}
-                        className="w-full py-3.5 bg-[#2E7D32] hover:bg-[#256629] text-white font-bold rounded-2xl transition-all disabled:opacity-50 text-sm flex items-center justify-center gap-2 shadow-sm active:scale-[0.98] cursor-pointer"
+                        className="w-full py-3.5 bg-[#2E7D32] hover:bg-[#256629] text-white font-bold rounded-2xl transition-all disabled:opacity-50 text-base flex items-center justify-center gap-2 shadow-sm active:scale-[0.98] cursor-pointer"
                       >
-                        <Receipt size={18} />
+                        <Receipt size={20} />
                         <span>{isClosingBill ? 'Procesando...' : 'Cobrar y Liberar'}</span>
                       </button>
 
                       <button
                         disabled={isClosingBill}
                         onClick={() => setModalStep('details')}
-                        className="w-full py-1.5 text-xs text-gray-500 hover:text-gray-700 font-semibold transition-colors cursor-pointer"
+                        className="w-full py-2 text-sm text-gray-500 hover:text-gray-700 font-semibold transition-colors cursor-pointer"
                       >
                         Cancelar
                       </button>

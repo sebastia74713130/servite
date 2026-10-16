@@ -45,15 +45,15 @@ export function KanbanColumn({
       }`}
     >
       {/* Column Header */}
-      <div className={`p-2.5 sm:p-3 border-b flex items-center justify-between rounded-t-2xl ${theme.headerBg} ${theme.border}`}>
-        <div className="flex items-center gap-1.5 min-w-0">
+      <div className={`p-3 border-b flex items-center justify-between rounded-t-2xl ${theme.headerBg} ${theme.border}`}>
+        <div className="flex items-center gap-2 min-w-0">
           <span className="flex-shrink-0">{icon}</span>
-          <h3 className="font-black text-[11px] sm:text-xs text-gray-800 uppercase tracking-wide truncate">
+          <h3 className="font-black text-xs sm:text-sm text-gray-800 uppercase tracking-wide truncate">
             {title}
           </h3>
         </div>
 
-        <span className={`px-2 py-0.5 rounded-full text-[11px] sm:text-xs font-black flex-shrink-0 ${theme.badgeBg} ${theme.badgeText}`}>
+        <span className={`px-2.5 py-0.5 rounded-full text-xs sm:text-sm font-black flex-shrink-0 ${theme.badgeBg} ${theme.badgeText}`}>
           {count}
         </span>
       </div>
@@ -65,10 +65,10 @@ export function KanbanColumn({
             type="button"
             disabled={batchAction.loading}
             onClick={batchAction.onClick}
-            className="w-full py-1.5 px-2.5 bg-[#E76F51] hover:bg-[#d65e40] text-white font-bold text-xs rounded-xl transition-all shadow-2xs active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+            className="w-full py-2 px-3 bg-[#E76F51] hover:bg-[#d65e40] text-white font-bold text-xs sm:text-sm rounded-xl transition-all shadow-2xs active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
           >
             {batchAction.loading ? (
-              <Loader2 size={13} className="animate-spin text-white" />
+              <Loader2 size={15} className="animate-spin text-white" />
             ) : (
               batchAction.icon
             )}
@@ -80,9 +80,9 @@ export function KanbanColumn({
       {/* Droppable Cards Container */}
       <div className="flex-1 p-2 space-y-2.5 overflow-y-auto min-h-[160px]">
         {count === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-center p-4 border border-dashed border-gray-200 rounded-xl text-gray-400 text-xs">
-            <span>Sin productos</span>
-            <span className="text-[10px] text-gray-300 mt-0.5">Arrastra aquí</span>
+          <div className="h-full flex flex-col items-center justify-center text-center p-4 border border-dashed border-gray-200 rounded-xl text-gray-400">
+            <span className="text-sm font-semibold">Sin productos</span>
+            <span className="text-xs text-gray-300 mt-1">Arrastra aquí</span>
           </div>
         ) : (
           children
