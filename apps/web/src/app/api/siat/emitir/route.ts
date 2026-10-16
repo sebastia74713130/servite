@@ -161,10 +161,19 @@ export async function POST(req: Request) {
       const respuestaSiat = await emitirFacturaSIAT(xmlFirmado, siatSettings);
       resp = respuestaSiat.RespuestaServicioFacturacion;
       isSuccess = resp && (resp.codigoEstado === 904 || resp.codigoEstado === 908);
+
+      // Si el SIAT responde con error de servidor no controlado (-1, 500, etc.), activar contingencia reglamentaria
+      if (!isSuccess && resp && (resp.codigoEstado === -1 || resp.codigoEstado === 500)) {
+        console.warn(`[SIAT CONTINGENCIA] Servidor del SIAT no disponible (codigoEstado: ${resp.codigoEstado}). Activando emisión en Contingencia (Offline)...`);
+        isOffline = true;
+      }
     } catch (networkError: any) {
       // Si emitirFacturaSIAT lanza un error (falla de red, SIAT caído, timeout), caemos a Offline
+      console.warn('[SIAT CONTINGENCIA] Falla de red o timeout al comunicar con el SIAT. Activando modo Offline:', networkError.message);
       isOffline = true;
-      
+    }
+
+    if (isOffline) {
       // Regeneramos CUF con tipoEmision: 2 (Offline)
       cufParams.tipoEmision = 2;
       cufFinal = generarCUF(cufParams);
@@ -183,7 +192,7 @@ export async function POST(req: Request) {
     // Interpretar estado
     const estado = isOffline ? 'PENDIENTE_OFFLINE' : (isSuccess ? 'VALIDADA' : 'RECHAZADA');
     const detallesError = isOffline 
-      ? 'Caída de conexión - Guardada para empaquetado offline' 
+      ? (resp?.codigoDescripcion ? `Contingencia activada por indisponibilidad SIAT: ${resp.codigoDescripcion}` : 'Caída de conexión - Guardada para empaquetado offline') 
       : (!isSuccess ? JSON.stringify(resp?.mensajesList || resp) : null);
 
     // Guardar en base de datos la confirmación o estado offline
@@ -206,15 +215,20 @@ export async function POST(req: Request) {
     if (isOffline) {
       return NextResponse.json({
         success: true,
-        message: "Factura emitida en modo contingencia (Offline).",
+        message: "Factura emitida en modo contingencia (Offline). Guardada para consolidación ante el SIAT.",
+        mensaje: "Factura emitida en modo contingencia (Offline). Guardada para consolidación ante el SIAT.",
         cuf: cufFinal,
+        numeroFactura: facturaParams.cabecera.numeroFactura,
+        estado: 'OFFLINE',
         offline: true
       });
     } else if (isSuccess) {
       return NextResponse.json({
         success: true,
         message: "Factura validada y recepcionada por el SIAT.",
+        mensaje: "Factura validada y recepcionada por el SIAT.",
         cuf: cufFinal,
+        numeroFactura: facturaParams.cabecera.numeroFactura,
         codigoRecepcion: resp.codigoRecepcion
       });
     } else {
