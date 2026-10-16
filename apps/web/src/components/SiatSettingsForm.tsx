@@ -10,11 +10,12 @@ import {
   Hash, 
   ShieldCheck, 
   CheckCircle, 
-  AlertCircle,
-  KeyRound,
-  Radio,
-  ExternalLink
+  AlertCircle 
 } from 'lucide-react';
+
+interface SiatSettingsFormProps {
+  restaurantId: string;
+}
 
 export function SiatSettingsForm({ restaurantId, branchId, isMainBranch }: { restaurantId: string, branchId?: string, isMainBranch?: boolean }) {
   const [loading, setLoading] = useState(true);
@@ -22,14 +23,11 @@ export function SiatSettingsForm({ restaurantId, branchId, isMainBranch }: { res
   const [syncingCuis, setSyncingCuis] = useState(false);
   const [syncingCufd, setSyncingCufd] = useState(false);
   const [syncingCatalogos, setSyncingCatalogos] = useState(false);
-  const [pinging, setPinging] = useState(false);
-  const [pingResult, setPingResult] = useState<{ success: boolean; message: string } | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState('Configuración SIAT guardada correctamente');
   const [error, setError] = useState<string | null>(null);
 
   // Form State
-  const [apiKey, setApiKey] = useState('');
   const [nit, setNit] = useState('');
   const [sucursal, setSucursal] = useState('0');
   const [puntoVenta, setPuntoVenta] = useState('0');
@@ -61,7 +59,7 @@ export function SiatSettingsForm({ restaurantId, branchId, isMainBranch }: { res
 
         let bData = null;
         if (branchId) {
-          const { data: branchInfo } = await supabase
+          const { data: branchInfo, error: branchErr } = await supabase
             .from('branches')
             .select('*')
             .eq('id', branchId)
@@ -72,7 +70,6 @@ export function SiatSettingsForm({ restaurantId, branchId, isMainBranch }: { res
         }
 
         if (data) {
-          setApiKey(data.siat_api_key || '');
           setNit(data.siat_nit || '');
           setCertPassword(data.siat_cert_password || '');
           setCafc(data.siat_cafc || '');
@@ -121,9 +118,8 @@ export function SiatSettingsForm({ restaurantId, branchId, isMainBranch }: { res
         }
       }
 
-      const baseSettings: Record<string, any> = {
+      const baseSettings = {
         restaurant_id: restaurantId,
-        siat_api_key: apiKey || null,
         siat_nit: nit,
         siat_cert_password: certPassword,
         siat_cafc: cafc,
@@ -172,31 +168,6 @@ export function SiatSettingsForm({ restaurantId, branchId, isMainBranch }: { res
       setSuccessMessage('Configuración SIAT guardada correctamente');
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 3000);
-    }
-  };
-
-  const handlePingSiat = async () => {
-    setPinging(true);
-    setPingResult(null);
-    setError(null);
-    try {
-      const url = restaurantId ? `/api/siat/ping?restaurantId=${restaurantId}` : '/api/siat/ping';
-      const res = await fetch(url);
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || data.message || 'Error de conexión con el SIAT');
-      }
-      setPingResult({
-        success: true,
-        message: data.message || 'Comunicación exitosa con los servidores del SIN (SIAT)',
-      });
-    } catch (err: any) {
-      setPingResult({
-        success: false,
-        message: err.message || 'No se pudo establecer comunicación con el SIAT',
-      });
-    } finally {
-      setPinging(false);
     }
   };
 
@@ -289,38 +260,15 @@ export function SiatSettingsForm({ restaurantId, branchId, isMainBranch }: { res
 
   return (
     <div className="bg-white border border-[#E5E7EB] rounded-2xl p-8 shadow-sm space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-bold text-[#1F2933] flex items-center gap-2 mb-1">
-            <ShieldCheck size={20} className="text-[#E76F51]" />
-            Configuración Facturación Electrónica SIAT
-          </h2>
-          <p className="text-[#6B7280] text-sm">
-            Conexión con el microservicio multi-inquilino de facturación electrónica boliviana en línea.
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={handlePingSiat}
-          disabled={pinging}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-gray-50 border border-gray-200 text-[#1F2933] hover:bg-gray-100 transition-colors self-start sm:self-auto disabled:opacity-50"
-        >
-          <Radio size={14} className={pinging ? "animate-pulse text-[#E76F51]" : "text-emerald-600"} />
-          {pinging ? 'Probando conexión...' : 'Probar Conexión con SIAT'}
-        </button>
+      <div>
+        <h2 className="text-lg font-bold text-[#1F2933] flex items-center gap-2 mb-1">
+          <ShieldCheck size={20} className="text-[#E76F51]" />
+          Configuración Facturación SIAT
+        </h2>
+        <p className="text-[#6B7280] text-sm mb-4">
+          Configura tus credenciales y firma digital para la facturación electrónica boliviana en línea.
+        </p>
       </div>
-
-      {pingResult && (
-        <div className={`flex items-center gap-3 rounded-xl p-4 text-sm animate-in fade-in ${
-          pingResult.success 
-            ? 'bg-emerald-50 border border-emerald-200 text-emerald-800' 
-            : 'bg-red-50 border border-red-200 text-red-800'
-        }`}>
-          {pingResult.success ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
-          <span className="font-medium">{pingResult.message}</span>
-        </div>
-      )}
 
       {showSuccess && (
         <div className="flex items-center gap-3 bg-green-50 border border-green-200 text-green-700 rounded-xl p-4 animate-in fade-in">
@@ -337,34 +285,6 @@ export function SiatSettingsForm({ restaurantId, branchId, isMainBranch }: { res
       )}
 
       <form onSubmit={handleSave} className="space-y-6">
-        {/* API Key de Facturación */}
-        <div className="bg-gradient-to-r from-orange-50/50 to-transparent border border-[#F4A261]/30 rounded-2xl p-5 space-y-2">
-          <div className="flex items-center justify-between">
-            <label className="text-sm font-semibold text-[#1F2933] flex items-center gap-2">
-              <KeyRound size={16} className="text-[#E76F51]" />
-              API Key del Microservicio de Facturación
-            </label>
-            <a 
-              href="https://facturas-by-tendai-nhnm.vercel.app/" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-xs text-[#E76F51] hover:underline flex items-center gap-1 font-medium"
-            >
-              Panel Facturas by Tendai <ExternalLink size={12} />
-            </a>
-          </div>
-          <p className="text-xs text-[#6B7280]">
-            Si dejas este campo vacío, se usará la API Key general configurada en el servidor.
-          </p>
-          <input
-            type="password"
-            value={apiKey}
-            onChange={e => setApiKey(e.target.value)}
-            className="w-full font-mono text-sm border border-[#E5E7EB] bg-white rounded-xl px-4 py-3 text-[#1F2933] focus:outline-none focus:ring-2 focus:ring-[#E76F51]/30 focus:border-[#E76F51] transition-colors"
-            placeholder="siat_tendai_servite_live_..."
-          />
-        </div>
-
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* NIT */}
           <div>
@@ -377,7 +297,7 @@ export function SiatSettingsForm({ restaurantId, branchId, isMainBranch }: { res
               value={nit}
               onChange={e => setNit(e.target.value)}
               className="w-full border border-[#E5E7EB] rounded-xl px-4 py-3 text-[#1F2933] focus:outline-none focus:ring-2 focus:ring-[#E76F51]/30 focus:border-[#E76F51] transition-colors disabled:bg-gray-100 disabled:cursor-not-allowed"
-              placeholder="Ej. 698777025"
+              placeholder="Ej. 123456789"
               required
             />
           </div>
@@ -441,6 +361,7 @@ export function SiatSettingsForm({ restaurantId, branchId, isMainBranch }: { res
               onChange={e => setCertPassword(e.target.value)}
               className="w-full border border-[#E5E7EB] rounded-xl px-4 py-3 text-[#1F2933] focus:outline-none focus:ring-2 focus:ring-[#E76F51]/30 focus:border-[#E76F51] transition-colors disabled:bg-gray-100 disabled:cursor-not-allowed"
               placeholder="Contraseña del archivo de AGETIC"
+              required
             />
           </div>
         </div>
@@ -452,7 +373,7 @@ export function SiatSettingsForm({ restaurantId, branchId, isMainBranch }: { res
             Archivo de Firma Digital (.p12)
           </label>
           <p className="text-xs text-[#6B7280] mb-4">
-            Sube el archivo de tu certificado de AGETIC si necesitas actualizarlo en el servidor seguro.
+            Sube el archivo de tu certificado de AGETIC. Este archivo se guardará de forma encriptada en tu servidor.
           </p>
           <div className="flex items-center gap-4">
             <input
@@ -488,7 +409,7 @@ export function SiatSettingsForm({ restaurantId, branchId, isMainBranch }: { res
             </div>
             <div className="flex justify-between">
               <span>CUFD Diario:</span>
-              <span className="font-mono text-[#E76F51]">{cufd ? 'Activo (Sincronizado)' : 'No asignado'}</span>
+              <span className="font-mono text-[#E76F51]">{cufd ? 'Activo (Oculto)' : 'No asignado'}</span>
             </div>
             {cufdFecha && (
               <div className="flex justify-between">

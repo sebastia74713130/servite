@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { solicitarCUIS } from "@/lib/siat/services/solicitarCUIS";
 import { resolveBranchId } from "@/lib/siat/branchHelper";
-import { tendaiApiClient } from "@/lib/siat/tendaiApiClient";
+import { siatConfig } from "@/lib/siat/config";
 
 export async function POST(req: Request) {
   try {
@@ -9,84 +10,72 @@ export async function POST(req: Request) {
     const { restaurantId, overridePuntoVenta } = body;
     const branchId = await resolveBranchId(restaurantId, body.branchId);
 
+    if (!branchId) {
+      return NextResponse.json({ error: "Falta el ID de la sucursal" }, { status: 400 });
+    }
+
     if (!restaurantId) {
       return NextResponse.json({ error: "Falta el ID del restaurante" }, { status: 400 });
     }
 
     // 1. Obtener la configuración del SIAT del restaurante
-    const { data: siatSettings } = await supabaseAdmin
+    const { data: siatSettings, error: dbError } = await supabaseAdmin
       .from('restaurant_siat_settings')
       .select('*')
       .eq('restaurant_id', restaurantId)
       .single();
 
-    let sucursal = siatSettings?.siat_codigo_sucursal || 0;
-    let puntoVenta = siatSettings?.siat_codigo_punto_venta || 0;
+    if (dbError || !siatSettings) {
+      return NextResponse.json({ error: "El restaurante no tiene configurado el SIAT" }, { status: 404 });
+    }
+    
+    // Obtener la configuración de la sucursal
+    const { data: branchData, error: branchError } = await supabaseAdmin
+      .from('branches')
+      .select('siat_codigo_sucursal, siat_codigo_punto_venta')
+      .eq('id', branchId)
+      .single();
 
-    if (branchId) {
-      const { data: branchData } = await supabaseAdmin
-        .from('branches')
-        .select('siat_codigo_sucursal, siat_codigo_punto_venta')
-        .eq('id', branchId)
-        .single();
-
-      if (branchData) {
-        if (branchData.siat_codigo_sucursal !== null && branchData.siat_codigo_sucursal !== undefined) {
-          sucursal = parseInt(branchData.siat_codigo_sucursal, 10) || 0;
-        }
-        if (branchData.siat_codigo_punto_venta !== null && branchData.siat_codigo_punto_venta !== undefined) {
-          puntoVenta = parseInt(branchData.siat_codigo_punto_venta, 10) || 0;
-        }
-      }
+    if (branchError || !branchData) {
+      return NextResponse.json({ error: "No se encontró la configuración de la sucursal" }, { status: 404 });
     }
 
-    const pv = overridePuntoVenta !== undefined ? Number(overridePuntoVenta) : puntoVenta;
-    const apiKey = siatSettings?.siat_api_key || process.env.FACTURACION_API_KEY;
+    const pv = overridePuntoVenta !== undefined ? overridePuntoVenta : parseInt(branchData.siat_codigo_punto_venta) || 0;
 
-    // 2. Solicitar CUIS al microservicio
-    const resp = await tendaiApiClient.sincronizarCuis(sucursal, pv, apiKey);
+    // 2. Solicitar CUIS
+    const response = await solicitarCUIS({
+      codigoAmbiente: siatConfig.ambiente,
+      codigoModalidad: 1, // Electrónica en Línea
+      codigoPuntoVenta: pv,
+      codigoSucursal: parseInt(branchData.siat_codigo_sucursal) || 0,
+      nit: parseInt(siatSettings.siat_nit, 10),
+    });
 
-    if (!resp.success || !resp.data?.cuis) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Error al solicitar CUIS al SIAT",
-          error: resp.error || resp.message || "Fallo en la respuesta del microservicio",
-          detalles: resp.detalles,
-        },
-        { status: 500 }
-      );
+    const codigoCuis = response?.RespuestaCuis?.codigo;
+    if (!codigoCuis) {
+       throw new Error(JSON.stringify(response));
     }
 
-    const { cuis, fechaVigencia } = resp.data;
-
-    // 3. Persistir en la base de datos local
+    // 3. Guardar en Supabase 
     if (overridePuntoVenta === undefined) {
-      if (branchId) {
-        await supabaseAdmin
-          .from('branches')
-          .update({ siat_cuis: cuis })
-          .eq('id', branchId);
-      }
-
       await supabaseAdmin
-        .from('restaurant_siat_settings')
-        .update({ siat_cuis: cuis })
-        .eq('restaurant_id', restaurantId);
+        .from('branches')
+        .update({ siat_cuis: codigoCuis })
+        .eq('id', branchId);
     }
 
     return NextResponse.json({
       success: true,
       message: "CUIS obtenido exitosamente.",
-      cuis,
-      fechaVigencia,
+      cuis: codigoCuis,
+      data: response,
     });
   } catch (error: any) {
-    console.error("Error en /api/siat/cuis:", error);
+    console.error("Error en solicitar CUIS:", error);
     return NextResponse.json(
       {
         success: false,
-        message: "Error interno al solicitar CUIS",
+        message: "Error al solicitar CUIS al SIAT.",
         error: error.message || error.toString(),
       },
       { status: 500 }
