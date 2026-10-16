@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { RefreshCw, ShoppingCart, X, Plus, Minus, FileText, LayoutGrid, ChevronLeft, Search, CheckCircle, CheckCircle2, AlertCircle, ChevronRight, Download, Trash2, Clock, AlertTriangle, QrCode, Banknote, CreditCard, ArrowRight, ArrowLeft, Check, Bell, Loader2, UtensilsCrossed } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { QRCodeSVG } from 'qrcode.react';
+import { TakeawayCountdownTimer } from '@/components/TakeawayCountdownTimer';
 
 import { Product } from '@shared/types';
 
@@ -243,44 +244,47 @@ export default function PublicMenuClient({
   useEffect(() => {
     if (isPreviewMode) return;
     if (!table?.id || table.id === 'mock') return;
-    if (table.type === 'takeaway') return;
 
-    const channel = supabase
-      .channel(`public:tables:${table.id}`)
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'tables',
-        filter: `id=eq.${table.id}`
-      }, async (payload) => {
-        if (payload.new && payload.new.service_status !== undefined) {
-          setTableStatus(payload.new.service_status);
+    let tablesChannel: any = null;
+    // Solo escuchar estado de mesa física (servicio/mesero) si NO es takeaway
+    if (table.type !== 'takeaway') {
+      tablesChannel = supabase
+        .channel(`public:tables:${table.id}`)
+        .on('postgres_changes', {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'tables',
+          filter: `id=eq.${table.id}`
+        }, async (payload) => {
+          if (payload.new && payload.new.service_status !== undefined) {
+            setTableStatus(payload.new.service_status);
 
-          // Si la mesa fue liberada (service_status pasó a ser null)
-          if (payload.new.service_status === null) {
-            if (sessionStorage.getItem(`has_ordered_${table.id}`) === 'true') {
-              try {
-                const { data: unpaid } = await supabase
-                  .from('orders')
-                  .select('id')
-                  .eq('table_id', table.id)
-                  .eq('is_paid', false)
-                  .neq('status', 'cancelled');
+            // Si la mesa fue liberada (service_status pasó a ser null)
+            if (payload.new.service_status === null) {
+              if (sessionStorage.getItem(`has_ordered_${table.id}`) === 'true') {
+                try {
+                  const { data: unpaid } = await supabase
+                    .from('orders')
+                    .select('id')
+                    .eq('table_id', table.id)
+                    .eq('is_paid', false)
+                    .neq('status', 'cancelled');
 
-                if (!unpaid || unpaid.length === 0) {
-                  if (!isDineInPayingRef.current && !dineInPaymentCompletedRef.current) {
-                    setSessionEnded(true);
-                    localStorage.setItem(`session_ended_timestamp_${table.id}`, Date.now().toString());
+                  if (!unpaid || unpaid.length === 0) {
+                    if (!isDineInPayingRef.current && !dineInPaymentCompletedRef.current) {
+                      setSessionEnded(true);
+                      localStorage.setItem(`session_ended_timestamp_${table.id}`, Date.now().toString());
+                    }
                   }
-                }
-              } catch (e) {}
+                } catch (e) {}
+              }
             }
           }
-        }
-      })
-      .subscribe();
+        })
+        .subscribe();
+    }
 
-    // Escuchar cambios en los pedidos de esta mesa en tiempo real
+    // Escuchar cambios en los pedidos de esta mesa o barra en tiempo real
     const ordersChannel = supabase
       .channel(`public:orders:table:${table.id}`)
       .on('postgres_changes', {
@@ -289,21 +293,25 @@ export default function PublicMenuClient({
         table: 'orders',
         filter: `table_id=eq.${table.id}`
       }, async (payload: any) => {
-        if (table.type === 'takeaway') {
-          if (payload.eventType === 'UPDATE' && payload.new) {
-            setBillOrders(prev => prev.map(o => o.id === payload.new.id ? { ...o, ...payload.new } : o));
-            if (payload.new.status === 'ready' && payload.old?.status !== 'ready') {
-              setServiceMessage("¡Tu pedido está listo! Por favor acércate a la barra a recogerlo.");
-              if (alarmAudioRef.current) {
-                alarmAudioRef.current.currentTime = 0;
-                alarmAudioRef.current.play().catch(() => {});
-                setIsAlarmRinging(true);
-              }
+        if (payload.eventType === 'UPDATE' && payload.new) {
+          setBillOrders(prev => {
+            const exists = prev.some(o => o.id === payload.new.id);
+            if (!exists) return [...prev, payload.new];
+            return prev.map(o => o.id === payload.new.id ? { ...o, ...payload.new } : o);
+          });
+          if (payload.new.status === 'ready' && payload.old?.status !== 'ready') {
+            setServiceMessage("¡Tu pedido está listo! Por favor acércate a la barra a recogerlo.");
+            if (alarmAudioRef.current) {
+              alarmAudioRef.current.currentTime = 0;
+              alarmAudioRef.current.play().catch(() => {});
+              setIsAlarmRinging(true);
             }
           }
+        } else if (payload.eventType === 'INSERT' && payload.new) {
+          handleFetchBill(true);
         }
 
-        if (sessionStorage.getItem(`has_ordered_${table.id}`) === 'true') {
+        if (table.type !== 'takeaway' && sessionStorage.getItem(`has_ordered_${table.id}`) === 'true') {
           try {
             const { data: unpaid } = await supabase
               .from('orders')
@@ -324,10 +332,10 @@ export default function PublicMenuClient({
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      if (tablesChannel) supabase.removeChannel(tablesChannel);
       supabase.removeChannel(ordersChannel);
     };
-  }, [table.id, table.type]);
+  }, [table.id, table.type, isPreviewMode]);
 
   useEffect(() => {
     if (isPreviewMode) return;
@@ -1050,6 +1058,24 @@ export default function PublicMenuClient({
       setIsFetchingBill(false);
     }
   };
+
+  // Auto-cargar cuenta en segundo plano para takeaway en caso de que existan pedidos activos
+  useEffect(() => {
+    if (table?.type === 'takeaway' && !isPreviewMode) {
+      handleFetchBill(true);
+    }
+  }, [table?.type, isPreviewMode]);
+
+  // Pedido activo de takeaway más relevante para mostrar en el banner flotante
+  const activeTakeawayOrder = useMemo(() => {
+    if (table?.type !== 'takeaway' || !billOrders || billOrders.length === 0) return null;
+    const readyOrder = billOrders.find((o: any) => o.status === 'ready');
+    if (readyOrder) return readyOrder;
+    const preparingOrder = billOrders.find((o: any) => o.status === 'preparing');
+    if (preparingOrder) return preparingOrder;
+    const pendingOrder = billOrders.find((o: any) => o.status === 'sent' || o.status === 'received');
+    return pendingOrder || null;
+  }, [table?.type, billOrders]);
 
 
   const handleRepeatOrder = (order: any) => {
@@ -2273,44 +2299,10 @@ export default function PublicMenuClient({
                             </span>
                           </div>
 
-                          {/* Takeaway Estimated Prep Time Banner */}
+                          {/* Takeaway Estimated Prep Time Banner / Countdown */}
                           {table?.type === 'takeaway' && (
                             <div className="mb-3">
-                              {order.status === 'preparing' && (
-                                <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 flex items-center justify-between">
-                                  <div className="flex items-center gap-2">
-                                    <Clock size={18} className="text-[#E76F51]" />
-                                    <div>
-                                      <p className="text-xs font-bold text-orange-950">
-                                        ⏱️ Tiempo estimado: ~{order.estimated_prep_minutes || 20} min
-                                      </p>
-                                      {order.estimated_ready_at && (
-                                        <p className="text-[11px] text-orange-800 mt-0.5">
-                                          Listo aprox: {new Intl.DateTimeFormat('es-BO', { hour: '2-digit', minute: '2-digit', timeZone: 'America/La_Paz' }).format(new Date(order.estimated_ready_at))}
-                                        </p>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <span className="text-[10px] uppercase tracking-wider font-extrabold px-2 py-0.5 bg-orange-200/60 text-orange-900 rounded-full">
-                                    En cocina
-                                  </span>
-                                </div>
-                              )}
-                              {(order.status === 'sent' || order.status === 'received') && (
-                                <div className="bg-blue-50 border border-blue-100 rounded-xl p-2.5 flex items-center gap-2 text-xs text-blue-900">
-                                  <Clock size={15} className="text-blue-600 animate-pulse flex-shrink-0" />
-                                  <span>Tu orden fue recibida. La cocina indicará el tiempo de espera en breve.</span>
-                                </div>
-                              )}
-                              {order.status === 'ready' && (
-                                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center gap-2.5 text-emerald-950">
-                                  <span className="text-2xl animate-bounce">🎉</span>
-                                  <div>
-                                    <p className="text-xs font-bold text-emerald-900">¡Tu pedido está listo para recoger!</p>
-                                    <p className="text-[11px] text-emerald-700">Por favor acércate a la barra a recogerlo.</p>
-                                  </div>
-                                </div>
-                              )}
+                              <TakeawayCountdownTimer order={order} variant="card" />
                             </div>
                           )}
                           {order.order_items?.map((item: any) => (
@@ -3126,6 +3118,22 @@ export default function PublicMenuClient({
             >
               Entendido
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Persistent Floating Takeaway Countdown Banner ── */}
+      {table?.type === 'takeaway' && !showBill && !showCart && activeTakeawayOrder && (
+        <div 
+          className="fixed bottom-[60px] left-0 right-0 z-40 px-4 max-w-lg mx-auto pointer-events-none animate-in slide-in-from-bottom duration-300"
+          style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+        >
+          <div className="pointer-events-auto">
+            <TakeawayCountdownTimer
+              order={activeTakeawayOrder}
+              variant="banner"
+              onViewDetails={() => handleFetchBill()}
+            />
           </div>
         </div>
       )}
