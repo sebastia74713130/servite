@@ -8,10 +8,12 @@ export async function sincronizarCatalogosSIAT(params: {
   codigoSucursal: number;
   cuis: string;
   nit: number;
+  tokenDelegado?: string;
 }) {
   try {
     const client = await soap.createClientAsync(siatConfig.wsdlSincronizacion);
-    client.addHttpHeader("apikey", `TokenApi ${siatConfig.tokenDelegado}`);
+    const token = params.tokenDelegado || siatConfig.tokenDelegado;
+    client.addHttpHeader("apikey", `TokenApi ${token}`);
 
     const args = {
       SolicitudSincronizacion: {

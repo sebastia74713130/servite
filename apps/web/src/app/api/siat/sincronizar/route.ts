@@ -38,10 +38,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Falta el CUIS. Solicite el CUIS primero." }, { status: 400 });
     }
 
+    const token = siatSettings.siat_token_delegado || siatConfig.tokenDelegado;
+    const codigoSistema = siatSettings.siat_codigo_sistema || siatConfig.codigoSistema;
+
     const catalogos = await sincronizarCatalogosSIAT({
       codigoAmbiente: siatConfig.ambiente,
       codigoPuntoVenta: parseInt(branchData.siat_codigo_punto_venta) || 0,
-      codigoSistema: siatConfig.codigoSistema,
+      codigoSistema: codigoSistema,
+      tokenDelegado: token,
       codigoSucursal: parseInt(branchData.siat_codigo_sucursal) || 0,
       cuis: branchData.siat_cuis,
       nit: parseInt(siatSettings.siat_nit, 10),

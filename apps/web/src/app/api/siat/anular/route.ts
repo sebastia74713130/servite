@@ -39,8 +39,11 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Configuración SIAT incompleta en este restaurante" }, { status: 400 });
         }
 
+        const token = siatSettings.siat_token_delegado || siatConfig.tokenDelegado;
+        const codigoSistema = siatSettings.siat_codigo_sistema || siatConfig.codigoSistema;
+
         const compraVentaClient = await createClientWithRetry(siatConfig.wsdlCompraVenta);
-        compraVentaClient.addHttpHeader("apikey", `TokenApi ${siatSettings.siat_token_delegado}`);
+        compraVentaClient.addHttpHeader("apikey", `TokenApi ${token}`);
 
         
         let cuis = siatSettings.siat_cuis;
@@ -68,7 +71,7 @@ export async function POST(req: Request) {
                 codigoEmision: 1, // 1 = Online, 2 = Offline (We assume it's sent to SIAT)
                 codigoModalidad: 1, // Electronica en linea
                 codigoPuntoVenta: pv,
-                codigoSistema: siatSettings.siat_codigo_sistema,
+                codigoSistema: codigoSistema,
                 codigoSucursal: parseInt(sucursal) || 0,
                 cufd: cufd,
                 cuis: cuis,

@@ -14,6 +14,16 @@ export default function InvoicesPage() {
   
   const [isAnulling, setIsAnulling] = useState<string | null>(null);
   const [isSyncingOffline, setIsSyncingOffline] = useState(false);
+  const [ambienteInfo, setAmbienteInfo] = useState<{ ambiente: string; codigoAmbiente: number } | null>(null);
+
+  useEffect(() => {
+    fetch('/api/siat/ping')
+      .then(r => r.json())
+      .then(d => {
+        if (d?.ambiente) setAmbienteInfo({ ambiente: d.ambiente, codigoAmbiente: d.codigoAmbiente });
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (restaurant?.id && branch?.id) {
@@ -129,7 +139,21 @@ export default function InvoicesPage() {
     <div className="p-8 max-w-7xl mx-auto h-[100vh] overflow-y-auto pb-32">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-6">
         <div>
-          <h1 className="text-3xl font-black text-gray-900 tracking-tight">Facturas SIAT</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-black text-gray-900 tracking-tight">Facturas SIAT</h1>
+            {ambienteInfo && (
+              <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${
+                ambienteInfo.codigoAmbiente === 1 
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                  : 'bg-amber-50 text-amber-700 border-amber-200'
+              }`}>
+                <span className={`w-2 h-2 rounded-full ${
+                  ambienteInfo.codigoAmbiente === 1 ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
+                }`} />
+                {ambienteInfo.codigoAmbiente === 1 ? 'PRODUCCIÓN' : 'PILOTO'}
+              </span>
+            )}
+          </div>
           <p className="text-gray-500 mt-1">Historial de emisiones, contingencias y anulaciones</p>
         </div>
         <div className="flex items-center gap-3 w-full md:w-auto">

@@ -6,6 +6,8 @@ export interface CufdRequestParams {
   codigoModalidad?: number; 
   codigoPuntoVenta?: number; 
   codigoSucursal?: number; 
+  codigoSistema?: string;
+  tokenDelegado?: string;
   cuis?: string;
   nit: number;
 }
@@ -20,6 +22,8 @@ export async function solicitarCUFD(params: CufdRequestParams) {
     codigoModalidad = 1,
     codigoPuntoVenta = 0,
     codigoSucursal = 0,
+    codigoSistema = siatConfig.codigoSistema,
+    tokenDelegado = siatConfig.tokenDelegado,
     cuis = process.env.SIAT_CUIS || "",
   } = params;
 
@@ -28,14 +32,14 @@ export async function solicitarCUFD(params: CufdRequestParams) {
   }
 
   try {
-    const client = await createSiatClient(siatConfig.wsdlCodigos);
+    const client = await createSiatClient(siatConfig.wsdlCodigos, tokenDelegado);
     
     const solicitudCufd = {
       SolicitudCufd: {
         codigoAmbiente,
         codigoModalidad,
         codigoPuntoVenta,
-        codigoSistema: siatConfig.codigoSistema,
+        codigoSistema,
         codigoSucursal,
         cuis,
         nit: params.nit

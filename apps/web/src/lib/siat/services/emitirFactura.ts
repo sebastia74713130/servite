@@ -32,7 +32,7 @@ export async function emitirFacturaSIAT(xmlFirmado: string, siatSettings: any) {
         codigoEmision: 1, // 1 = Online, 2 = Offline
         codigoModalidad: 1, // 1 = Electrónica en Línea, 2 = Computarizada
         codigoPuntoVenta: parseInt(siatSettings.siat_codigo_punto_venta) || 0,
-        codigoSistema: siatConfig.codigoSistema,
+        codigoSistema: siatSettings.siat_codigo_sistema || siatConfig.codigoSistema,
         codigoSucursal: parseInt(siatSettings.siat_codigo_sucursal) || 0,
         cufd: siatSettings.siat_cufd,
         cuis: siatSettings.siat_cuis,
@@ -48,7 +48,8 @@ export async function emitirFacturaSIAT(xmlFirmado: string, siatSettings: any) {
     const client = await soap.createClientAsync(siatConfig.wsdlCompraVenta);
     
     // Configurar Token de API
-    client.addHttpHeader("apikey", `TokenApi ${siatConfig.tokenDelegado}`);
+    const token = siatSettings.siat_token_delegado || siatConfig.tokenDelegado;
+    client.addHttpHeader("apikey", `TokenApi ${token}`);
 
     // 6. Enviar la factura al SIAT
     const [result] = await client.recepcionFacturaAsync(args);

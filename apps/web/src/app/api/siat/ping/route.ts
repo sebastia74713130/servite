@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { verificarComunicacion } from "@/lib/siat/services/verificarComunicacion";
+import { siatConfig } from "@/lib/siat/config";
 
 export async function GET() {
   try {
@@ -7,6 +8,8 @@ export async function GET() {
     
     return NextResponse.json({
       success: true,
+      ambiente: siatConfig.ambiente === 1 ? 'PRODUCCION' : 'PILOTO',
+      codigoAmbiente: siatConfig.ambiente,
       message: "Comunicación con SIAT ejecutada.",
       data: response,
     });

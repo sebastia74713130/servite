@@ -6,6 +6,8 @@ export interface CuisRequestParams {
   codigoModalidad?: number; // 1 = Electrónica en Línea, 2 = Computarizada en Línea
   codigoPuntoVenta?: number; // 0 = Casa Matriz
   codigoSucursal?: number; // 0 = Principal
+  codigoSistema?: string;
+  tokenDelegado?: string;
   nit: number; // NIT del contribuyente
 }
 
@@ -19,17 +21,19 @@ export async function solicitarCUIS(params: CuisRequestParams) {
     codigoModalidad = 1, // Por defecto Electrónica en Línea
     codigoPuntoVenta = 0,
     codigoSucursal = 0,
+    codigoSistema = siatConfig.codigoSistema,
+    tokenDelegado = siatConfig.tokenDelegado,
   } = params;
 
   try {
-    const client = await createSiatClient(siatConfig.wsdlCodigos);
+    const client = await createSiatClient(siatConfig.wsdlCodigos, tokenDelegado);
     
     const solicitudCuis = {
       SolicitudCuis: {
         codigoAmbiente,
         codigoModalidad,
         codigoPuntoVenta,
-        codigoSistema: siatConfig.codigoSistema,
+        codigoSistema,
         codigoSucursal,
         nit: params.nit
       }

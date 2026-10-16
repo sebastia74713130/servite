@@ -41,8 +41,16 @@ export function SiatSettingsForm({ restaurantId, branchId, isMainBranch }: { res
   const [cufdFecha, setCufdFecha] = useState<string | null>(null);
   const [actividad, setActividad] = useState<string | null>(null);
   const [producto, setProducto] = useState<string | null>(null);
+  const [ambienteInfo, setAmbienteInfo] = useState<{ ambiente: string; codigoAmbiente: number } | null>(null);
 
   useEffect(() => {
+    fetch('/api/siat/ping')
+      .then(r => r.json())
+      .then(d => {
+        if (d?.ambiente) setAmbienteInfo({ ambiente: d.ambiente, codigoAmbiente: d.codigoAmbiente });
+      })
+      .catch(() => {});
+
     async function loadSettings() {
       if (!restaurantId) return;
       try {
@@ -260,14 +268,30 @@ export function SiatSettingsForm({ restaurantId, branchId, isMainBranch }: { res
 
   return (
     <div className="bg-white border border-[#E5E7EB] rounded-2xl p-8 shadow-sm space-y-6">
-      <div>
-        <h2 className="text-lg font-bold text-[#1F2933] flex items-center gap-2 mb-1">
-          <ShieldCheck size={20} className="text-[#E76F51]" />
-          Configuración Facturación SIAT
-        </h2>
-        <p className="text-[#6B7280] text-sm mb-4">
-          Configura tus credenciales y firma digital para la facturación electrónica boliviana en línea.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-bold text-[#1F2933] flex items-center gap-2 mb-1">
+            <ShieldCheck size={20} className="text-[#E76F51]" />
+            Configuración Facturación SIAT
+          </h2>
+          <p className="text-[#6B7280] text-sm">
+            Configura tus credenciales y firma digital para la facturación electrónica boliviana en línea.
+          </p>
+        </div>
+        {ambienteInfo && (
+          <div className="self-start sm:self-auto">
+            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${
+              ambienteInfo.codigoAmbiente === 1 
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                : 'bg-amber-50 text-amber-700 border-amber-200'
+            }`}>
+              <span className={`w-2 h-2 rounded-full ${
+                ambienteInfo.codigoAmbiente === 1 ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
+              }`} />
+              {ambienteInfo.codigoAmbiente === 1 ? 'Ambiente: PRODUCCIÓN (SIN)' : 'Ambiente: PILOTO / PRUEBAS'}
+            </span>
+          </div>
+        )}
       </div>
 
       {showSuccess && (

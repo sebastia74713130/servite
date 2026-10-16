@@ -310,3 +310,35 @@ export async function copyMenuFromMainBranch(restaurantId: string, targetBranchI
   }
   return { success: true };
 }
+
+export async function updateOrderStatusAction(
+  orderId: string,
+  newStatus: string,
+  extraPayload?: Record<string, any>
+) {
+  try {
+    const payload: any = {
+      status: newStatus,
+      updated_at: new Date().toISOString(),
+      ...(extraPayload || {})
+    };
+
+    const { data, error } = await supabaseAdmin
+      .from('orders')
+      .update(payload)
+      .eq('id', orderId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error in updateOrderStatusAction:", error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, data };
+  } catch (err: any) {
+    console.error("Exception in updateOrderStatusAction:", err);
+    return { success: false, error: err.message || "Error al actualizar pedido" };
+  }
+}
+

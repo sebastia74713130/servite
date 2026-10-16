@@ -42,11 +42,16 @@ export async function POST(req: Request) {
 
     const pv = overridePuntoVenta !== undefined ? overridePuntoVenta : parseInt(branchData.siat_codigo_punto_venta) || 0;
 
+    const token = siatSettings.siat_token_delegado || siatConfig.tokenDelegado;
+    const codigoSistema = siatSettings.siat_codigo_sistema || siatConfig.codigoSistema;
+
     // 2. Solicitar CUIS
     const response = await solicitarCUIS({
       codigoAmbiente: siatConfig.ambiente,
       codigoModalidad: 1, // Electrónica en Línea
       codigoPuntoVenta: pv,
+      codigoSistema: codigoSistema,
+      tokenDelegado: token,
       codigoSucursal: parseInt(branchData.siat_codigo_sucursal) || 0,
       nit: parseInt(siatSettings.siat_nit, 10),
     });

@@ -7,12 +7,13 @@ import { siatConfig } from "./config";
  * 
  * @param wsdlUrl La URL del WSDL al que conectarse.
  */
-export async function createSiatClient(wsdlUrl: string) {
+export async function createSiatClient(wsdlUrl: string, tokenDelegado?: string) {
   try {
     const client = await soap.createClientAsync(wsdlUrl);
     
     // El SIAT requiere el Token Delegado (apikey) en los headers HTTP
-    client.addHttpHeader("apikey", `TokenApi ${siatConfig.tokenDelegado}`);
+    const token = tokenDelegado || siatConfig.tokenDelegado;
+    client.addHttpHeader("apikey", `TokenApi ${token}`);
     
     return client;
   } catch (error) {
