@@ -19,23 +19,24 @@ import {
   ArrowLeft,
   Trash2,
   ChefHat,
-  Loader2
+  Loader2,
+  BellRing,
+  UtensilsCrossed,
+  CheckCircle2
 } from 'lucide-react';
 import { RestaurantTable, OrderStatus } from '@shared/types';
 import { useOrders } from '@/hooks/useOrders';
-
-interface FlatOrderItem {
-  id: string;
-  order_id: string;
-  product_id?: string;
-  product_name: string;
-  quantity: number;
-  unit_price: number;
-  total_price: number;
-  notes?: string | null;
-  order_status: OrderStatus;
-  order_created_at: string;
-}
+import {
+  DndContext,
+  DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
+  PointerSensor,
+  useSensor,
+  useSensors
+} from '@dnd-kit/core';
+import { KanbanCard, FlatOrderItem } from './KanbanCard';
+import { KanbanColumn } from './KanbanColumn';
 
 export default function AccountsPage() {
   const { restaurant, branch, loading: sessionLoading, hasModule } = useRestaurantSession();
@@ -58,6 +59,15 @@ export default function AccountsPage() {
   const [isClosingBill, setIsClosingBill] = useState(false);
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
   const [updatingItemId, setUpdatingItemId] = useState<string | null>(null);
+
+  // DnD state & sensors
+  const [activeDraggedItem, setActiveDraggedItem] = useState<FlatOrderItem | null>(null);
+  const pointerSensor = useSensor(PointerSensor, {
+    activationConstraint: {
+      distance: 8,
+    },
+  });
+  const sensors = useSensors(pointerSensor);
 
   // Table grid filters
   const [activeTabFilter, setActiveTabFilter] = useState<'all' | 'new_orders' | 'occupied' | 'free' | 'calling'>('all');
@@ -315,10 +325,8 @@ export default function AccountsPage() {
     delivered: 'received'
   };
 
-  const handleUpdateItemStatus = async (item: FlatOrderItem) => {
+  const handleUpdateItemStatusDirect = async (item: FlatOrderItem, targetStatus: OrderStatus) => {
     setUpdatingItemId(item.id);
-    const currentStatus = (item.order_status === 'sent' ? 'received' : item.order_status) || 'received';
-    const nextStatus = ITEM_NEXT_STATUS[currentStatus] || 'preparing';
 
     // 1. Optimistic UI update for the single product in tableOrders
     setTableOrders(prevOrders => {
@@ -326,12 +334,12 @@ export default function AccountsPage() {
         if (order.id !== item.order_id) return order;
 
         if (item.id.startsWith('order-')) {
-          return { ...order, status: nextStatus };
+          return { ...order, status: targetStatus };
         }
 
         const updatedItems = (order.order_items || []).map((oi: any) => {
           if (oi.id === item.id) {
-            return { ...oi, status: nextStatus };
+            return { ...oi, status: targetStatus };
           }
           return oi;
         });
@@ -353,6 +361,8 @@ export default function AccountsPage() {
           newOrderStatus = 'ready';
         } else if (allPreparingOrHigher) {
           newOrderStatus = 'preparing';
+        } else {
+          newOrderStatus = 'received';
         }
 
         return {
@@ -368,7 +378,7 @@ export default function AccountsPage() {
       if (!item.id.startsWith('order-')) {
         const { error: itemError } = await supabase
           .from('order_items')
-          .update({ status: nextStatus })
+          .update({ status: targetStatus })
           .eq('id', item.id);
 
         if (itemError) {
@@ -380,7 +390,7 @@ export default function AccountsPage() {
       const currentOrder = tableOrders.find(o => o.id === item.order_id);
       if (currentOrder) {
         const currentItems = (currentOrder.order_items || []).map((oi: any) => 
-          oi.id === item.id ? { ...oi, status: nextStatus } : oi
+          oi.id === item.id ? { ...oi, status: targetStatus } : oi
         );
         const allPreparingOrHigher = currentItems.every((oi: any) => 
           oi.status === 'preparing' || oi.status === 'ready' || oi.status === 'delivered'
@@ -399,6 +409,8 @@ export default function AccountsPage() {
           targetOrderStatus = 'ready';
         } else if (allPreparingOrHigher) {
           targetOrderStatus = 'preparing';
+        } else {
+          targetOrderStatus = 'received';
         }
 
         if (targetOrderStatus && targetOrderStatus !== currentOrder.status) {
@@ -419,6 +431,36 @@ export default function AccountsPage() {
       console.error('Error actualizando estado del producto:', err);
     } finally {
       setUpdatingItemId(null);
+    }
+  };
+
+  const handleUpdateItemStatus = async (item: FlatOrderItem) => {
+    const currentStatus = (item.order_status === 'sent' ? 'received' : item.order_status) || 'received';
+    const nextStatus = ITEM_NEXT_STATUS[currentStatus] || 'preparing';
+    return handleUpdateItemStatusDirect(item, nextStatus);
+  };
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const item = event.active.data.current?.item as FlatOrderItem | undefined;
+    if (item) {
+      setActiveDraggedItem(item);
+    }
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveDraggedItem(null);
+
+    if (!over) return;
+
+    const targetStatus = over.id as OrderStatus;
+    const item = active.data.current?.item as FlatOrderItem | undefined;
+
+    if (item && targetStatus) {
+      const currentStatus = (item.order_status === 'sent' ? 'received' : item.order_status) || 'received';
+      if (currentStatus !== targetStatus) {
+        handleUpdateItemStatusDirect(item, targetStatus);
+      }
     }
   };
 
@@ -747,6 +789,23 @@ export default function AccountsPage() {
     });
   }, [tableOrders]);
 
+  const receivedItems = useMemo(
+    () => flatItems.filter(i => i.order_status === 'sent' || i.order_status === 'received' || !i.order_status),
+    [flatItems]
+  );
+  const preparingItems = useMemo(
+    () => flatItems.filter(i => i.order_status === 'preparing'),
+    [flatItems]
+  );
+  const readyItems = useMemo(
+    () => flatItems.filter(i => i.order_status === 'ready'),
+    [flatItems]
+  );
+  const deliveredItems = useMemo(
+    () => flatItems.filter(i => i.order_status === 'delivered'),
+    [flatItems]
+  );
+
   const totalAmount = useMemo(() => {
     return tableOrders.reduce((acc, o) => {
       if (o.order_items && o.order_items.length > 0) {
@@ -1023,21 +1082,30 @@ export default function AccountsPage() {
 
       {/* Bill & Orders Details Modal */}
       {selectedTable && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 sm:p-6 animate-in fade-in duration-200 backdrop-blur-xs">
-          <div className="bg-white w-full max-w-xl rounded-3xl shadow-2xl flex flex-col max-h-[92vh] overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-2 sm:p-4 md:p-6 animate-in fade-in duration-200 backdrop-blur-xs">
+          <div className="bg-white w-full max-w-6xl rounded-3xl shadow-2xl flex flex-col h-[90vh] max-h-[92vh] overflow-hidden">
             {/* Modal Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-white">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-white flex-shrink-0">
               <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-2xl font-bold text-gray-900">{selectedTable.table_number}</h2>
-                  {selectedTable.type === 'takeaway' && (
-                    <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-purple-100 text-purple-700">
+                <div className="flex items-center gap-2.5">
+                  <h2 className="text-2xl font-black text-gray-900 tracking-tight">{selectedTable.table_number}</h2>
+                  {selectedTable.type === 'takeaway' ? (
+                    <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-purple-100 text-purple-700">
                       Barra / Para llevar
+                    </span>
+                  ) : (
+                    <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                      Mesa de Salón
+                    </span>
+                  )}
+                  {flatItems.length > 0 && (
+                    <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-gray-100 text-gray-700">
+                      {flatItems.length} {flatItems.length === 1 ? 'producto' : 'productos'}
                     </span>
                   )}
                 </div>
-                <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
-                  {modalStep === 'details' ? 'Detalle de pedidos y estados' : 'Cobro y liquidación de cuenta'}
+                <p className="text-xs text-gray-400 mt-0.5 font-medium">
+                  {modalStep === 'details' ? 'Tablero Kanban de preparación y cobranza' : 'Cobro y liquidación de cuenta'}
                 </p>
               </div>
 
@@ -1071,27 +1139,34 @@ export default function AccountsPage() {
                     setSelectedTable(null);
                     setModalStep('details');
                   }}
-                  className="w-10 h-10 flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-500 rounded-full transition-colors"
+                  className="w-10 h-10 flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-500 rounded-full transition-colors cursor-pointer"
                 >
                   <X size={20} />
                 </button>
               </div>
             </div>
 
-            {/* Modal Step 1: Details and Individual Product Strips */}
-            {modalStep === 'details' && (
-              <>
-                <div className="flex-1 overflow-y-auto p-6 bg-gray-50 space-y-4">
+            {/* Split View Body: Left 70% Kanban / Right 30% Account & Checkout */}
+            <div className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0 bg-gray-50">
+              
+              {/* LEFT SIDE: KANBAN BOARD */}
+              <div className="flex-1 flex flex-col overflow-hidden min-h-0 p-4 sm:p-5">
+                
+                {/* Service Status Banners (Waiter call, SIAT invoice request) */}
+                <div className="space-y-3 mb-4 flex-shrink-0">
                   {/* Waiter call banner */}
                   {selectedTable.service_status === 'calling_waiter' && (
-                    <div className="bg-orange-100 border border-orange-200 rounded-2xl p-4 flex justify-between items-center shadow-xs">
-                      <div className="flex items-center gap-3 text-orange-800">
-                        <HandPlatter size={24} />
-                        <span className="font-bold text-sm">Esta mesa está llamando al mesero.</span>
+                    <div className="bg-orange-100 border border-orange-200 rounded-2xl p-3 sm:p-4 flex justify-between items-center shadow-xs">
+                      <div className="flex items-center gap-3 text-orange-900">
+                        <HandPlatter size={22} className="flex-shrink-0 text-orange-600" />
+                        <div>
+                          <p className="font-extrabold text-sm">Esta mesa está llamando al mesero</p>
+                          <p className="text-xs text-orange-800">El cliente necesita atención presencial.</p>
+                        </div>
                       </div>
                       <button
                         onClick={() => handleClearService(selectedTable.id)}
-                        className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl text-xs transition-colors shadow-xs"
+                        className="px-3.5 py-2 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl text-xs transition-colors shadow-xs cursor-pointer flex-shrink-0"
                       >
                         Atendido
                       </button>
@@ -1100,14 +1175,14 @@ export default function AccountsPage() {
 
                   {/* SIAT Invoice Request Info Banner */}
                   {hasInvoices && selectedTable.service_status === 'requesting_bill' && selectedTable.siat_customer_name && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 shadow-xs">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2.5 text-blue-900">
-                          <Receipt size={20} />
+                    <div className="bg-blue-50 border border-blue-200 rounded-2xl p-3 sm:p-4 shadow-xs">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-2 text-blue-900">
+                          <Receipt size={18} className="text-blue-700" />
                           <h3 className="font-bold text-sm">El cliente solicitó Factura (SIAT):</h3>
                         </div>
                       </div>
-                      <div className="text-xs text-blue-800 grid grid-cols-1 sm:grid-cols-2 gap-y-1.5 gap-x-4 bg-white/60 p-3 rounded-xl border border-blue-100">
+                      <div className="text-xs text-blue-800 grid grid-cols-1 sm:grid-cols-2 gap-y-1 gap-x-4 bg-white/70 p-2.5 rounded-xl border border-blue-100">
                         <p><span className="font-semibold text-blue-900">NIT/CI:</span> {selectedTable.siat_customer_nit}</p>
                         <p><span className="font-semibold text-blue-900">Razón Social:</span> {selectedTable.siat_customer_name}</p>
                         {selectedTable.siat_customer_email && (
@@ -1116,317 +1191,372 @@ export default function AccountsPage() {
                       </div>
                     </div>
                   )}
-
-                  {/* New orders pending preparation banner */}
-                  {flatItems.some(i => i.order_status === 'sent' || i.order_status === 'received') && (
-                    <div className="bg-[#FFF8F6] border border-[#E76F51]/30 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
-                      <div className="flex items-center gap-3 text-orange-950">
-                        <span className="relative flex h-3 w-3 flex-shrink-0">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#E76F51] opacity-80" />
-                          <span className="relative inline-flex rounded-full h-3 w-3 bg-[#E76F51]" />
-                        </span>
-                        <div>
-                          <p className="font-bold text-sm text-[#1F2933]">Hay nuevos pedidos esperando preparación</p>
-                          <p className="text-xs text-gray-500">Pasa los pedidos a cocina para comenzar a elaborarlos.</p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={handleStartAllPreparation}
-                        disabled={isStartingPrep}
-                        className="px-4 py-2 bg-[#E76F51] hover:bg-[#d65e40] text-white font-bold rounded-xl text-xs transition-colors shadow-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 self-end sm:self-auto"
-                      >
-                        <ChefHat size={15} />
-                        <span>{isStartingPrep ? 'Actualizando...' : 'Pasar a Preparación'}</span>
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Individual Product Strips */}
-                  {isFetchingBill ? (
-                    <div className="text-center py-12 text-gray-500 font-medium">Cargando pedidos...</div>
-                  ) : flatItems.length === 0 ? (
-                    <div className="text-center py-10 text-gray-500 flex flex-col items-center">
-                      <div className="w-16 h-16 rounded-full bg-green-50 text-green-600 flex items-center justify-center mb-3">
-                        <CheckCircle size={36} />
-                      </div>
-                      <p className="font-bold text-gray-800 text-lg">Sin pedidos pendientes</p>
-                      <p className="text-sm text-gray-400 mt-1 max-w-xs text-center">
-                        No existen pedidos abiertos para esta mesa. Puedes liberarla para dejarla lista para nuevos clientes.
-                      </p>
-                      <button
-                        onClick={() => handleReleaseTable(selectedTable.id)}
-                        disabled={isClosingBill}
-                        className="mt-5 px-5 py-2.5 bg-gray-900 hover:bg-black text-white font-bold rounded-xl text-sm transition-colors shadow-sm"
-                      >
-                        Liberar Mesa
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="space-y-2.5">
-                      <div className="flex justify-between items-center mb-1 text-xs font-bold text-gray-400 px-1 uppercase tracking-wider">
-                        <span>Productos pedidos ({flatItems.length})</span>
-                        <span>Estado</span>
-                      </div>
-                      {flatItems.map(item => (
-                        <div
-                          key={item.id}
-                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 bg-white rounded-2xl border border-gray-200/70 shadow-sm hover:border-gray-300 transition-colors"
-                        >
-                          <div className="flex items-start gap-3 min-w-0">
-                            <span className="flex-shrink-0 w-8 h-8 rounded-xl bg-gray-100 text-gray-800 font-extrabold text-xs flex items-center justify-center">
-                              {item.quantity}x
-                            </span>
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <h4 className="font-bold text-gray-900 text-sm truncate">{item.product_name}</h4>
-                                <span className="text-[11px] text-gray-400 font-medium flex items-center gap-1">
-                                  <Clock size={12} />
-                                  {new Date(item.order_created_at).toLocaleTimeString('es-BO', {
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                    timeZone: 'America/La_Paz'
-                                  })}
-                                </span>
-                              </div>
-                              {item.notes && (
-                                <p className="text-xs text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md mt-1 inline-block border border-amber-100 font-medium">
-                                  Nota: {item.notes}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="flex items-center justify-between sm:justify-end gap-3 self-end sm:self-center w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100">
-                            <span className="font-bold text-gray-900 text-sm whitespace-nowrap">
-                              Bs {item.total_price.toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </span>
-                            <button
-                              type="button"
-                              disabled={updatingItemId === item.id}
-                              onClick={() => handleUpdateItemStatus(item)}
-                              className={`text-xs font-bold px-3.5 py-1.5 rounded-xl border transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-50 select-none ${
-                                item.order_status === 'preparing'
-                                  ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300'
-                                  : item.order_status === 'ready'
-                                  ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300'
-                                  : item.order_status === 'delivered'
-                                  ? 'bg-gray-100 hover:bg-gray-200 text-gray-700 border-gray-300'
-                                  : 'bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200'
-                              }`}
-                              title="Haz clic para avanzar de estado (Recibido -> En preparación -> Listo -> Entregado)"
-                            >
-                              {updatingItemId === item.id ? (
-                                <Loader2 size={13} className="animate-spin text-current" />
-                              ) : item.order_status === 'preparing' ? (
-                                <ChefHat size={13} className="text-amber-600" />
-                              ) : item.order_status === 'ready' ? (
-                                <CheckCircle size={13} className="text-emerald-600" />
-                              ) : item.order_status === 'delivered' ? (
-                                <CheckCircle size={13} className="text-gray-500" />
-                              ) : (
-                                <Clock size={13} className="text-blue-500" />
-                              )}
-                              <span>
-                                {item.order_status === 'preparing'
-                                  ? 'En preparación'
-                                  : item.order_status === 'ready'
-                                  ? 'Listo'
-                                  : item.order_status === 'delivered'
-                                  ? 'Entregado'
-                                  : 'Recibido'}
-                              </span>
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
 
-                {/* Footer Step 1 */}
-                {flatItems.length > 0 && (
-                  <div className="p-6 border-t border-gray-100 bg-white rounded-b-3xl">
-                    <div className="flex justify-between items-center mb-4">
-                      <span className="text-base text-gray-600 font-medium">Total de la cuenta:</span>
-                      <span className="text-3xl font-extrabold text-gray-900">
-                        Bs {totalAmount.toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
+                {/* Main Kanban Columns Container */}
+                {isFetchingBill ? (
+                  <div className="flex-1 flex items-center justify-center text-gray-500 font-medium">
+                    <Loader2 className="animate-spin mr-2 text-gray-400" size={24} />
+                    <span>Cargando pedidos...</span>
+                  </div>
+                ) : flatItems.length === 0 ? (
+                  <div className="flex-1 bg-white rounded-3xl border border-gray-200/80 p-8 flex flex-col items-center justify-center text-center shadow-xs">
+                    <div className="w-16 h-16 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-4">
+                      <CheckCircle2 size={36} />
+                    </div>
+                    <h3 className="text-lg font-bold text-gray-900">Sin pedidos pendientes</h3>
+                    <p className="text-sm text-gray-500 mt-1.5 max-w-sm">
+                      Esta mesa no tiene comandas abiertas. Puedes liberarla para que quede disponible para nuevos comensales.
+                    </p>
+                    <button
+                      onClick={() => handleReleaseTable(selectedTable.id)}
+                      disabled={isClosingBill}
+                      className="mt-6 px-6 py-2.5 bg-gray-900 hover:bg-black text-white font-bold rounded-xl text-sm transition-all shadow-xs cursor-pointer active:scale-95"
+                    >
+                      {isClosingBill ? 'Liberando...' : 'Liberar Mesa'}
+                    </button>
+                  </div>
+                ) : (
+                  <DndContext
+                    sensors={sensors}
+                    onDragStart={handleDragStart}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3.5 overflow-y-auto lg:overflow-x-auto min-h-0 pb-1">
+                      {/* Column 1: Recibidos */}
+                      <KanbanColumn
+                        id="received"
+                        title="Recibidos"
+                        icon={<Clock className="w-4 h-4 text-blue-600" />}
+                        count={receivedItems.length}
+                        theme={{
+                          headerBg: 'bg-blue-50/70',
+                          border: 'border-blue-100',
+                          badgeBg: 'bg-blue-100',
+                          badgeText: 'text-blue-800'
+                        }}
+                        batchAction={receivedItems.length > 0 ? {
+                          label: 'Pasar a Prep',
+                          onClick: handleStartAllPreparation,
+                          loading: isStartingPrep,
+                          icon: <ChefHat size={13} />
+                        } : undefined}
+                      >
+                        {receivedItems.map(item => (
+                          <KanbanCard
+                            key={item.id}
+                            item={item}
+                            onAdvance={handleUpdateItemStatus}
+                            isUpdating={updatingItemId === item.id}
+                          />
+                        ))}
+                      </KanbanColumn>
+
+                      {/* Column 2: En Preparación */}
+                      <KanbanColumn
+                        id="preparing"
+                        title="En Preparación"
+                        icon={<ChefHat className="w-4 h-4 text-amber-600" />}
+                        count={preparingItems.length}
+                        theme={{
+                          headerBg: 'bg-amber-50/70',
+                          border: 'border-amber-100',
+                          badgeBg: 'bg-amber-100',
+                          badgeText: 'text-amber-800'
+                        }}
+                      >
+                        {preparingItems.map(item => (
+                          <KanbanCard
+                            key={item.id}
+                            item={item}
+                            onAdvance={handleUpdateItemStatus}
+                            isUpdating={updatingItemId === item.id}
+                          />
+                        ))}
+                      </KanbanColumn>
+
+                      {/* Column 3: Listos en Cocina */}
+                      <KanbanColumn
+                        id="ready"
+                        title="Listos"
+                        icon={<BellRing className="w-4 h-4 text-emerald-600" />}
+                        count={readyItems.length}
+                        theme={{
+                          headerBg: 'bg-emerald-50/70',
+                          border: 'border-emerald-100',
+                          badgeBg: 'bg-emerald-100',
+                          badgeText: 'text-emerald-800'
+                        }}
+                      >
+                        {readyItems.map(item => (
+                          <KanbanCard
+                            key={item.id}
+                            item={item}
+                            onAdvance={handleUpdateItemStatus}
+                            isUpdating={updatingItemId === item.id}
+                          />
+                        ))}
+                      </KanbanColumn>
+
+                      {/* Column 4: Entregados */}
+                      <KanbanColumn
+                        id="delivered"
+                        title="Entregados"
+                        icon={<UtensilsCrossed className="w-4 h-4 text-gray-500" />}
+                        count={deliveredItems.length}
+                        theme={{
+                          headerBg: 'bg-gray-100/70',
+                          border: 'border-gray-200',
+                          badgeBg: 'bg-gray-200',
+                          badgeText: 'text-gray-800'
+                        }}
+                      >
+                        {deliveredItems.map(item => (
+                          <KanbanCard
+                            key={item.id}
+                            item={item}
+                            onAdvance={handleUpdateItemStatus}
+                            isUpdating={updatingItemId === item.id}
+                          />
+                        ))}
+                      </KanbanColumn>
                     </div>
 
-                    <div className="flex flex-col sm:flex-row gap-3">
+                    {/* Drag Overlay for smooth preview while dragging */}
+                    <DragOverlay>
+                      {activeDraggedItem ? (
+                        <KanbanCard
+                          item={activeDraggedItem}
+                          onAdvance={() => {}}
+                          isUpdating={false}
+                          isOverlay
+                        />
+                      ) : null}
+                    </DragOverlay>
+                  </DndContext>
+                )}
+              </div>
+
+              {/* RIGHT SIDE: ACCOUNT SUMMARY & CHECKOUT (Fixed Sticky Panel) */}
+              <div className="w-full lg:w-80 xl:w-96 flex-shrink-0 bg-white border-t lg:border-t-0 lg:border-l border-gray-200 flex flex-col justify-between overflow-y-auto">
+                {modalStep === 'details' ? (
+                  <div className="p-5 flex flex-col h-full justify-between gap-6">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+                        <span className="text-xs font-black uppercase text-gray-400 tracking-wider">
+                          Resumen de Cuenta
+                        </span>
+                        <span className="text-xs font-bold text-gray-500">
+                          {flatItems.length} {flatItems.length === 1 ? 'ítem' : 'ítems'}
+                        </span>
+                      </div>
+
+                      {/* Big total display */}
+                      <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 text-center">
+                        <span className="text-xs font-bold text-gray-500 block mb-1">
+                          Total a Pagar
+                        </span>
+                        <span className="text-3xl font-black text-gray-900 tracking-tight">
+                          Bs {totalAmount.toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+
+                      {/* Items mini list */}
+                      <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
+                        {flatItems.map((item) => (
+                          <div key={item.id} className="flex items-center justify-between text-xs py-1.5 border-b border-gray-50">
+                            <div className="flex items-center gap-2 min-w-0 pr-2">
+                              <span className="font-black text-gray-800 flex-shrink-0">{item.quantity}x</span>
+                              <span className="text-gray-700 truncate font-medium">{item.product_name}</span>
+                            </div>
+                            <span className="font-bold text-gray-900 flex-shrink-0">
+                              Bs {item.total_price.toFixed(2)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="space-y-2.5 pt-4 border-t border-gray-100">
+                      {flatItems.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setModalStep('checkout')}
+                          className="w-full py-3.5 px-4 bg-[#2E7D32] hover:bg-[#256629] text-white font-bold rounded-2xl transition-all shadow-sm active:scale-[0.98] text-sm flex items-center justify-center gap-2 cursor-pointer"
+                        >
+                          <Receipt size={18} />
+                          <span>Cobrar Cuenta</span>
+                        </button>
+                      )}
+
                       <button
                         type="button"
                         disabled={isClosingBill}
                         onClick={() => {
-                          if (confirm('¿Estás seguro de liberar esta mesa sin cobrar? Se cancelarán los pedidos pendientes de esta mesa.')) {
-                            handleReleaseTable(selectedTable.id);
+                          if (flatItems.length > 0) {
+                            if (!confirm('¿Estás seguro de liberar esta mesa sin cobrar? Se cancelarán los pedidos pendientes de esta mesa.')) {
+                              return;
+                            }
                           }
+                          handleReleaseTable(selectedTable.id);
                         }}
-                        className="flex-1 py-3 px-4 border border-gray-200 hover:bg-gray-50 text-gray-600 hover:text-gray-900 font-semibold rounded-2xl transition-colors text-sm text-center disabled:opacity-50"
+                        className="w-full py-2.5 px-3 border border-gray-200 hover:bg-gray-50 text-gray-600 hover:text-gray-900 font-semibold rounded-xl transition-colors text-xs text-center disabled:opacity-50 cursor-pointer"
                       >
-                        Liberar mesa sin cobrar
+                        {isClosingBill ? 'Liberando...' : 'Liberar mesa sin cobrar'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* Step 2: Checkout Form */
+                  <div className="p-5 flex flex-col h-full justify-between gap-4">
+                    <div className="space-y-4">
+                      <button
+                        type="button"
+                        onClick={() => setModalStep('details')}
+                        className="inline-flex items-center gap-1.5 text-xs font-bold text-gray-600 hover:text-gray-900 transition-colors cursor-pointer"
+                      >
+                        <ArrowLeft size={14} />
+                        <span>Volver al Tablero</span>
+                      </button>
+
+                      <div className="bg-emerald-50/60 rounded-2xl p-4 border border-emerald-100 text-center">
+                        <span className="text-xs font-bold text-emerald-800 block mb-1">
+                          Total a Liquidar
+                        </span>
+                        <span className="text-2xl font-black text-gray-900">
+                          Bs {totalAmount.toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+
+                      {/* Payment Method Selector */}
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                          {selectedTable.requested_payment_method
+                            ? `Método solicitado: ${selectedTable.requested_payment_method}`
+                            : 'Método de pago:'}
+                        </label>
+                        <select
+                          value={paymentMethod}
+                          onChange={e => setPaymentMethod(e.target.value)}
+                          className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32] font-semibold text-gray-800 text-sm"
+                        >
+                          <option value="Pago QR">Pago QR</option>
+                          <option value="Efectivo">Efectivo</option>
+                          <option value="Tarjeta">Tarjeta</option>
+                        </select>
+
+                        {paymentMethod === 'Tarjeta' && (
+                          <div className="mt-2.5">
+                            <label className="block text-[11px] font-semibold text-gray-600 mb-1">
+                              Número de Tarjeta (Primeros 4 y últimos 4):
+                            </label>
+                            <input
+                              type="text"
+                              value={cardNumber}
+                              onChange={e => setCardNumber(e.target.value)}
+                              placeholder="1234000000005678"
+                              className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32] text-xs"
+                            />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* SIAT Invoice Section */}
+                      {hasInvoices ? (
+                        <div className="pt-2 border-t border-gray-100">
+                          <label className="flex items-center gap-2 cursor-pointer mb-2.5 select-none">
+                            <input
+                              type="checkbox"
+                              checked={generateInvoice}
+                              onChange={e => setGenerateInvoice(e.target.checked)}
+                              className="w-4 h-4 text-[#2E7D32] rounded focus:ring-[#2E7D32]"
+                            />
+                            <span className="font-bold text-gray-800 text-xs">Generar Factura (SIAT)</span>
+                          </label>
+
+                          {generateInvoice && (
+                            <div className="space-y-2.5 bg-gray-50 p-3 rounded-xl border border-gray-200">
+                              <div>
+                                <label className="block text-[11px] font-semibold text-gray-600 mb-0.5">NIT / CI</label>
+                                <input
+                                  type="text"
+                                  value={cashierNit}
+                                  onChange={e => setCashierNit(e.target.value)}
+                                  placeholder="Ej. 1234567"
+                                  className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32] text-xs"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[11px] font-semibold text-gray-600 mb-0.5">Razón Social</label>
+                                <input
+                                  type="text"
+                                  value={cashierName}
+                                  onChange={e => setCashierName(e.target.value)}
+                                  placeholder="Nombre o Razón Social"
+                                  className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32] text-xs"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[11px] font-semibold text-gray-600 mb-0.5">Punto de Venta SIAT</label>
+                                <select
+                                  value={siatPuntoVenta}
+                                  onChange={e => setSiatPuntoVenta(e.target.value)}
+                                  className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32] text-xs"
+                                >
+                                  <option value="0">Punto de Venta 0</option>
+                                  <option value="1">Punto de Venta 1</option>
+                                  <option value="2">Punto de Venta 2</option>
+                                  <option value="3">Punto de Venta 3</option>
+                                </select>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="pt-2 border-t border-gray-100">
+                          <div className="bg-amber-50 border border-amber-200/80 rounded-xl p-3 flex items-start gap-2 text-xs text-amber-900">
+                            <AlertCircle className="w-3.5 h-3.5 text-amber-600 flex-shrink-0 mt-0.5" />
+                            <div>
+                              <p className="font-bold text-amber-950 text-[11px]">Régimen RTS</p>
+                              <p className="text-amber-800 text-[10px] mt-0.5 leading-relaxed">
+                                Emisión de comprobante térmico simplificado.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {!activeRegister && (
+                        <p className="text-[11px] text-orange-600 font-medium leading-tight">
+                          Nota: La caja diaria no está abierta. El cobro no sumará a un arqueo de turno.
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Step 2 Actions */}
+                    <div className="space-y-2 pt-3 border-t border-gray-100">
+                      <button
+                        disabled={isClosingBill}
+                        onClick={handleCloseBill}
+                        className="w-full py-3.5 bg-[#2E7D32] hover:bg-[#256629] text-white font-bold rounded-2xl transition-all disabled:opacity-50 text-sm flex items-center justify-center gap-2 shadow-sm active:scale-[0.98] cursor-pointer"
+                      >
+                        <Receipt size={18} />
+                        <span>{isClosingBill ? 'Procesando...' : 'Cobrar y Liberar'}</span>
                       </button>
 
                       <button
-                        type="button"
-                        onClick={() => setModalStep('checkout')}
-                        className="flex-1 py-3.5 px-6 bg-[#2E7D32] hover:bg-[#256629] text-white font-bold rounded-2xl transition-all shadow-sm active:scale-[0.99] text-base flex items-center justify-center gap-2"
+                        disabled={isClosingBill}
+                        onClick={() => setModalStep('details')}
+                        className="w-full py-1.5 text-xs text-gray-500 hover:text-gray-700 font-semibold transition-colors cursor-pointer"
                       >
-                        <Receipt size={20} />
-                        <span>Cobrar</span>
+                        Cancelar
                       </button>
                     </div>
                   </div>
                 )}
-              </>
-            )}
-
-            {/* Modal Step 2: Payment and Liberation */}
-            {modalStep === 'checkout' && (
-              <>
-                <div className="flex-1 overflow-y-auto p-6 bg-gray-50 space-y-4">
-                  <button
-                    type="button"
-                    onClick={() => setModalStep('details')}
-                    className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-600 hover:text-gray-900 transition-colors"
-                  >
-                    <ArrowLeft size={16} />
-                    <span>Volver a pedidos</span>
-                  </button>
-
-                  <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-4">
-                    <div className="flex justify-between items-center pb-3 border-b border-gray-100">
-                      <span className="text-sm font-semibold text-gray-600">Total a liquidar:</span>
-                      <span className="text-2xl font-black text-gray-900">
-                        Bs {totalAmount.toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2">
-                        {selectedTable.requested_payment_method
-                          ? `Método solicitado: ${selectedTable.requested_payment_method}`
-                          : 'Método de pago:'}
-                      </label>
-                      <select
-                        value={paymentMethod}
-                        onChange={e => setPaymentMethod(e.target.value)}
-                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32] font-medium text-gray-800"
-                      >
-                        <option value="Pago QR">Pago QR</option>
-                        <option value="Efectivo">Efectivo</option>
-                        <option value="Tarjeta">Tarjeta</option>
-                      </select>
-
-                      {paymentMethod === 'Tarjeta' && (
-                        <div className="mt-3">
-                          <label className="block text-xs font-semibold text-gray-600 mb-1">
-                            Número de Tarjeta (Primeros 4 y últimos 4 ej. 1234000000005678):
-                          </label>
-                          <input
-                            type="text"
-                            value={cardNumber}
-                            onChange={e => setCardNumber(e.target.value)}
-                            placeholder="1234000000005678"
-                            className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32] text-sm"
-                          />
-                        </div>
-                      )}
-                    </div>
-
-                    {hasInvoices ? (
-                      <div className="pt-3 border-t border-gray-100">
-                        <label className="flex items-center gap-2 cursor-pointer mb-3 select-none">
-                          <input
-                            type="checkbox"
-                            checked={generateInvoice}
-                            onChange={e => setGenerateInvoice(e.target.checked)}
-                            className="w-4 h-4 text-[#2E7D32] rounded focus:ring-[#2E7D32]"
-                          />
-                          <span className="font-bold text-gray-800 text-sm">Generar Factura Electrónica (SIAT)</span>
-                        </label>
-
-                        {generateInvoice && (
-                          <div className="space-y-3 bg-gray-50 p-4 rounded-xl border border-gray-200">
-                            <div>
-                              <label className="block text-xs font-semibold text-gray-600 mb-1">NIT / CI</label>
-                              <input
-                                type="text"
-                                value={cashierNit}
-                                onChange={e => setCashierNit(e.target.value)}
-                                placeholder="Ej. 1234567"
-                                className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32] text-sm"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-semibold text-gray-600 mb-1">Razón Social</label>
-                              <input
-                                type="text"
-                                value={cashierName}
-                                onChange={e => setCashierName(e.target.value)}
-                                placeholder="Nombre o Razón Social del cliente"
-                                className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32] text-sm"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-semibold text-gray-600 mb-1">Punto de Venta SIAT</label>
-                              <select
-                                value={siatPuntoVenta}
-                                onChange={e => setSiatPuntoVenta(e.target.value)}
-                                className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32] text-sm"
-                              >
-                                <option value="0">Punto de Venta 0 (Por Defecto)</option>
-                                <option value="1">Punto de Venta 1</option>
-                                <option value="2">Punto de Venta 2</option>
-                                <option value="3">Punto de Venta 3</option>
-                              </select>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="pt-3 border-t border-gray-100">
-                        <div className="bg-amber-50 border border-amber-200/80 rounded-xl p-3.5 flex items-start gap-2.5 text-xs text-amber-900">
-                          <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                          <div>
-                            <p className="font-bold text-amber-950">Régimen Tributario Simplificado (RTS)</p>
-                            <p className="text-amber-800 text-[11px] mt-0.5 leading-relaxed">
-                              Este restaurante opera bajo régimen simplificado. Al cobrar se emitirá un comprobante de venta térmico no válido para crédito fiscal.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {!activeRegister && (
-                      <p className="text-xs text-orange-600 font-medium">
-                        Nota: La caja diaria no está abierta. El cobro se procesará y la mesa quedará libre, pero no se sumará a un arqueo de turno.
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Footer Step 2 */}
-                <div className="p-6 border-t border-gray-100 bg-white rounded-b-3xl space-y-2">
-                  <button
-                    disabled={isClosingBill}
-                    onClick={handleCloseBill}
-                    className="w-full py-4 bg-[#2E7D32] hover:bg-[#256629] text-white font-bold rounded-2xl transition-all disabled:opacity-50 text-base sm:text-lg flex items-center justify-center gap-2 shadow-sm active:scale-[0.99]"
-                  >
-                    <Receipt size={22} />
-                    {isClosingBill ? 'Procesando y liberando...' : 'Cobrar y Liberar Mesa'}
-                  </button>
-
-                  <button
-                    disabled={isClosingBill}
-                    onClick={() => setModalStep('details')}
-                    className="w-full py-2 text-sm text-gray-500 hover:text-gray-700 font-semibold transition-colors"
-                  >
-                    Cancelar y volver
-                  </button>
-                </div>
-              </>
-            )}
+              </div>
+            </div>
           </div>
         </div>
       )}
