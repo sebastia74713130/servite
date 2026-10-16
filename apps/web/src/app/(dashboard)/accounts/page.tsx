@@ -17,7 +17,8 @@ import {
   QrCode,
   Clock,
   ArrowLeft,
-  Trash2
+  Trash2,
+  ChefHat
 } from 'lucide-react';
 import { RestaurantTable, OrderStatus } from '@shared/types';
 import { useOrders } from '@/hooks/useOrders';
@@ -57,7 +58,8 @@ export default function AccountsPage() {
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
 
   // Table grid filters
-  const [activeTabFilter, setActiveTabFilter] = useState<'all' | 'occupied' | 'free' | 'calling'>('all');
+  const [activeTabFilter, setActiveTabFilter] = useState<'all' | 'new_orders' | 'occupied' | 'free' | 'calling'>('all');
+  const [isStartingPrep, setIsStartingPrep] = useState(false);
 
   const [siatResult, setSiatResult] = useState<{
     type: 'success' | 'error';
@@ -236,6 +238,46 @@ export default function AccountsPage() {
       }
     } finally {
       setUpdatingOrderId(null);
+    }
+  };
+
+  const handleStartAllPreparation = async () => {
+    if (!selectedTable || tableOrders.length === 0) return;
+    setIsStartingPrep(true);
+    try {
+      const pendingOrders = tableOrders.filter(o => 
+        o.status === 'sent' || o.status === 'received' || (o.status as string) === 'pending' || !o.status
+      );
+      if (pendingOrders.length === 0) return;
+
+      const pendingOrderIds = pendingOrders.map(o => o.id);
+
+      // Optimistic UI update
+      setTableOrders(prev => prev.map(o => 
+        pendingOrderIds.includes(o.id) ? { ...o, status: 'preparing' } : o
+      ));
+
+      const { error } = await supabase
+        .from('orders')
+        .update({
+          status: 'preparing',
+          updated_at: new Date().toISOString()
+        })
+        .in('id', pendingOrderIds);
+
+      if (error) throw error;
+
+      if (refreshOrders) {
+        await refreshOrders();
+      }
+    } catch (err) {
+      console.error('Error al pasar pedidos a preparación:', err);
+      alert('Error al pasar los pedidos a preparación');
+      if (selectedTable) {
+        fetchTableBill(selectedTable.id);
+      }
+    } finally {
+      setIsStartingPrep(false);
     }
   };
 
@@ -575,24 +617,45 @@ export default function AccountsPage() {
 
   const activeTableIdsWithOrders = useMemo(() => new Set(orders.map(o => o.table_id)), [orders]);
 
+  // Mapa de table_id a pedidos pendientes de preparación (estado inicial antes de 'preparing')
+  const newOrdersByTableId = useMemo(() => {
+    const map: Record<string, any[]> = {};
+    orders.forEach(order => {
+      const isPendingPrep = 
+        order.status === 'sent' || 
+        order.status === 'received' || 
+        (order.status as string) === 'pending' || 
+        !order.status;
+      if (isPendingPrep && order.table_id) {
+        if (!map[order.table_id]) {
+          map[order.table_id] = [];
+        }
+        map[order.table_id].push(order);
+      }
+    });
+    return map;
+  }, [orders]);
+
   const salonTables = useMemo(() => tables.filter(t => t.type !== 'takeaway'), [tables]);
 
   const counts = useMemo(() => {
     const total = salonTables.length;
     const occupied = salonTables.filter(t => activeTableIdsWithOrders.has(t.id)).length;
     const calling = salonTables.filter(t => t.service_status === 'calling_waiter' || t.service_status === 'requesting_bill').length;
+    const newOrders = salonTables.filter(t => (newOrdersByTableId[t.id]?.length || 0) > 0).length;
     const free = Math.max(0, total - occupied);
-    return { total, occupied, free, calling };
-  }, [salonTables, activeTableIdsWithOrders]);
+    return { total, occupied, free, calling, newOrders };
+  }, [salonTables, activeTableIdsWithOrders, newOrdersByTableId]);
 
   const filteredTables = useMemo(() => {
     return salonTables.filter(t => {
+      if (activeTabFilter === 'new_orders') return (newOrdersByTableId[t.id]?.length || 0) > 0;
       if (activeTabFilter === 'occupied') return activeTableIdsWithOrders.has(t.id);
       if (activeTabFilter === 'free') return !activeTableIdsWithOrders.has(t.id);
       if (activeTabFilter === 'calling') return t.service_status === 'calling_waiter' || t.service_status === 'requesting_bill';
       return true;
     });
-  }, [salonTables, activeTabFilter, activeTableIdsWithOrders]);
+  }, [salonTables, activeTabFilter, activeTableIdsWithOrders, newOrdersByTableId]);
 
   if (sessionLoading || loading) return <LoadingState />;
 
@@ -628,6 +691,28 @@ export default function AccountsPage() {
             {counts.total}
           </span>
         </button>
+
+        {counts.newOrders > 0 && (
+          <button
+            onClick={() => setActiveTabFilter('new_orders')}
+            className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors flex items-center gap-2 cursor-pointer ${
+              activeTabFilter === 'new_orders'
+                ? 'bg-[#E76F51] text-white shadow-sm'
+                : 'bg-orange-50 text-orange-900 border border-orange-200 hover:bg-orange-100'
+            }`}
+          >
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#E76F51] opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-[#E76F51]" />
+            </span>
+            <span>Nuevos</span>
+            <span className={`px-1.5 py-0.5 rounded-full text-xs font-bold ${
+              activeTabFilter === 'new_orders' ? 'bg-white/20 text-white' : 'bg-orange-200 text-orange-950'
+            }`}>
+              {counts.newOrders}
+            </span>
+          </button>
+        )}
 
         <button
           onClick={() => setActiveTabFilter('occupied')}
@@ -699,6 +784,9 @@ export default function AccountsPage() {
             const isCalling = table.service_status === 'calling_waiter';
             const isRequestingBill = table.service_status === 'requesting_bill';
             const isOccupied = activeTableIdsWithOrders.has(table.id);
+            const pendingOrders = newOrdersByTableId[table.id] || [];
+            const hasNewOrder = pendingOrders.length > 0;
+            const newOrdersCount = pendingOrders.length;
 
             return (
               <div
@@ -708,12 +796,33 @@ export default function AccountsPage() {
                   setModalStep('details');
                 }}
                 className={`relative flex flex-col items-center justify-center p-6 bg-white rounded-3xl border-2 cursor-pointer transition-all hover:-translate-y-1 shadow-sm ${
-                  isCalling ? 'border-orange-400 bg-orange-50 animate-pulse' :
-                  isRequestingBill ? 'border-green-400 bg-green-50' :
-                  isOccupied ? 'border-blue-400 bg-blue-50/50 hover:border-blue-500' :
-                  'border-gray-100 hover:border-gray-300'
+                  hasNewOrder && !isCalling && !isRequestingBill
+                    ? 'border-[#E76F51] bg-[#FFF8F6] shadow-md ring-2 ring-[#E76F51]/20'
+                    : isCalling
+                    ? 'border-orange-400 bg-orange-50 animate-pulse'
+                    : isRequestingBill
+                    ? 'border-green-400 bg-green-50'
+                    : isOccupied
+                    ? 'border-blue-400 bg-blue-50/50 hover:border-blue-500'
+                    : 'border-gray-100 hover:border-gray-300'
                 }`}
               >
+                {/* Burbuja individual de nuevo pedido (permanece hasta pasar a preparación) */}
+                {hasNewOrder && (
+                  <div
+                    className="absolute -top-3 -left-3 z-10 flex items-center gap-1.5 bg-[#E76F51] text-white px-2.5 py-1 rounded-full shadow-lg border-2 border-white animate-bounce"
+                    title="¡Nuevo pedido pendiente de preparación!"
+                  >
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-85" />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
+                    </span>
+                    <span className="text-[11px] font-black uppercase tracking-wider">
+                      {newOrdersCount > 1 ? `${newOrdersCount} nuevos` : 'Nuevo'}
+                    </span>
+                  </div>
+                )}
+
                 {/* Status Indicator Badges */}
                 {isCalling && (
                   <div className="absolute -top-3 -right-3 bg-orange-500 text-white p-2 rounded-full shadow-lg" title="Mesero llamado">
@@ -727,10 +836,15 @@ export default function AccountsPage() {
                 )}
 
                 <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-3 transition-colors ${
-                  isCalling ? 'bg-orange-200 text-orange-700' :
-                  isRequestingBill ? 'bg-green-200 text-green-700' :
-                  isOccupied ? 'bg-blue-200 text-blue-700' :
-                  'bg-gray-100 text-gray-500'
+                  hasNewOrder && !isCalling && !isRequestingBill
+                    ? 'bg-orange-100 text-[#E76F51] ring-4 ring-orange-200/50'
+                    : isCalling
+                    ? 'bg-orange-200 text-orange-700'
+                    : isRequestingBill
+                    ? 'bg-green-200 text-green-700'
+                    : isOccupied
+                    ? 'bg-blue-200 text-blue-700'
+                    : 'bg-gray-100 text-gray-500'
                 }`}>
                   <span className="text-xl font-bold">
                     {table.table_number.replace(/^(Mesa|Barra)\s*/i, '')}
@@ -746,16 +860,18 @@ export default function AccountsPage() {
                   )}
                 </div>
 
-                {isCalling && (
+                {hasNewOrder && !isCalling && !isRequestingBill ? (
+                  <span className="text-xs font-bold text-[#E76F51] mt-2 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#E76F51] animate-ping" />
+                    Nuevo pedido
+                  </span>
+                ) : isCalling ? (
                   <span className="text-xs font-bold text-orange-600 mt-2">Mesero llamado</span>
-                )}
-                {isRequestingBill && (
+                ) : isRequestingBill ? (
                   <span className="text-xs font-bold text-green-600 mt-2">Pide la cuenta</span>
-                )}
-                {isOccupied && !isCalling && !isRequestingBill && (
+                ) : isOccupied ? (
                   <span className="text-xs font-bold text-blue-600 mt-2">Ocupada</span>
-                )}
-                {!isOccupied && !isCalling && !isRequestingBill && (
+                ) : (
                   <span className="text-xs font-medium text-gray-400 mt-2">Libre</span>
                 )}
               </div>
@@ -857,6 +973,30 @@ export default function AccountsPage() {
                           <p className="col-span-1 sm:col-span-2"><span className="font-semibold text-blue-900">Correo:</span> {selectedTable.siat_customer_email}</p>
                         )}
                       </div>
+                    </div>
+                  )}
+
+                  {/* New orders pending preparation banner */}
+                  {tableOrders.some(o => o.status === 'sent' || o.status === 'received' || (o.status as string) === 'pending' || !o.status) && (
+                    <div className="bg-[#FFF8F6] border border-[#E76F51]/30 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                      <div className="flex items-center gap-3 text-orange-950">
+                        <span className="relative flex h-3 w-3 flex-shrink-0">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#E76F51] opacity-80" />
+                          <span className="relative inline-flex rounded-full h-3 w-3 bg-[#E76F51]" />
+                        </span>
+                        <div>
+                          <p className="font-bold text-sm text-[#1F2933]">Hay nuevos pedidos esperando preparación</p>
+                          <p className="text-xs text-gray-500">Pasa los pedidos a cocina para comenzar a elaborarlos.</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={handleStartAllPreparation}
+                        disabled={isStartingPrep}
+                        className="px-4 py-2 bg-[#E76F51] hover:bg-[#d65e40] text-white font-bold rounded-xl text-xs transition-colors shadow-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 self-end sm:self-auto"
+                      >
+                        <ChefHat size={15} />
+                        <span>{isStartingPrep ? 'Actualizando...' : 'Pasar a Preparación'}</span>
+                      </button>
                     </div>
                   )}
 
