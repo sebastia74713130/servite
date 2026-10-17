@@ -196,8 +196,8 @@ export default function PublicMenuClient({
         setFoodCourtSessionId(fcid);
 
         // Restore saved customer name/NIT and delivery details for this session
-        const savedName = localStorage.getItem('customer_name') || '';
-        const savedNit = localStorage.getItem('customer_nit') || '';
+        const savedName = (localStorage.getItem('customer_name') || '').replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]/g, '');
+        const savedNit = (localStorage.getItem('customer_nit') || '').replace(/\D/g, '');
         const savedLocation = localStorage.getItem('delivery_location_url') || '';
         const savedInstructions = localStorage.getItem('delivery_instructions') || '';
         if (savedName) setCustomerName(savedName);
@@ -1589,15 +1589,17 @@ export default function PublicMenuClient({
             </button>
           )}
 
-          <button
-            onClick={() => {
-              setSessionEnded(false);
-              window.location.reload();
-            }}
-            className="flex items-center justify-center gap-2 px-6 py-2.5 text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-full active:scale-95 transition-all mt-2"
-          >
-            Volver al Menú
-          </button>
+          {isTakeaway && (
+            <button
+              onClick={() => {
+                setSessionEnded(false);
+                window.location.reload();
+              }}
+              className="flex items-center justify-center gap-2 px-6 py-2.5 text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-full active:scale-95 transition-all mt-2"
+            >
+              Volver al Menú
+            </button>
+          )}
         </div>
       </div>
     );
@@ -2225,7 +2227,10 @@ export default function PublicMenuClient({
                   <input
                     type="text"
                     value={customerName}
-                    onChange={e => setCustomerName(e.target.value)}
+                    onChange={e => {
+                      const val = e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]/g, '');
+                      setCustomerName(val);
+                    }}
                     onFocus={(e) => {
                       setTimeout(() => {
                         e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -2245,8 +2250,13 @@ export default function PublicMenuClient({
                     </label>
                     <input
                       type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       value={customerNit}
-                      onChange={e => setCustomerNit(e.target.value)}
+                      onChange={e => {
+                        const val = e.target.value.replace(/\D/g, '');
+                        setCustomerNit(val);
+                      }}
                       onFocus={(e) => {
                         setTimeout(() => {
                           e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -2771,8 +2781,13 @@ export default function PublicMenuClient({
                     </label>
                     <input 
                       type="text" 
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       value={customerNit}
-                      onChange={(e) => setCustomerNit(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '');
+                        setCustomerNit(val);
+                      }}
                       placeholder="Ej. 1234567"
                       className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 text-sm"
                       style={{ '--tw-ring-color': brandColor } as React.CSSProperties}
@@ -2786,7 +2801,10 @@ export default function PublicMenuClient({
                     <input 
                       type="text" 
                       value={customerName}
-                      onChange={(e) => setCustomerName(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]/g, '');
+                        setCustomerName(val);
+                      }}
                       placeholder="Ej. Juan Pérez"
                       className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 text-sm"
                       style={{ '--tw-ring-color': brandColor } as React.CSSProperties}

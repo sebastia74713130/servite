@@ -128,8 +128,8 @@ export default function AccountsPage() {
   useEffect(() => {
     if (selectedTable) {
       setModalStep('details');
-      const isPaidQr = selectedTable.service_status === 'paid_qr';
-      if (isPaidQr) {
+      const isPaid = selectedTable.service_status === 'paid_qr' || selectedTable.requested_payment_method === 'Pago QR';
+      if (isPaid) {
         fetchTableBill(selectedTable.id, false, true);
       } else {
         const cached = orders.filter(
@@ -147,13 +147,14 @@ export default function AccountsPage() {
 
   // Keep open table orders in sync with Realtime useOrders updates
   useEffect(() => {
-    if (selectedTable && selectedTable.service_status !== 'paid_qr') {
+    const isPaid = selectedTable?.service_status === 'paid_qr' || selectedTable?.requested_payment_method === 'Pago QR';
+    if (selectedTable && !isPaid) {
       const liveOrders = orders.filter(
         (o) => o.table_id === selectedTable.id && o.status !== 'cancelled' && !o.is_paid
       );
       setTableOrders(liveOrders);
     }
-  }, [orders, selectedTable?.id, selectedTable?.service_status]);
+  }, [orders, selectedTable?.id, selectedTable?.service_status, selectedTable?.requested_payment_method]);
 
   useEffect(() => {
     if (selectedTable?.requested_payment_method) {
@@ -227,6 +228,26 @@ export default function AccountsPage() {
 
       const { data, error } = await query;
       if (error) throw error;
+
+      if ((!data || data.length === 0) && !isPaidQr) {
+        const recentTime = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
+        const { data: recentData } = await supabase
+          .from('orders')
+          .select(`
+            *,
+            order_items (*)
+          `)
+          .eq('table_id', tableId)
+          .neq('status', 'cancelled')
+          .gte('created_at', recentTime)
+          .order('created_at', { ascending: false });
+
+        if (recentData && recentData.length > 0) {
+          setTableOrders(recentData);
+          return;
+        }
+      }
+
       setTableOrders(data || []);
     } catch (err) {
       console.error('Error fetching table bill:', err);
@@ -618,17 +639,20 @@ export default function AccountsPage() {
     }
 
     try {
-      // 1. Vincular órdenes a la caja activa si existe
+      // 1. Asegurar que las órdenes activas de la mesa queden marcadas como pagadas (Pago QR) y vinculadas a la caja
+      const orderUpdatePayload: any = {
+        is_paid: true,
+        payment_method: 'Pago QR',
+        paid_at: new Date().toISOString()
+      };
       if (activeRegister?.id) {
-        await supabase
-          .from('orders')
-          .update({
-            cash_register_id: activeRegister.id
-          })
-          .eq('table_id', tableId)
-          .eq('is_paid', true)
-          .is('cash_register_id', null);
+        orderUpdatePayload.cash_register_id = activeRegister.id;
       }
+      await supabase
+        .from('orders')
+        .update(orderUpdatePayload)
+        .eq('table_id', tableId)
+        .neq('status', 'cancelled');
 
       // 2. Liberar el estado de servicio y datos temporales de la mesa
       const { error: tableError } = await supabase
@@ -935,10 +959,19 @@ export default function AccountsPage() {
     }, 0);
   }, [tableOrders]);
 
+  const isPaidQr = useMemo(() => {
+    if (!selectedTable) return false;
+    if (selectedTable.service_status === 'paid_qr') return true;
+    if (selectedTable.requested_payment_method === 'Pago QR') return true;
+    if (tableOrders.some(o => o.payment_method === 'Pago QR' || (o.payment_method && o.payment_method.toLowerCase().includes('qr')))) return true;
+    if (tableOrders.length > 0 && tableOrders.every(o => o.is_paid)) return true;
+    return false;
+  }, [selectedTable, tableOrders]);
+
   const activeTableIdsWithOrders = useMemo(() => {
     const set = new Set(orders.map(o => o.table_id));
     tables.forEach(t => {
-      if (t.service_status === 'paid_qr') {
+      if (t.service_status === 'paid_qr' || t.requested_payment_method === 'Pago QR') {
         set.add(t.id);
       }
     });
@@ -969,7 +1002,7 @@ export default function AccountsPage() {
   const counts = useMemo(() => {
     const total = salonTables.length;
     const occupied = salonTables.filter(t => activeTableIdsWithOrders.has(t.id)).length;
-    const calling = salonTables.filter(t => t.service_status === 'calling_waiter' || t.service_status === 'requesting_bill' || t.service_status === 'paid_qr').length;
+    const calling = salonTables.filter(t => t.service_status === 'calling_waiter' || t.service_status === 'requesting_bill' || t.service_status === 'paid_qr' || t.requested_payment_method === 'Pago QR').length;
     const newOrders = salonTables.filter(t => (newOrdersByTableId[t.id]?.length || 0) > 0).length;
     const free = Math.max(0, total - occupied);
     return { total, occupied, free, calling, newOrders };
@@ -980,7 +1013,7 @@ export default function AccountsPage() {
       if (activeTabFilter === 'new_orders') return (newOrdersByTableId[t.id]?.length || 0) > 0;
       if (activeTabFilter === 'occupied') return activeTableIdsWithOrders.has(t.id);
       if (activeTabFilter === 'free') return !activeTableIdsWithOrders.has(t.id);
-      if (activeTabFilter === 'calling') return t.service_status === 'calling_waiter' || t.service_status === 'requesting_bill' || t.service_status === 'paid_qr';
+      if (activeTabFilter === 'calling') return t.service_status === 'calling_waiter' || t.service_status === 'requesting_bill' || t.service_status === 'paid_qr' || t.requested_payment_method === 'Pago QR';
       return true;
     });
   }, [salonTables, activeTabFilter, activeTableIdsWithOrders, newOrdersByTableId]);
@@ -1110,9 +1143,9 @@ export default function AccountsPage() {
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
           {filteredTables.map(table => {
             const isCalling = table.service_status === 'calling_waiter';
-            const isRequestingBill = table.service_status === 'requesting_bill';
-            const isPaidQr = table.service_status === 'paid_qr';
-            const isOccupied = activeTableIdsWithOrders.has(table.id) || isPaidQr;
+            const isTablePaidQr = table.service_status === 'paid_qr' || (table.requested_payment_method === 'Pago QR' && table.service_status !== 'calling_waiter');
+            const isRequestingBill = table.service_status === 'requesting_bill' && !isTablePaidQr;
+            const isOccupied = activeTableIdsWithOrders.has(table.id) || isTablePaidQr;
             const pendingOrders = newOrdersByTableId[table.id] || [];
             const hasNewOrder = pendingOrders.length > 0;
             const newOrdersCount = pendingOrders.length;
@@ -1123,7 +1156,7 @@ export default function AccountsPage() {
                 onClick={() => {
                   setSelectedTable(table);
                   setModalStep('details');
-                  if (table.service_status === 'paid_qr') {
+                  if (table.service_status === 'paid_qr' || table.requested_payment_method === 'Pago QR') {
                     fetchTableBill(table.id, false, true);
                   } else {
                     const cachedForTable = orders.filter(
@@ -1134,7 +1167,7 @@ export default function AccountsPage() {
                   }
                 }}
                 className={`relative flex flex-col items-center justify-center p-6 bg-white rounded-3xl border-2 cursor-pointer transition-all hover:-translate-y-1 shadow-sm ${
-                  isPaidQr
+                  isTablePaidQr
                     ? 'border-emerald-500 bg-emerald-50/70 shadow-md ring-2 ring-emerald-500/30 animate-pulse'
                     : hasNewOrder && !isCalling && !isRequestingBill
                     ? 'border-[#E76F51] bg-[#FFF8F6] shadow-md ring-2 ring-[#E76F51]/20'
@@ -1148,7 +1181,7 @@ export default function AccountsPage() {
                 }`}
               >
                 {/* Burbuja individual de nuevo pedido (permanece hasta pasar a preparación) */}
-                {hasNewOrder && !isPaidQr && (
+                {hasNewOrder && !isTablePaidQr && (
                   <div
                     className="absolute -top-3 -left-3 z-10 flex items-center gap-1.5 bg-[#E76F51] text-white px-2.5 py-1 rounded-full shadow-lg border-2 border-white animate-bounce"
                     title="¡Nuevo pedido pendiente de preparación!"
@@ -1164,24 +1197,24 @@ export default function AccountsPage() {
                 )}
 
                 {/* Status Indicator Badges */}
-                {isPaidQr && (
+                {isTablePaidQr && (
                   <div className="absolute -top-3 -right-3 bg-emerald-600 text-white p-2 rounded-full shadow-lg animate-bounce" title="Pago QR verificado y acreditado">
                     <CheckCircle2 size={20} />
                   </div>
                 )}
-                {!isPaidQr && isCalling && (
+                {!isTablePaidQr && isCalling && (
                   <div className="absolute -top-3 -right-3 bg-orange-500 text-white p-2 rounded-full shadow-lg" title="Mesero llamado">
                     <HandPlatter size={20} />
                   </div>
                 )}
-                {!isPaidQr && isRequestingBill && (
+                {!isTablePaidQr && isRequestingBill && (
                   <div className="absolute -top-3 -right-3 bg-green-600 text-white p-2 rounded-full shadow-lg animate-bounce" title="Pide la cuenta">
                     <Receipt size={20} />
                   </div>
                 )}
 
                 <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-3 transition-colors ${
-                  isPaidQr
+                  isTablePaidQr
                     ? 'bg-emerald-200 text-emerald-800 ring-4 ring-emerald-200/50'
                     : hasNewOrder && !isCalling && !isRequestingBill
                     ? 'bg-orange-100 text-[#E76F51] ring-4 ring-orange-200/50'
@@ -1207,7 +1240,7 @@ export default function AccountsPage() {
                   )}
                 </div>
 
-                {isPaidQr ? (
+                {isTablePaidQr ? (
                   <span className="text-xs font-black text-emerald-700 mt-2 flex items-center gap-1">
                     <CheckCircle2 size={13} className="text-emerald-600" />
                     Pago QR Verificado
@@ -1313,7 +1346,7 @@ export default function AccountsPage() {
                 {/* Service Status Banners (Waiter call, SIAT invoice request, QR payment verified) */}
                 <div className="space-y-3 mb-3 sm:mb-4 flex-shrink-0">
                   {/* Paid QR banner */}
-                  {selectedTable.service_status === 'paid_qr' && (
+                  {isPaidQr && (
                     <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shadow-xs">
                       <div className="flex items-center gap-3 text-emerald-900">
                         <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0 text-emerald-700">
@@ -1327,7 +1360,7 @@ export default function AccountsPage() {
                             </span>
                           </div>
                           <p className="text-xs text-emerald-700 mt-0.5">
-                            El cliente completó el pago por QR exitosamente. Valida el estado para liberar la mesa.
+                            El cliente completó el pago por QR exitosamente. Presiona &quot;Validar&quot; para liberar la mesa.
                           </p>
                         </div>
                       </div>
@@ -1337,7 +1370,7 @@ export default function AccountsPage() {
                         className="w-full sm:w-auto px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition-colors shadow-xs cursor-pointer flex-shrink-0 flex items-center justify-center gap-1.5"
                       >
                         <CheckCircle2 size={16} />
-                        <span>{isClosingBill ? 'Validando...' : 'Validar y Liberar Mesa'}</span>
+                        <span>{isClosingBill ? 'Validando...' : 'Validar'}</span>
                       </button>
                     </div>
                   )}
@@ -1542,7 +1575,7 @@ export default function AccountsPage() {
                       </div>
 
                       {/* Big total display */}
-                      {selectedTable.service_status === 'paid_qr' ? (
+                      {isPaidQr ? (
                         <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-200 text-center shadow-xs">
                           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-100 text-emerald-800 text-xs font-black rounded-full mb-1">
                             <CheckCircle2 size={14} className="text-emerald-700" />
@@ -1584,15 +1617,15 @@ export default function AccountsPage() {
 
                     {/* Actions */}
                     <div className="space-y-2.5 pt-4 border-t border-gray-100">
-                      {selectedTable.service_status === 'paid_qr' ? (
+                      {isPaidQr ? (
                         <button
                           type="button"
                           disabled={isClosingBill}
                           onClick={() => handleValidateAndReleaseTable(selectedTable.id)}
-                          className="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl transition-all shadow-sm active:scale-[0.98] text-base flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                          className="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl transition-all shadow-md active:scale-[0.98] text-base flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                         >
                           <CheckCircle2 size={20} />
-                          <span>{isClosingBill ? 'Validando...' : 'Validar y Liberar Mesa'}</span>
+                          <span>{isClosingBill ? 'Validando...' : 'Validar'}</span>
                         </button>
                       ) : (
                         <>
@@ -1700,8 +1733,10 @@ export default function AccountsPage() {
                                 <label className="block text-xs font-semibold text-gray-600 mb-0.5">NIT / CI</label>
                                 <input
                                   type="text"
+                                  inputMode="numeric"
+                                  pattern="[0-9]*"
                                   value={cashierNit}
-                                  onChange={e => setCashierNit(e.target.value)}
+                                  onChange={e => setCashierNit(e.target.value.replace(/\D/g, ''))}
                                   placeholder="Ej. 1234567"
                                   className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32] text-sm"
                                 />
@@ -1711,7 +1746,7 @@ export default function AccountsPage() {
                                 <input
                                   type="text"
                                   value={cashierName}
-                                  onChange={e => setCashierName(e.target.value)}
+                                  onChange={e => setCashierName(e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]/g, ''))}
                                   placeholder="Nombre o Razón Social"
                                   className="w-full px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32] text-sm"
                                 />
