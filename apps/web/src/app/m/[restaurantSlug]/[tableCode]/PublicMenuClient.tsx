@@ -2476,22 +2476,35 @@ export default function PublicMenuClient({
       {/* Bill Modal */}
       {showBill && (
         <div className="fixed inset-0 z-50 flex flex-col bg-white animate-in slide-in-from-right duration-300">
-          <div className="flex items-center justify-between p-4 border-b border-gray-200">
-            <h2 className="text-xl font-bold text-gray-900">Mi Cuenta</h2>
+          <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-white">
+            <h2 className="text-lg sm:text-xl font-bold text-gray-900 whitespace-nowrap">Mi Cuenta</h2>
             <div className="flex items-center gap-2">
+              {table.type === 'takeaway' && billOrders.length > 0 && (
+                <button 
+                  onClick={handleClearHistory}
+                  className="px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg active:scale-95 transition-all flex items-center gap-1.5 whitespace-nowrap"
+                  title="Limpiar historial de pedidos"
+                >
+                  <Trash2 size={14} className="text-red-500 flex-shrink-0" />
+                  <span>Limpiar historial</span>
+                </button>
+              )}
               <button 
                 onClick={() => handleFetchBill(true)}
-                className="px-3 py-1.5 text-sm font-medium bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 active:scale-95 transition-all"
+                className="px-3 py-1.5 text-xs sm:text-sm font-medium bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 active:scale-95 transition-all whitespace-nowrap"
               >
                 Actualizar
               </button>
-              <button onClick={() => setShowBill(false)} className="w-10 h-10 flex items-center justify-center bg-gray-100 text-gray-500 rounded-full">
-                <X size={20} />
+              <button 
+                onClick={() => setShowBill(false)} 
+                className="w-9 h-9 flex items-center justify-center bg-gray-100 text-gray-500 rounded-full hover:bg-gray-200 active:scale-95 transition-colors flex-shrink-0"
+              >
+                <X size={18} />
               </button>
             </div>
           </div>
           
-          <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-gray-50 pb-28">
             {isFetchingBill ? (
               <div className="text-center text-gray-500 py-10">Cargando tu cuenta...</div>
             ) : billOrders.length === 0 ? (
@@ -2638,45 +2651,16 @@ export default function PublicMenuClient({
             })()}
           </div>
           
-          <div className="p-6 pb-[70px] bg-white border-t border-gray-200">
-            {table.type !== 'takeaway' && (
+          {table.type !== 'takeaway' && (
+            <div className="p-6 pb-[70px] bg-white border-t border-gray-200 flex-shrink-0">
               <div className="flex justify-between items-center mb-6">
                 <span className="text-xl font-bold text-gray-900">Total a pagar</span>
                 <span className="text-2xl font-bold" style={{ color: brandColor }}>
                   Bs {totalBill.toLocaleString('es-BO')}
                 </span>
               </div>
-            )}
-            
-            {table.type === 'takeaway' ? (
-              <div className="flex flex-col items-center">
-                {totalBill > 0 ? (
-                  <>
-                    <p className="text-xs text-gray-500 text-center font-medium bg-gray-100 p-2 rounded-lg w-full mb-2">
-                      Sigue el estado de tu pedido aquí.
-                    </p>
-                    {activeTakeawayOrder?.fulfillment_type !== 'delivery' && (
-                      <div className="bg-blue-50 border border-blue-100 p-3 rounded-xl text-left mb-4">
-                        <p className="text-xs text-blue-800 font-medium flex items-start gap-2">
-                          <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
-                          <span>Mantén esta pantalla abierta. Si utilizas otras apps multimedia, la alarma de 'pedido listo' no sonará.</span>
-                        </p>
-                      </div>
-                    )}
-                    <button 
-                      onClick={handleClearHistory}
-                      className="w-full py-3 rounded-xl font-bold text-red-600 bg-red-50 border border-red-100 active:scale-95 transition-transform flex items-center justify-center gap-2"
-                    >
-                      <X size={18} />
-                      Limpiar historial de pedidos
-                    </button>
-                  </>
-                ) : (
-                  <p className="text-sm text-gray-500 text-center font-medium">Agrega productos y haz un pedido para poder ver su estado aquí.</p>
-                )}
-              </div>
-            ) : (
-              tableStatus === 'requesting_bill' ? (
+              
+              {tableStatus === 'requesting_bill' ? (
                 <div className="text-center p-3 rounded-xl font-bold text-gray-500 bg-gray-100 border border-gray-200">
                   Mesa bloqueada: Cuenta solicitada
                 </div>
@@ -2709,9 +2693,9 @@ export default function PublicMenuClient({
                     Pedir la cuenta
                   </button>
                 </div>
-              )
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
