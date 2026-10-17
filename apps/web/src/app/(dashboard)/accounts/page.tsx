@@ -180,6 +180,17 @@ export default function AccountsPage() {
     }
   }, [restaurant?.id]);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && selectedTable) {
+        setSelectedTable(null);
+        setModalStep('details');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedTable]);
+
   const fetchTables = async () => {
     if (!restaurant) return;
     try {
@@ -1267,8 +1278,17 @@ export default function AccountsPage() {
 
       {/* Bill & Orders Details Modal */}
       {selectedTable && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-2 sm:p-4 md:p-6 animate-in fade-in duration-200 backdrop-blur-xs">
-          <div className="bg-white w-full max-w-7xl rounded-3xl shadow-2xl flex flex-col h-[90vh] max-h-[92vh] overflow-hidden">
+        <div 
+          onClick={() => {
+            setSelectedTable(null);
+            setModalStep('details');
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-2 sm:p-4 md:p-6 animate-in fade-in duration-200 backdrop-blur-xs cursor-pointer"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white w-full max-w-7xl rounded-3xl shadow-2xl flex flex-col h-[90vh] max-h-[92vh] overflow-hidden cursor-default"
+          >
             {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-white flex-shrink-0">
               <div>
