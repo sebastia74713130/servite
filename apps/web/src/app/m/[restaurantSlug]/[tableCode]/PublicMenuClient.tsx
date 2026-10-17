@@ -1444,15 +1444,12 @@ export default function PublicMenuClient({
         }
       }
 
-      // Liberar mesa en Supabase
+      // Notificar al sistema/dashboard que el pago QR ha sido verificado para esta mesa
       await supabase
         .from('tables')
         .update({
-          service_status: null,
-          siat_customer_nit: null,
-          siat_customer_name: null,
-          siat_customer_email: null,
-          requested_payment_method: null,
+          service_status: 'paid_qr',
+          requested_payment_method: 'Pago QR',
           updated_at: new Date().toISOString()
         })
         .eq('id', table.id);

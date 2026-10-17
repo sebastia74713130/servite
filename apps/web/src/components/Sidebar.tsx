@@ -55,7 +55,7 @@ export function Sidebar({ isOpen = true, setIsOpen }: { isOpen?: boolean, setIsO
   }, []);
 
   const playSound = (
-    type: 'order' | 'order_takeaway' | 'order_dine_in' | 'call' | 'ready' | 'reservation',
+    type: 'order' | 'order_takeaway' | 'order_dine_in' | 'call' | 'ready' | 'reservation' | 'paid_qr',
     extra?: string
   ) => {
     try {
@@ -71,6 +71,9 @@ export function Sidebar({ isOpen = true, setIsOpen }: { isOpen?: boolean, setIsO
         } else if (type === 'order') {
           title = '🍔 ¡Nuevo Pedido!';
           msg = 'Nuevo pedido registrado en Servido.';
+        } else if (type === 'paid_qr') {
+          title = `💳 ¡Pago QR Verificado${extra ? ` (${extra})` : ''}!`;
+          msg = 'Un cliente completó su pago por QR. Requiere validación para liberar mesa.';
         } else if (type === 'call') {
           title = '🛎️ ¡Llamado de Mesa!';
           msg = 'Un cliente está solicitando atención o la cuenta.';
@@ -98,6 +101,8 @@ export function Sidebar({ isOpen = true, setIsOpen }: { isOpen?: boolean, setIsO
           speechText = 'Nuevo pedido para llevar';
         } else if (type === 'order') {
           speechText = 'Nuevo pedido';
+        } else if (type === 'paid_qr') {
+          speechText = extra ? `Pago QR verificado en ${extra}` : 'Pago QR verificado en mesa';
         } else if (type === 'call') {
           speechText = 'Llamada en mesa';
         } else if (type === 'ready') {
@@ -144,15 +149,20 @@ export function Sidebar({ isOpen = true, setIsOpen }: { isOpen?: boolean, setIsO
           fetchCalling();
           
           if (payload.eventType === 'UPDATE' && payload.new?.id) {
-            // Fetch the full table row to guarantee we have all columns (restaurant_id, service_status)
+            // Fetch the full table row to guarantee we have all columns (restaurant_id, service_status, table_number)
             const { data } = await supabase
               .from('tables')
-              .select('restaurant_id, service_status')
+              .select('restaurant_id, service_status, table_number')
               .eq('id', payload.new.id)
               .single();
               
             if (data && data.restaurant_id === restaurant.id && data.service_status) {
-              playSound('call');
+              if (data.service_status === 'paid_qr') {
+                const tableClean = data.table_number ? data.table_number.replace(/^(Mesa|Barra)\s*/i, '') : '';
+                playSound('paid_qr', tableClean ? `Mesa ${tableClean}` : undefined);
+              } else {
+                playSound('call');
+              }
             }
           }
         }

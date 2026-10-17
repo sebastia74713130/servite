@@ -100,8 +100,22 @@ export default function AccountsPage() {
       // Subscribe to table changes (for service_status updates)
       const tablesSub = supabase
         .channel(`public:tables_${Math.random()}`)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'tables' }, () => {
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'tables' }, (payload: any) => {
           fetchTables();
+          if (payload.new) {
+            if (payload.new.service_status === 'paid_qr' && payload.old?.service_status !== 'paid_qr') {
+              try {
+                const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+                audio.play().catch(() => {});
+              } catch (e) {}
+            }
+            if (selectedTable && payload.new.id === selectedTable.id) {
+              setSelectedTable(payload.new);
+              if (payload.new.service_status === 'paid_qr') {
+                fetchTableBill(payload.new.id, false, true);
+              }
+            }
+          }
         })
         .subscribe();
 
@@ -109,32 +123,37 @@ export default function AccountsPage() {
         supabase.removeChannel(tablesSub);
       };
     }
-  }, [restaurant?.id, branch?.id]);
+  }, [restaurant?.id, branch?.id, selectedTable?.id]);
 
   useEffect(() => {
     if (selectedTable) {
       setModalStep('details');
-      const cached = orders.filter(
-        (o) => o.table_id === selectedTable.id && o.status !== 'cancelled' && !o.is_paid
-      );
-      if (cached.length > 0) {
-        setTableOrders(cached);
-        fetchTableBill(selectedTable.id, true);
+      const isPaidQr = selectedTable.service_status === 'paid_qr';
+      if (isPaidQr) {
+        fetchTableBill(selectedTable.id, false, true);
       } else {
-        fetchTableBill(selectedTable.id, false);
+        const cached = orders.filter(
+          (o) => o.table_id === selectedTable.id && o.status !== 'cancelled' && !o.is_paid
+        );
+        if (cached.length > 0) {
+          setTableOrders(cached);
+          fetchTableBill(selectedTable.id, true, false);
+        } else {
+          fetchTableBill(selectedTable.id, false, false);
+        }
       }
     }
   }, [selectedTable]);
 
   // Keep open table orders in sync with Realtime useOrders updates
   useEffect(() => {
-    if (selectedTable) {
+    if (selectedTable && selectedTable.service_status !== 'paid_qr') {
       const liveOrders = orders.filter(
         (o) => o.table_id === selectedTable.id && o.status !== 'cancelled' && !o.is_paid
       );
       setTableOrders(liveOrders);
     }
-  }, [orders, selectedTable?.id]);
+  }, [orders, selectedTable?.id, selectedTable?.service_status]);
 
   useEffect(() => {
     if (selectedTable?.requested_payment_method) {
@@ -183,22 +202,30 @@ export default function AccountsPage() {
     }
   };
 
-  const fetchTableBill = async (tableId: string, hasCachedData = false) => {
+  const fetchTableBill = async (tableId: string, hasCachedData = false, isPaidQr = false) => {
     if (!hasCachedData) {
       setIsFetchingBill(true);
     }
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('orders')
         .select(`
           *,
           order_items (*)
         `)
         .eq('table_id', tableId)
-        .eq('is_paid', false)
         .neq('status', 'cancelled')
         .order('created_at', { ascending: false });
 
+      if (isPaidQr) {
+        // Para mesas con pago QR verificado, traemos los pedidos recientes de la mesa
+        const recentTime = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
+        query = query.gte('created_at', recentTime);
+      } else {
+        query = query.eq('is_paid', false);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       setTableOrders(data || []);
     } catch (err) {
@@ -570,6 +597,73 @@ export default function AccountsPage() {
     }
   };
 
+  const handleValidateAndReleaseTable = async (tableId: string) => {
+    setIsClosingBill(true);
+    const prevTable = tables.find(t => t.id === tableId);
+
+    // Optimistic update
+    setTables(prev => prev.map(t => t.id === tableId ? {
+      ...t,
+      service_status: null,
+      siat_customer_nit: null,
+      siat_customer_name: null,
+      siat_customer_email: null,
+      requested_payment_method: null
+    } : t));
+
+    if (selectedTable?.id === tableId) {
+      setSelectedTable(null);
+      setTableOrders([]);
+      setModalStep('details');
+    }
+
+    try {
+      // 1. Vincular órdenes a la caja activa si existe
+      if (activeRegister?.id) {
+        await supabase
+          .from('orders')
+          .update({
+            cash_register_id: activeRegister.id
+          })
+          .eq('table_id', tableId)
+          .eq('is_paid', true)
+          .is('cash_register_id', null);
+      }
+
+      // 2. Liberar el estado de servicio y datos temporales de la mesa
+      const { error: tableError } = await supabase
+        .from('tables')
+        .update({
+          service_status: null,
+          siat_customer_nit: null,
+          siat_customer_name: null,
+          siat_customer_email: null,
+          requested_payment_method: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', tableId);
+
+      if (tableError) throw tableError;
+
+      // 3. Imprimir comprobante térmico si opera bajo Régimen Simplificado (opcional)
+      if (!hasInvoices) {
+        window.open(`/api/receipt/print?tableId=${tableId}&autoPrint=true`, '_blank');
+      }
+
+      if (refreshOrders) {
+        await refreshOrders();
+      }
+    } catch (err: any) {
+      console.error('Error al validar y liberar mesa:', err);
+      alert('Error al validar y liberar la mesa: ' + (err.message || err));
+      if (prevTable) {
+        setTables(prev => prev.map(t => t.id === tableId ? prevTable : t));
+      }
+    } finally {
+      setIsClosingBill(false);
+    }
+  };
+
   const handleCloseBill = async () => {
     if (!selectedTable) return;
     setIsClosingBill(true);
@@ -841,7 +935,15 @@ export default function AccountsPage() {
     }, 0);
   }, [tableOrders]);
 
-  const activeTableIdsWithOrders = useMemo(() => new Set(orders.map(o => o.table_id)), [orders]);
+  const activeTableIdsWithOrders = useMemo(() => {
+    const set = new Set(orders.map(o => o.table_id));
+    tables.forEach(t => {
+      if (t.service_status === 'paid_qr') {
+        set.add(t.id);
+      }
+    });
+    return set;
+  }, [orders, tables]);
 
   // Mapa de table_id a pedidos pendientes de preparación (estado inicial antes de 'preparing')
   const newOrdersByTableId = useMemo(() => {
@@ -867,7 +969,7 @@ export default function AccountsPage() {
   const counts = useMemo(() => {
     const total = salonTables.length;
     const occupied = salonTables.filter(t => activeTableIdsWithOrders.has(t.id)).length;
-    const calling = salonTables.filter(t => t.service_status === 'calling_waiter' || t.service_status === 'requesting_bill').length;
+    const calling = salonTables.filter(t => t.service_status === 'calling_waiter' || t.service_status === 'requesting_bill' || t.service_status === 'paid_qr').length;
     const newOrders = salonTables.filter(t => (newOrdersByTableId[t.id]?.length || 0) > 0).length;
     const free = Math.max(0, total - occupied);
     return { total, occupied, free, calling, newOrders };
@@ -878,7 +980,7 @@ export default function AccountsPage() {
       if (activeTabFilter === 'new_orders') return (newOrdersByTableId[t.id]?.length || 0) > 0;
       if (activeTabFilter === 'occupied') return activeTableIdsWithOrders.has(t.id);
       if (activeTabFilter === 'free') return !activeTableIdsWithOrders.has(t.id);
-      if (activeTabFilter === 'calling') return t.service_status === 'calling_waiter' || t.service_status === 'requesting_bill';
+      if (activeTabFilter === 'calling') return t.service_status === 'calling_waiter' || t.service_status === 'requesting_bill' || t.service_status === 'paid_qr';
       return true;
     });
   }, [salonTables, activeTabFilter, activeTableIdsWithOrders, newOrdersByTableId]);
@@ -1009,7 +1111,8 @@ export default function AccountsPage() {
           {filteredTables.map(table => {
             const isCalling = table.service_status === 'calling_waiter';
             const isRequestingBill = table.service_status === 'requesting_bill';
-            const isOccupied = activeTableIdsWithOrders.has(table.id);
+            const isPaidQr = table.service_status === 'paid_qr';
+            const isOccupied = activeTableIdsWithOrders.has(table.id) || isPaidQr;
             const pendingOrders = newOrdersByTableId[table.id] || [];
             const hasNewOrder = pendingOrders.length > 0;
             const newOrdersCount = pendingOrders.length;
@@ -1018,15 +1121,22 @@ export default function AccountsPage() {
               <div
                 key={table.id}
                 onClick={() => {
-                  const cachedForTable = orders.filter(
-                    (o) => o.table_id === table.id && o.status !== 'cancelled' && !o.is_paid
-                  );
-                  setTableOrders(cachedForTable);
                   setSelectedTable(table);
                   setModalStep('details');
+                  if (table.service_status === 'paid_qr') {
+                    fetchTableBill(table.id, false, true);
+                  } else {
+                    const cachedForTable = orders.filter(
+                      (o) => o.table_id === table.id && o.status !== 'cancelled' && !o.is_paid
+                    );
+                    setTableOrders(cachedForTable);
+                    fetchTableBill(table.id, cachedForTable.length > 0, false);
+                  }
                 }}
                 className={`relative flex flex-col items-center justify-center p-6 bg-white rounded-3xl border-2 cursor-pointer transition-all hover:-translate-y-1 shadow-sm ${
-                  hasNewOrder && !isCalling && !isRequestingBill
+                  isPaidQr
+                    ? 'border-emerald-500 bg-emerald-50/70 shadow-md ring-2 ring-emerald-500/30 animate-pulse'
+                    : hasNewOrder && !isCalling && !isRequestingBill
                     ? 'border-[#E76F51] bg-[#FFF8F6] shadow-md ring-2 ring-[#E76F51]/20'
                     : isCalling
                     ? 'border-orange-400 bg-orange-50 animate-pulse'
@@ -1038,7 +1148,7 @@ export default function AccountsPage() {
                 }`}
               >
                 {/* Burbuja individual de nuevo pedido (permanece hasta pasar a preparación) */}
-                {hasNewOrder && (
+                {hasNewOrder && !isPaidQr && (
                   <div
                     className="absolute -top-3 -left-3 z-10 flex items-center gap-1.5 bg-[#E76F51] text-white px-2.5 py-1 rounded-full shadow-lg border-2 border-white animate-bounce"
                     title="¡Nuevo pedido pendiente de preparación!"
@@ -1054,19 +1164,26 @@ export default function AccountsPage() {
                 )}
 
                 {/* Status Indicator Badges */}
-                {isCalling && (
+                {isPaidQr && (
+                  <div className="absolute -top-3 -right-3 bg-emerald-600 text-white p-2 rounded-full shadow-lg animate-bounce" title="Pago QR verificado y acreditado">
+                    <CheckCircle2 size={20} />
+                  </div>
+                )}
+                {!isPaidQr && isCalling && (
                   <div className="absolute -top-3 -right-3 bg-orange-500 text-white p-2 rounded-full shadow-lg" title="Mesero llamado">
                     <HandPlatter size={20} />
                   </div>
                 )}
-                {isRequestingBill && (
+                {!isPaidQr && isRequestingBill && (
                   <div className="absolute -top-3 -right-3 bg-green-600 text-white p-2 rounded-full shadow-lg animate-bounce" title="Pide la cuenta">
                     <Receipt size={20} />
                   </div>
                 )}
 
                 <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-3 transition-colors ${
-                  hasNewOrder && !isCalling && !isRequestingBill
+                  isPaidQr
+                    ? 'bg-emerald-200 text-emerald-800 ring-4 ring-emerald-200/50'
+                    : hasNewOrder && !isCalling && !isRequestingBill
                     ? 'bg-orange-100 text-[#E76F51] ring-4 ring-orange-200/50'
                     : isCalling
                     ? 'bg-orange-200 text-orange-700'
@@ -1090,7 +1207,12 @@ export default function AccountsPage() {
                   )}
                 </div>
 
-                {hasNewOrder && !isCalling && !isRequestingBill ? (
+                {isPaidQr ? (
+                  <span className="text-xs font-black text-emerald-700 mt-2 flex items-center gap-1">
+                    <CheckCircle2 size={13} className="text-emerald-600" />
+                    Pago QR Verificado
+                  </span>
+                ) : hasNewOrder && !isCalling && !isRequestingBill ? (
                   <span className="text-xs font-bold text-[#E76F51] mt-2 flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-[#E76F51] animate-ping" />
                     Nuevo pedido
@@ -1188,8 +1310,38 @@ export default function AccountsPage() {
               {/* LEFT SIDE: KANBAN BOARD */}
               <div className="flex-1 flex flex-col overflow-hidden min-h-0 p-3 sm:p-4 lg:p-5">
                 
-                {/* Service Status Banners (Waiter call, SIAT invoice request) */}
+                {/* Service Status Banners (Waiter call, SIAT invoice request, QR payment verified) */}
                 <div className="space-y-3 mb-3 sm:mb-4 flex-shrink-0">
+                  {/* Paid QR banner */}
+                  {selectedTable.service_status === 'paid_qr' && (
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shadow-xs">
+                      <div className="flex items-center gap-3 text-emerald-900">
+                        <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0 text-emerald-700">
+                          <CheckCircle2 size={24} />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className="font-extrabold text-sm text-emerald-900">Pago Verificado por QR (Acreditado)</p>
+                            <span className="px-2 py-0.5 bg-emerald-200 text-emerald-800 text-[11px] font-black rounded-full uppercase tracking-wider">
+                              Acreditado
+                            </span>
+                          </div>
+                          <p className="text-xs text-emerald-700 mt-0.5">
+                            El cliente completó el pago por QR exitosamente. Valida el estado para liberar la mesa.
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleValidateAndReleaseTable(selectedTable.id)}
+                        disabled={isClosingBill}
+                        className="w-full sm:w-auto px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition-colors shadow-xs cursor-pointer flex-shrink-0 flex items-center justify-center gap-1.5"
+                      >
+                        <CheckCircle2 size={16} />
+                        <span>{isClosingBill ? 'Validando...' : 'Validar y Liberar Mesa'}</span>
+                      </button>
+                    </div>
+                  )}
+
                   {/* Waiter call banner */}
                   {selectedTable.service_status === 'calling_waiter' && (
                     <div className="bg-orange-100 border border-orange-200 rounded-2xl p-3 sm:p-4 flex justify-between items-center shadow-xs">
@@ -1390,14 +1542,29 @@ export default function AccountsPage() {
                       </div>
 
                       {/* Big total display */}
-                      <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 text-center">
-                        <span className="text-sm font-bold text-gray-500 block mb-1">
-                          Total a Pagar
-                        </span>
-                        <span className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight">
-                          Bs {totalAmount.toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </span>
-                      </div>
+                      {selectedTable.service_status === 'paid_qr' ? (
+                        <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-200 text-center shadow-xs">
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-100 text-emerald-800 text-xs font-black rounded-full mb-1">
+                            <CheckCircle2 size={14} className="text-emerald-700" />
+                            <span>PAGO QR VERIFICADO</span>
+                          </div>
+                          <span className="text-3xl sm:text-4xl font-black text-emerald-900 tracking-tight block">
+                            Bs {totalAmount.toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                          <span className="text-xs font-bold text-emerald-700 mt-1 block">
+                            Monto acreditado exitosamente
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 text-center">
+                          <span className="text-sm font-bold text-gray-500 block mb-1">
+                            Total a Pagar
+                          </span>
+                          <span className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight">
+                            Bs {totalAmount.toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      )}
 
                       {/* Items mini list */}
                       <div className="max-h-60 overflow-y-auto space-y-2.5 pr-1">
@@ -1417,32 +1584,46 @@ export default function AccountsPage() {
 
                     {/* Actions */}
                     <div className="space-y-2.5 pt-4 border-t border-gray-100">
-                      {flatItems.length > 0 && (
+                      {selectedTable.service_status === 'paid_qr' ? (
                         <button
                           type="button"
-                          onClick={() => setModalStep('checkout')}
-                          className="w-full py-3.5 px-4 bg-[#2E7D32] hover:bg-[#256629] text-white font-bold rounded-2xl transition-all shadow-sm active:scale-[0.98] text-base flex items-center justify-center gap-2 cursor-pointer"
+                          disabled={isClosingBill}
+                          onClick={() => handleValidateAndReleaseTable(selectedTable.id)}
+                          className="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl transition-all shadow-sm active:scale-[0.98] text-base flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                         >
-                          <Receipt size={20} />
-                          <span>Cobrar Cuenta</span>
+                          <CheckCircle2 size={20} />
+                          <span>{isClosingBill ? 'Validando...' : 'Validar y Liberar Mesa'}</span>
                         </button>
-                      )}
+                      ) : (
+                        <>
+                          {flatItems.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setModalStep('checkout')}
+                              className="w-full py-3.5 px-4 bg-[#2E7D32] hover:bg-[#256629] text-white font-bold rounded-2xl transition-all shadow-sm active:scale-[0.98] text-base flex items-center justify-center gap-2 cursor-pointer"
+                            >
+                              <Receipt size={20} />
+                              <span>Cobrar Cuenta</span>
+                            </button>
+                          )}
 
-                      <button
-                        type="button"
-                        disabled={isClosingBill}
-                        onClick={() => {
-                          if (flatItems.length > 0) {
-                            if (!confirm('¿Estás seguro de liberar esta mesa sin cobrar? Se cancelarán los pedidos pendientes de esta mesa.')) {
-                              return;
-                            }
-                          }
-                          handleReleaseTable(selectedTable.id);
-                        }}
-                        className="w-full py-2.5 px-3 border border-gray-200 hover:bg-gray-50 text-gray-600 hover:text-gray-900 font-semibold rounded-xl transition-colors text-sm text-center disabled:opacity-50 cursor-pointer"
-                      >
-                        {isClosingBill ? 'Liberando...' : 'Liberar mesa sin cobrar'}
-                      </button>
+                          <button
+                            type="button"
+                            disabled={isClosingBill}
+                            onClick={() => {
+                              if (flatItems.length > 0) {
+                                if (!confirm('¿Estás seguro de liberar esta mesa sin cobrar? Se cancelarán los pedidos pendientes de esta mesa.')) {
+                                  return;
+                                }
+                              }
+                              handleReleaseTable(selectedTable.id);
+                            }}
+                            className="w-full py-2.5 px-3 border border-gray-200 hover:bg-gray-50 text-gray-600 hover:text-gray-900 font-semibold rounded-xl transition-colors text-sm text-center disabled:opacity-50 cursor-pointer"
+                          >
+                            {isClosingBill ? 'Liberando...' : 'Liberar mesa sin cobrar'}
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 ) : (
