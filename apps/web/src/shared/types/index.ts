@@ -195,6 +195,7 @@ export interface Branch {
   address: string | null;
   city: string | null;
   phone: string | null;
+  google_maps_url?: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -278,6 +279,8 @@ export interface Product {
   updated_at: string;
 }
 
+export type FulfillmentType = 'pickup' | 'delivery';
+
 export interface Order {
   id: string;
   restaurant_id: string;
@@ -285,6 +288,11 @@ export interface Order {
   table_id?: string | null;
   table_number?: string | null;
   order_channel: OrderChannel;
+  fulfillment_type?: FulfillmentType | null;
+  delivery_location_url?: string | null;
+  delivery_instructions?: string | null;
+  delivery_extra_minutes?: number | null;
+  restaurant_maps_url?: string | null;
   customer_session_id: string;
   status: OrderStatus;
   subtotal: number;

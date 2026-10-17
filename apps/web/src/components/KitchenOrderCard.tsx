@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
+import ReactDOMServer from "react-dom/server";
+import { QRCodeSVG } from "qrcode.react";
 import { Order } from "@shared/types";
 import { generateShortOrderCode, getTimeAgo } from "@shared/utils";
 import { NEXT_STATUS, NEXT_STATUS_ACTION_LABEL } from "@shared/constants";
 import { useUpdateOrderStatus } from "@/hooks/useUpdateOrderStatus";
-import { Clock, Printer, Minus, Plus, ChefHat, User, CheckCircle, AlertCircle } from "lucide-react";
+import { Clock, Printer, Minus, Plus, ChefHat, User, CheckCircle, AlertCircle, Bike, MapPin, ExternalLink } from "lucide-react";
 
 interface KitchenOrderCardProps {
   order: Order;
@@ -119,6 +121,22 @@ export function KitchenOrderCard({ order, stationId, onOrderUpdated }: KitchenOr
       )
       .join("");
 
+    const isDelivery = order.fulfillment_type === "delivery";
+    let qrSvgString = "";
+    if (isDelivery && order.delivery_location_url) {
+      try {
+        qrSvgString = ReactDOMServer.renderToString(
+          React.createElement(QRCodeSVG, {
+            value: order.delivery_location_url,
+            size: 135,
+            level: "M",
+          })
+        );
+      } catch (e) {
+        console.error("Error generating QR for delivery print:", e);
+      }
+    }
+
     const html = `
       <html>
         <head>
@@ -127,19 +145,49 @@ export function KitchenOrderCard({ order, stationId, onOrderUpdated }: KitchenOr
             body { font-family: monospace; padding: 20px; color: #000; }
             h1 { font-size: 24px; margin-bottom: 5px; }
             h2 { font-size: 18px; margin-top: 0; color: #555; border-bottom: 1px dashed #000; padding-bottom: 10px; }
+            .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 14px; margin-bottom: 8px; }
+            .badge-delivery { background: #000; color: #fff; }
+            .badge-takeaway { background: #e0e0e0; color: #000; }
             .items { margin-top: 20px; }
+            .delivery-box { margin-top: 15px; border: 1px dashed #000; padding: 10px; border-radius: 6px; text-align: center; }
             .footer { margin-top: 30px; font-size: 12px; border-top: 1px dashed #000; padding-top: 10px; }
           </style>
         </head>
         <body>
-          <h1>${isTakeaway ? (order.table_number || "BARRA / PARA LLEVAR") : `MESA ${order.table_number}`}</h1>
+          <div>
+            ${isDelivery 
+              ? `<div class="badge badge-delivery">🛵 PEDIDO DELIVERY</div>`
+              : isTakeaway
+              ? `<div class="badge badge-takeaway">🛍️ PARA LLEVAR (PICK UP)</div>`
+              : ""
+            }
+          </div>
+          <h1>${isDelivery ? "DELIVERY A DOMICILIO" : isTakeaway ? (order.table_number || "BARRA / PARA LLEVAR") : `MESA ${order.table_number}`}</h1>
           ${order.customer_name ? `<h3>Cliente: ${order.customer_name}</h3>` : ""}
           <h2>Pedido #${generateShortOrderCode(order.id)}</h2>
+
+          ${isDelivery && order.delivery_instructions ? `
+            <div style="margin: 10px 0; padding: 8px; background: #f0f0f0; border-left: 3px solid #000; font-size: 13px;">
+              <strong>Indicaciones de Entrega:</strong><br/>
+              ${order.delivery_instructions}
+            </div>
+          ` : ""}
+
+          ${qrSvgString ? `
+            <div class="delivery-box">
+              <div style="font-size: 12px; font-weight: bold; margin-bottom: 6px;">UBICACIÓN GOOGLE MAPS DEL CLIENTE:</div>
+              <div style="display: flex; justify-content: center; align-items: center; margin: 0 auto;">
+                ${qrSvgString}
+              </div>
+              <div style="font-size: 10px; margin-top: 6px; word-break: break-all;">${order.delivery_location_url}</div>
+            </div>
+          ` : ""}
+
           <div class="items">
             ${itemsHtml}
           </div>
           <div class="footer">
-            Fecha: ${new Date(order.created_at).toLocaleString()}
+            Fecha: ${new Date(order.created_at).toLocaleString("es-BO")}
           </div>
           <script>
             window.onload = function() { window.print(); window.close(); }
@@ -191,12 +239,20 @@ export function KitchenOrderCard({ order, stationId, onOrderUpdated }: KitchenOr
     <div className={`bg-white rounded-2xl p-6 shadow-sm border border-[#E5E7EB] border-l-4 ${borderColors[currentStatus] || "border-l-gray-300"} flex flex-col h-full transition-all`}>
       {/* Cabecera de la tarjeta */}
       <div className="flex justify-between items-start mb-4">
-        <div>
-          <div className="flex items-center gap-2">
+        <div className="flex-1 mr-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <h2 className="text-2xl font-bold text-[#1F2933]">
-              {isTakeaway ? (order.table_number || "Barra") : `Mesa ${order.table_number}`}
+              {order.fulfillment_type === "delivery"
+                ? "Delivery"
+                : isTakeaway
+                ? (order.table_number || "Barra")
+                : `Mesa ${order.table_number}`}
             </h2>
-            {isTakeaway ? (
+            {order.fulfillment_type === "delivery" ? (
+              <span className="text-xs bg-amber-100 text-amber-900 font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 border border-amber-300">
+                <Bike size={13} className="text-amber-700" /> Delivery
+              </span>
+            ) : isTakeaway ? (
               <span className="text-xs bg-purple-100 text-purple-800 font-bold px-2 py-0.5 rounded-full">
                 Para Llevar
               </span>
@@ -212,8 +268,34 @@ export function KitchenOrderCard({ order, stationId, onOrderUpdated }: KitchenOr
               <User size={13} className="text-[#E76F51]" /> {order.customer_name}
             </p>
           )}
+
+          {/* Detalles de Delivery (Ubicación e Indicaciones) */}
+          {order.fulfillment_type === "delivery" && (
+            <div className="mt-2.5 p-2.5 bg-amber-50/80 border border-amber-200 rounded-xl text-xs space-y-1.5">
+              <div className="flex items-center justify-between gap-1">
+                <span className="font-bold text-amber-950 flex items-center gap-1">
+                  <MapPin size={13} className="text-amber-700 shrink-0" /> Ubicación Delivery
+                </span>
+                {order.delivery_location_url && (
+                  <a
+                    href={order.delivery_location_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-900 bg-amber-200/80 hover:bg-amber-300 px-2 py-0.5 rounded-md transition-colors"
+                  >
+                    <ExternalLink size={11} /> Abrir Maps
+                  </a>
+                )}
+              </div>
+              {order.delivery_instructions && (
+                <p className="text-gray-700 italic bg-white/80 p-1.5 rounded-lg border border-amber-100 leading-tight">
+                  "{order.delivery_instructions}"
+                </p>
+              )}
+            </div>
+          )}
         </div>
-        <div className="flex flex-col items-end gap-2">
+        <div className="flex flex-col items-end gap-2 shrink-0">
           <div className="flex items-center text-[#6B7280]">
             <Clock size={16} className="mr-1" />
             <span className="text-sm font-medium">{getTimeAgo(order.created_at)}</span>
@@ -360,7 +442,7 @@ export function KitchenOrderCard({ order, stationId, onOrderUpdated }: KitchenOr
             className="w-full h-14 rounded-xl text-lg font-bold transition-colors bg-[#2E7D32] hover:bg-[#256629] text-white flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 cursor-pointer"
           >
             <CheckCircle size={20} />
-            {loading ? "Actualizando..." : (isTakeaway ? "Listo para Retirar" : "Listo para Servir")}
+            {loading ? "Actualizando..." : (order.fulfillment_type === "delivery" ? "Listo para Despachar" : isTakeaway ? "Listo para Retirar" : "Listo para Servir")}
           </button>
         </div>
       ) : (

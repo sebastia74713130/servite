@@ -23,7 +23,10 @@ import {
   AlertCircle,
   RefreshCw,
   ChefHat,
-  ArrowRight
+  ArrowRight,
+  Bike,
+  MapPin,
+  ExternalLink
 } from "lucide-react";
 
 // Module-level cache for takeaway table lookup
@@ -389,9 +392,15 @@ export default function OrdersPage() {
                         <span className="text-xl font-black text-[#1F2933] font-mono">
                           #{shortCode}
                         </span>
-                        <span className="text-xs bg-amber-100 text-amber-900 font-bold px-2 py-0.5 rounded-full">
-                          {order.table_number || "Barra"}
-                        </span>
+                        {order.fulfillment_type === "delivery" ? (
+                          <span className="text-xs bg-amber-100 text-amber-900 font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 border border-amber-300">
+                            <Bike size={13} className="text-amber-700" /> Delivery
+                          </span>
+                        ) : (
+                          <span className="text-xs bg-purple-100 text-purple-900 font-bold px-2 py-0.5 rounded-full">
+                            {order.table_number || "Barra"}
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-1">
                         <Clock size={13} />
@@ -455,6 +464,33 @@ export default function OrdersPage() {
                     )}
                   </div>
 
+                  {/* Delivery Location & Instructions */}
+                  {order.fulfillment_type === "delivery" && (
+                    <div className="mb-3.5 bg-amber-50/80 border border-amber-200 rounded-xl p-3 text-xs space-y-2">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="font-bold text-amber-950 flex items-center gap-1.5">
+                          <MapPin size={14} className="text-amber-700 shrink-0" />
+                          Ubicación para entrega
+                        </span>
+                        {order.delivery_location_url && (
+                          <a
+                            href={order.delivery_location_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-900 bg-amber-200 hover:bg-amber-300 px-2.5 py-1 rounded-md transition-colors"
+                          >
+                            <ExternalLink size={12} /> Abrir Maps
+                          </a>
+                        )}
+                      </div>
+                      {order.delivery_instructions && (
+                        <p className="text-gray-700 italic bg-white/90 p-2 rounded-lg border border-amber-100 leading-snug">
+                          "{order.delivery_instructions}"
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                   {/* Estimated Time Callout */}
                   {isPreparing && (
                     <div className="mb-3.5 bg-amber-50/80 border border-amber-200 rounded-xl p-3 flex items-center justify-between">
@@ -462,7 +498,12 @@ export default function OrdersPage() {
                         <Clock size={16} className="text-amber-700" />
                         <div>
                           <p className="text-xs font-bold text-amber-950">
-                            Tiempo estimado: ~{order.estimated_prep_minutes || 20} min
+                            Tiempo estimado: ~{(order.estimated_prep_minutes || 20) + (order.fulfillment_type === 'delivery' ? (order.delivery_extra_minutes || 10) : 0)} min
+                            {order.fulfillment_type === 'delivery' && (
+                              <span className="text-[11px] font-normal text-amber-800 ml-1">
+                                (incluye 10m delivery)
+                              </span>
+                            )}
                           </p>
                           {readyAtFormatted && (
                             <p className="text-[11px] text-amber-800">
@@ -476,9 +517,11 @@ export default function OrdersPage() {
 
                   {isReady && (
                     <div className="mb-3.5 bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center gap-2 text-emerald-950">
-                      <span className="text-xl">🛍️</span>
+                      <span className="text-xl">{order.fulfillment_type === 'delivery' ? '🛵' : '🛍️'}</span>
                       <div>
-                        <p className="text-xs font-bold text-emerald-900">Listo para retirar en barra</p>
+                        <p className="text-xs font-bold text-emerald-900">
+                          {order.fulfillment_type === 'delivery' ? 'Listo para despachar con repartidor' : 'Listo para retirar en barra'}
+                        </p>
                         <p className="text-[11px] text-emerald-700">Llamar a {order.customer_name || "Cliente"}</p>
                       </div>
                     </div>
@@ -532,7 +575,7 @@ export default function OrdersPage() {
                         className="w-full py-2.5 bg-[#2E7D32] hover:bg-[#256629] text-white font-bold rounded-xl text-sm transition-colors flex items-center justify-center gap-2 shadow-xs cursor-pointer disabled:opacity-50"
                       >
                         <CheckCircle size={16} />
-                        <span>{isActing ? "Actualizando..." : "Marcar Listo para Recoger"}</span>
+                        <span>{isActing ? "Actualizando..." : (order.fulfillment_type === 'delivery' ? "Listo para Despacho" : "Marcar Listo para Recoger")}</span>
                       </button>
                     ) : isReady ? (
                       <button
@@ -541,7 +584,7 @@ export default function OrdersPage() {
                         className="w-full py-2.5 bg-[#1F2933] hover:bg-black text-white font-bold rounded-xl text-sm transition-colors flex items-center justify-center gap-2 shadow-xs cursor-pointer disabled:opacity-50"
                       >
                         <CheckCircle size={16} />
-                        <span>{isActing ? "Actualizando..." : "Entregar al Cliente"}</span>
+                        <span>{isActing ? "Actualizando..." : (order.fulfillment_type === 'delivery' ? "Marcar Despachado / Entregado" : "Entregar al Cliente")}</span>
                       </button>
                     ) : null}
 

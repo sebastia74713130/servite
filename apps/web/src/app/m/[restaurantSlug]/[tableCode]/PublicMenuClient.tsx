@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useState, useRef, useMemo } from 'react';
-import { RefreshCw, ShoppingCart, X, Plus, Minus, FileText, LayoutGrid, ChevronLeft, Search, CheckCircle, CheckCircle2, AlertCircle, ChevronRight, Download, Trash2, Clock, AlertTriangle, QrCode, Banknote, CreditCard, ArrowRight, ArrowLeft, Check, Bell, Loader2, UtensilsCrossed } from 'lucide-react';
+import { RefreshCw, ShoppingCart, X, Plus, Minus, FileText, LayoutGrid, ChevronLeft, Search, CheckCircle, CheckCircle2, AlertCircle, ChevronRight, Download, Trash2, Clock, AlertTriangle, QrCode, Banknote, CreditCard, ArrowRight, ArrowLeft, Check, Bell, Loader2, UtensilsCrossed, Bike, MapPin, ExternalLink, Info, ShieldAlert } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { QRCodeSVG } from 'qrcode.react';
 import { TakeawayCountdownTimer } from '@/components/TakeawayCountdownTimer';
+import { validateGoogleMapsUrl, getRestaurantMapsUrl } from '@/lib/maps';
 
 import { Product } from '@shared/types';
 
@@ -18,6 +19,7 @@ type CartItem = {
 export default function PublicMenuClient({
   table,
   restaurant,
+  branch,
   categories,
   products,
   subsections = [],
@@ -27,6 +29,7 @@ export default function PublicMenuClient({
 }: {
   table: any;
   restaurant: any;
+  branch?: any;
   categories: any[];
   products: any[];
   subsections?: any[];
@@ -36,6 +39,11 @@ export default function PublicMenuClient({
 }) {
   const [selectedCatId, setSelectedCatId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Google Maps link for the restaurant (used for Pick Up orders)
+  const restaurantMapsUrl = useMemo(() => {
+    return getRestaurantMapsUrl(restaurant, branch);
+  }, [restaurant, branch]);
 
   // Check if restaurant operates under General SIAT Regime (invoices module enabled) or Simplificado
   const hasInvoices = !Array.isArray(restaurant?.enabled_modules) || restaurant.enabled_modules.length === 0
@@ -151,10 +159,16 @@ export default function PublicMenuClient({
   const dineInPaymentCompletedRef = useRef(false);
   const [tableStatus, setTableStatus] = useState<string | null>(table.service_status || null);
 
-  // Customer data for takeaway orders (name for calling, NIT for invoicing)
+  // Customer data for takeaway/delivery orders (name for calling, NIT for invoicing, delivery data)
   const [customerName, setCustomerName] = useState('');
   const [customerNit, setCustomerNit] = useState('');
   const [showCustomerDataStep, setShowCustomerDataStep] = useState(false);
+  const [fulfillmentType, setFulfillmentType] = useState<'pickup' | 'delivery'>('pickup');
+  const [deliveryLocationUrl, setDeliveryLocationUrl] = useState('');
+  const [deliveryInstructions, setDeliveryInstructions] = useState('');
+  const [deliveryUrlError, setDeliveryUrlError] = useState<string | null>(null);
+  const [showDeliveryNoticeModal, setShowDeliveryNoticeModal] = useState(false);
+  const [deliveryNoticeConfirmed, setDeliveryNoticeConfirmed] = useState(false);
 
   useEffect(() => {
     if (externalSelectedCatId !== undefined) {
@@ -181,11 +195,15 @@ export default function PublicMenuClient({
         }
         setFoodCourtSessionId(fcid);
 
-        // Restore saved customer name/NIT for this session
+        // Restore saved customer name/NIT and delivery details for this session
         const savedName = localStorage.getItem('customer_name') || '';
         const savedNit = localStorage.getItem('customer_nit') || '';
+        const savedLocation = localStorage.getItem('delivery_location_url') || '';
+        const savedInstructions = localStorage.getItem('delivery_instructions') || '';
         if (savedName) setCustomerName(savedName);
         if (savedNit) setCustomerNit(savedNit);
+        if (savedLocation) setDeliveryLocationUrl(savedLocation);
+        if (savedInstructions) setDeliveryInstructions(savedInstructions);
       } else {
         const endedTimestampStr = localStorage.getItem(`session_ended_timestamp_${table.id}`);
         let isEnded = false;
@@ -299,7 +317,7 @@ export default function PublicMenuClient({
             if (!exists) return [...prev, payload.new];
             return prev.map(o => o.id === payload.new.id ? { ...o, ...payload.new } : o);
           });
-          if (payload.new.status === 'ready' && payload.old?.status !== 'ready') {
+          if (table.type === 'takeaway' && payload.new.status === 'ready' && payload.old?.status !== 'ready') {
             setServiceMessage("¡Tu pedido está listo! Por favor acércate a la barra a recogerlo.");
             if (alarmAudioRef.current) {
               alarmAudioRef.current.currentTime = 0;
@@ -421,6 +439,9 @@ export default function PublicMenuClient({
   const keepAwakeAudioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
+    // La alarma y el audio beeper solo aplican para flujo de Takeaway / Para llevar
+    if (table.type !== 'takeaway') return;
+
     // 1. Usar un archivo de audio real de silencio (10 segundos) y reproducirlo normalmente (no muteado)
     // Esto mantiene el hilo de JS y la sesión de audio activos en iOS Safari en el fondo
     keepAwakeAudioRef.current = new Audio('https://raw.githubusercontent.com/anars/blank-audio/master/10-seconds-of-silence.mp3');
@@ -450,8 +471,14 @@ export default function PublicMenuClient({
     return () => {
       document.removeEventListener('touchstart', unlockAudio);
       document.removeEventListener('click', unlockAudio);
+      if (keepAwakeAudioRef.current) {
+        keepAwakeAudioRef.current.pause();
+      }
+      if (alarmAudioRef.current) {
+        alarmAudioRef.current.pause();
+      }
     };
-  }, []);
+  }, [table.type]);
 
   // Form state for selected product
   const [quantity, setQuantity] = useState(1);
@@ -551,12 +578,14 @@ export default function PublicMenuClient({
       return;
     }
 
-    // Despertar / pre-activar audio en iOS de forma síncrona
-    if (keepAwakeAudioRef.current) {
-      keepAwakeAudioRef.current.play().catch(() => {});
-    }
-    if (alarmAudioRef.current) {
-      alarmAudioRef.current.play().then(() => alarmAudioRef.current!.pause()).catch(() => {});
+    // Despertar / pre-activar audio en iOS de forma síncrona solo para takeaway
+    if (table.type === 'takeaway') {
+      if (keepAwakeAudioRef.current) {
+        keepAwakeAudioRef.current.play().catch(() => {});
+      }
+      if (alarmAudioRef.current) {
+        alarmAudioRef.current.play().then(() => alarmAudioRef.current!.pause()).catch(() => {});
+      }
     }
 
     setIsVerifyingPayment(true);
@@ -793,9 +822,9 @@ export default function PublicMenuClient({
       }
     }
     
-    // INICIAR AUDIO SILENCIOSO DE FORMA SÍNCRONA
+    // INICIAR AUDIO SILENCIOSO DE FORMA SÍNCRONA (Solo para Takeaway / Beeper)
     // Esto es vital para iOS, si se hace después de un 'await', iOS lo bloquea
-    if (isPaid) {
+    if (isPaid && table.type === 'takeaway') {
       if (keepAwakeAudioRef.current) {
         keepAwakeAudioRef.current.play().catch(() => {});
       }
@@ -859,13 +888,23 @@ export default function PublicMenuClient({
             targetOrderId = matchingOrder.id;
             
             // Update the total of the existing order
+            const updatePayload: any = {
+              subtotal: matchingOrder.subtotal + groupTotal,
+              total: matchingOrder.total + groupTotal,
+              updated_at: new Date().toISOString()
+            };
+            if (table.type === 'takeaway') {
+              updatePayload.fulfillment_type = fulfillmentType;
+              if (fulfillmentType === 'delivery') {
+                const val = validateGoogleMapsUrl(deliveryLocationUrl);
+                updatePayload.delivery_location_url = val.isValid ? val.normalizedUrl : deliveryLocationUrl.trim();
+                updatePayload.delivery_instructions = deliveryInstructions.trim() || null;
+                updatePayload.delivery_extra_minutes = 10;
+              }
+            }
             await supabase
               .from('orders')
-              .update({
-                subtotal: matchingOrder.subtotal + groupTotal,
-                total: matchingOrder.total + groupTotal,
-                updated_at: new Date().toISOString()
-              })
+              .update(updatePayload)
               .eq('id', targetOrderId);
               
             // Update local reference so if we merge again it's accurate
@@ -896,6 +935,13 @@ export default function PublicMenuClient({
             if (customerName.trim()) orderPayload.customer_name = customerName.trim();
             if (customerNit.trim()) orderPayload.customer_nit = customerNit.trim();
             if (foodCourtSessionId) orderPayload.food_court_session_id = foodCourtSessionId;
+            orderPayload.fulfillment_type = fulfillmentType;
+            if (fulfillmentType === 'delivery') {
+              const val = validateGoogleMapsUrl(deliveryLocationUrl);
+              orderPayload.delivery_location_url = val.isValid ? val.normalizedUrl : deliveryLocationUrl.trim();
+              orderPayload.delivery_instructions = deliveryInstructions.trim() || null;
+              orderPayload.delivery_extra_minutes = 10;
+            }
           }
 
           const { data: newOrder, error: orderError } = await supabase
@@ -1424,13 +1470,6 @@ export default function PublicMenuClient({
 
   const handleManualVerifyDineIn = async () => {
     if (!dineInQrId) return;
-
-    if (keepAwakeAudioRef.current) {
-      keepAwakeAudioRef.current.play().catch(() => {});
-    }
-    if (alarmAudioRef.current) {
-      alarmAudioRef.current.play().then(() => alarmAudioRef.current!.pause()).catch(() => {});
-    }
 
     setIsVerifyingPayment(true);
     try {
@@ -2102,12 +2141,76 @@ export default function PublicMenuClient({
               <span className="text-2xl font-bold text-gray-900">Bs {cartTotal.toLocaleString('es-BO')}</span>
             </div>
             
-            {/* Takeaway checkout: Step 1 = Customer Data, Step 2 = Payment QR */}
+            {/* Takeaway checkout: Step 1 = Modalidad (Pick Up / Delivery) & Datos, Step 2 = Payment QR */}
             {table.type === 'takeaway' && showCustomerDataStep ? (
               <div className="space-y-4">
-                <p className="text-sm font-semibold text-gray-700">¿Cómo te llamamos cuando esté listo?</p>
+                {/* Selector de Modalidad: Pick Up vs Delivery */}
                 <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Tu nombre <span className="text-orange-500">*</span></label>
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-2">
+                    ¿Cómo deseas recibir tu pedido?
+                  </label>
+                  <div className="grid grid-cols-2 gap-2 bg-gray-100 p-1.5 rounded-2xl">
+                    <button
+                      type="button"
+                      onClick={() => setFulfillmentType('pickup')}
+                      className={`py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                        fulfillmentType === 'pickup'
+                          ? 'bg-white text-gray-900 shadow-xs border border-gray-200/60'
+                          : 'text-gray-500 hover:text-gray-800'
+                      }`}
+                    >
+                      <span className="text-base">🛍️</span>
+                      <span>Para Llevar</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!deliveryNoticeConfirmed) {
+                          setShowDeliveryNoticeModal(true);
+                        } else {
+                          setFulfillmentType('delivery');
+                        }
+                      }}
+                      className={`py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                        fulfillmentType === 'delivery'
+                          ? 'bg-amber-500 text-white shadow-xs'
+                          : 'text-gray-500 hover:text-gray-800'
+                      }`}
+                    >
+                      <Bike size={16} />
+                      <span>Delivery</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Banner de información de la modalidad seleccionada */}
+                {fulfillmentType === 'pickup' ? (
+                  <div className="p-3 bg-purple-50 border border-purple-200 rounded-xl text-xs text-purple-950 flex items-start gap-2">
+                    <MapPin size={16} className="text-purple-700 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold">Retiro en Mostrador / Barra:</span>
+                      <p className="text-purple-800 mt-0.5 leading-snug">
+                        Al pagar verás el tiempo de preparación definido por cocina y la ubicación en Google Maps del restaurante para recogerlo.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-xs text-amber-950 space-y-1.5">
+                    <div className="flex items-center gap-1.5 font-bold text-amber-900">
+                      <AlertCircle size={15} className="text-amber-700 shrink-0" />
+                      <span>Aviso de costo del servicio de delivery:</span>
+                    </div>
+                    <p className="text-amber-800 text-[11px] leading-relaxed">
+                      El costo de envío <strong>no está incluido</strong> en el monto de tus productos. Este servicio tiene un costo aparte que <strong>se paga directamente al repartidor</strong> al momento de la entrega.
+                    </p>
+                  </div>
+                )}
+
+                {/* Nombre del cliente */}
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                    {fulfillmentType === 'delivery' ? 'Nombre para la entrega' : 'Tu nombre'} <span className="text-orange-500">*</span>
+                  </label>
                   <input
                     type="text"
                     value={customerName}
@@ -2123,9 +2226,13 @@ export default function PublicMenuClient({
                     autoFocus
                   />
                 </div>
+
+                {/* NIT opcional si hay facturación */}
                 {hasInvoices && (
                   <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">NIT (opcional, para factura)</label>
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      NIT o CI (opcional, para factura)
+                    </label>
                     <input
                       type="text"
                       value={customerNit}
@@ -2141,15 +2248,98 @@ export default function PublicMenuClient({
                     />
                   </div>
                 )}
+
+                {/* Campos requeridos para Delivery */}
+                {fulfillmentType === 'delivery' && (
+                  <div className="space-y-3 pt-1 border-t border-gray-100">
+                    <div>
+                      <div className="flex justify-between items-center">
+                        <label className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1">
+                          <MapPin size={13} className="text-amber-600" /> Link de tu Ubicación Actual <span className="text-red-500">*</span>
+                        </label>
+                        <span className="text-[10px] text-gray-500 font-semibold">Google Maps</span>
+                      </div>
+                      <input
+                        type="url"
+                        value={deliveryLocationUrl}
+                        onChange={e => {
+                          setDeliveryLocationUrl(e.target.value);
+                          if (deliveryUrlError) {
+                            const check = validateGoogleMapsUrl(e.target.value);
+                            if (check.isValid) setDeliveryUrlError(null);
+                          }
+                        }}
+                        onFocus={(e) => {
+                          setTimeout(() => {
+                            e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                          }, 300);
+                        }}
+                        placeholder="https://maps.app.goo.gl/... o https://goo.gl/maps/..."
+                        className={`w-full mt-1.5 px-4 py-3 border rounded-xl text-xs sm:text-sm text-gray-900 focus:outline-none focus:ring-2 ${
+                          deliveryUrlError
+                            ? 'border-red-400 bg-red-50/30 ring-1 ring-red-400'
+                            : 'border-gray-200'
+                        }`}
+                        style={{ '--tw-ring-color': brandColor } as React.CSSProperties}
+                      />
+                      {deliveryUrlError ? (
+                        <p className="text-xs text-red-600 font-medium mt-1 flex items-center gap-1">
+                          <AlertCircle size={13} className="shrink-0" /> {deliveryUrlError}
+                        </p>
+                      ) : (
+                        <p className="text-[11px] text-gray-500 mt-1 leading-snug">
+                          💡 Abre Google Maps en tu celular, busca tu ubicación actual, presiona <b>Compartir</b> y pega el link aquí.
+                        </p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                        Indicaciones para la entrega (opcional)
+                      </label>
+                      <textarea
+                        value={deliveryInstructions}
+                        onChange={e => setDeliveryInstructions(e.target.value)}
+                        placeholder="Ej. Casa blanca con portón café, timbre al lado derecho, tocar timbre..."
+                        rows={2}
+                        className="w-full mt-1.5 px-4 py-2.5 border border-gray-200 rounded-xl text-xs sm:text-sm text-gray-900 focus:outline-none focus:ring-2 resize-none"
+                        style={{ '--tw-ring-color': brandColor } as React.CSSProperties}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Botones Atrás y Continuar al Pago */}
                 <div className="flex gap-3 pt-2">
                   <button
+                    type="button"
                     onClick={() => setShowCustomerDataStep(false)}
-                    className="flex-1 py-3 rounded-xl font-bold text-gray-600 bg-gray-100"
+                    className="flex-1 py-3 rounded-xl font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors cursor-pointer"
                   >
                     Atrás
                   </button>
                   <button
+                    type="button"
                     onClick={() => {
+                      if (!customerName.trim()) {
+                        alert("Por favor ingresa tu nombre.");
+                        return;
+                      }
+
+                      if (fulfillmentType === 'delivery') {
+                        const val = validateGoogleMapsUrl(deliveryLocationUrl);
+                        if (!val.isValid) {
+                          setDeliveryUrlError(val.error || "Debes ingresar un enlace válido de Google Maps.");
+                          return;
+                        }
+                        setDeliveryUrlError(null);
+                        setDeliveryLocationUrl(val.normalizedUrl);
+                        localStorage.setItem('delivery_location_url', val.normalizedUrl);
+                        if (deliveryInstructions.trim()) {
+                          localStorage.setItem('delivery_instructions', deliveryInstructions.trim());
+                        }
+                      }
+
                       // Save to localStorage so it persists across restaurants
                       if (customerName.trim()) localStorage.setItem('customer_name', customerName.trim());
                       if (customerNit.trim()) localStorage.setItem('customer_nit', customerNit.trim());
@@ -2158,10 +2348,11 @@ export default function PublicMenuClient({
                       handleGenerateQR();
                     }}
                     disabled={!customerName.trim()}
-                    className="flex-1 py-3 rounded-xl font-bold text-white disabled:opacity-40 transition-transform active:scale-95"
+                    className="flex-1 py-3 rounded-xl font-bold text-white disabled:opacity-40 transition-transform active:scale-95 cursor-pointer shadow-md flex items-center justify-center gap-1.5"
                     style={{ backgroundColor: brandColor }}
                   >
-                    Continuar
+                    <span>Continuar al Pago</span>
+                    <ArrowRight size={16} />
                   </button>
                 </div>
               </div>
@@ -2372,7 +2563,7 @@ export default function PublicMenuClient({
                           {/* Takeaway Estimated Prep Time Banner / Countdown */}
                           {table?.type === 'takeaway' && (
                             <div className="mb-3">
-                              <TakeawayCountdownTimer order={order} variant="card" />
+                              <TakeawayCountdownTimer order={order} variant="card" restaurantMapsUrl={restaurantMapsUrl} />
                             </div>
                           )}
                           {order.order_items?.map((item: any) => (
@@ -3192,6 +3383,55 @@ export default function PublicMenuClient({
         </div>
       )}
 
+      {/* ── Modal de Aviso sobre Costo de Delivery ── */}
+      {showDeliveryNoticeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-amber-200 text-center space-y-4">
+            <div className="w-16 h-16 mx-auto bg-amber-100 rounded-2xl flex items-center justify-center text-3xl shadow-inner">
+              🛵
+            </div>
+            <div>
+              <h3 className="text-lg font-black text-gray-900">Aviso sobre el Delivery</h3>
+              <div className="text-xs font-medium text-amber-950 bg-amber-50 rounded-xl p-3.5 border border-amber-200 mt-2 text-left leading-relaxed space-y-1.5">
+                <p>
+                  ⚠️ <strong>El servicio de delivery tiene un costo aparte</strong> de los productos.
+                </p>
+                <p className="text-amber-900">
+                  Este monto no está incluido en el código QR y se paga de manera independiente directamente al repartidor al momento de recibir tu pedido.
+                </p>
+              </div>
+            </div>
+            <p className="text-xs font-semibold text-gray-600">
+              ¿Deseas continuar con pedido a domicilio?
+            </p>
+            <div className="flex flex-col gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setDeliveryNoticeConfirmed(true);
+                  setShowDeliveryNoticeModal(false);
+                  setFulfillmentType('delivery');
+                }}
+                className="w-full py-3.5 rounded-xl font-bold text-white transition-all shadow-md active:scale-95 cursor-pointer text-sm"
+                style={{ backgroundColor: brandColor }}
+              >
+                Sí, continuar con Delivery
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDeliveryNoticeModal(false);
+                  setFulfillmentType('pickup');
+                }}
+                className="w-full py-2.5 rounded-xl font-bold text-gray-600 hover:bg-gray-100 transition-colors text-xs cursor-pointer"
+              >
+                No, prefiero retirar en el restaurante
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Persistent Floating Takeaway Countdown Banner ── */}
       {table?.type === 'takeaway' && !showBill && !showCart && activeTakeawayOrder && (
         <div 
@@ -3202,6 +3442,7 @@ export default function PublicMenuClient({
             <TakeawayCountdownTimer
               order={activeTakeawayOrder}
               variant="banner"
+              restaurantMapsUrl={restaurantMapsUrl}
               onViewDetails={() => handleFetchBill()}
             />
           </div>

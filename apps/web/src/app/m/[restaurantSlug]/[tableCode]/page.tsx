@@ -107,6 +107,15 @@ export default async function PublicMenuPage({ params }: { params: Promise<{ res
   }
 
   const branchId = tableData.branch_id;
+  let branchData = null;
+  if (branchId) {
+    const { data: b } = await supabaseAdmin
+      .from('branches')
+      .select('*')
+      .eq('id', branchId)
+      .maybeSingle();
+    branchData = b;
+  }
 
   // 2. Fetch categories
   const { data: categories } = await supabaseAdmin
@@ -140,6 +149,7 @@ export default async function PublicMenuPage({ params }: { params: Promise<{ res
     <PublicMenuClient 
       table={tableData as any}
       restaurant={restaurant as any}
+      branch={branchData as any}
       categories={categories as any[]}
       products={products as any[]}
       subsections={subsections as any[]}
