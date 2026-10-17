@@ -7,8 +7,7 @@ import { useKitchenStations } from "@/hooks/useKitchenStations";
 import { KitchenOrderCard } from "@/components/KitchenOrderCard";
 import { LoadingState } from "@/components/LoadingState";
 import { EmptyState } from "@/components/EmptyState";
-import Link from "next/link";
-import { ArrowLeft, ChefHat } from "lucide-react";
+import { ChefHat, RefreshCw } from "lucide-react";
 
 export default function KitchenPage() {
   const { restaurant, branch, loading: sessionLoading } = useRestaurantSession();
@@ -31,17 +30,30 @@ export default function KitchenPage() {
   });
 
   return (
-    <div className="p-8">
-      <div className="flex justify-between items-center mb-8">
-        <div className="flex items-center gap-4">
-          <Link href="/" className="w-10 h-10 flex items-center justify-center bg-white border border-[#E5E7EB] rounded-full text-[#6B7280] hover:text-[#1F2933] hover:bg-gray-50 transition-colors">
-            <ArrowLeft size={20} />
-          </Link>
-          <h1 className="text-3xl font-bold text-[#1F2933]">Cocina</h1>
+    <div className="h-full flex flex-col">
+      {/* Header */}
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold text-[#1F2933]">Cocina</h1>
+            <div className="flex items-center space-x-1.5 text-[#2E7D32] bg-[#EDF7ED] px-3 py-1 rounded-full text-xs font-semibold">
+              <span className="w-2 h-2 rounded-full bg-[#2E7D32] animate-pulse" />
+              <span>Tiempo real</span>
+            </div>
+          </div>
+          <p className="text-gray-500 mt-1">
+            Visualización y control de comandas en preparación por estación de cocina.
+          </p>
         </div>
-        <div className="flex items-center space-x-2 text-[#2E7D32] bg-[#EDF7ED] px-4 py-2 rounded-full">
-          <div className="w-2 h-2 rounded-full bg-[#2E7D32] animate-pulse" />
-          <span className="font-semibold text-sm">Sincronizado en tiempo real</span>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => refreshOrders && refreshOrders()}
+            title="Refrescar comandas"
+            className="w-10 h-10 flex items-center justify-center bg-white border border-gray-200 rounded-xl text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors shadow-2xs cursor-pointer"
+          >
+            <RefreshCw size={18} />
+          </button>
         </div>
       </div>
 

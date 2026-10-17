@@ -42,7 +42,6 @@ function DashboardContent({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const isKitchen = pathname === "/kitchen";
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { loading, restaurant, billingCycle, hasModule } = useRestaurantSession();
 
@@ -61,20 +60,6 @@ function DashboardContent({
   const shouldBlockSubscription = !isSubscriptionActive && !isMenuOrSettings;
 
   if (shouldBlockSubscription) {
-    if (isKitchen) {
-       return (
-         <div className="min-h-screen bg-[#F9FAFB] flex flex-col items-center justify-center p-8">
-            <div className="text-center max-w-md bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
-              <Lock size={48} className="mx-auto text-gray-400 mb-4" />
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Suscripción Inactiva</h2>
-              <p className="text-gray-500 mb-6">Para acceder a este módulo y operar tu restaurante, necesitas activar un plan.</p>
-              <Link href="/settings/subscription" className="bg-[#E76F51] text-white px-6 py-3 rounded-xl font-bold inline-block hover:bg-[#d65e40] transition-colors">
-                Ver Planes de Suscripción
-              </Link>
-            </div>
-         </div>
-       );
-    }
     return (
       <div className="min-h-screen bg-[#F9FAFB] flex flex-col">
         <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
@@ -110,23 +95,6 @@ function DashboardContent({
   if (!isModuleEnabled && requiredModule) {
     const modInfo = AVAILABLE_MODULES[requiredModule];
     const moduleName = modInfo?.name || requiredModule;
-
-    if (isKitchen) {
-      return (
-        <div className="min-h-screen bg-[#F9FAFB] flex flex-col items-center justify-center p-8">
-          <div className="text-center max-w-md bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
-            <Lock size={48} className="mx-auto text-amber-500 mb-4" />
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Módulo No Contratado</h2>
-            <p className="text-gray-500 mb-6">
-              Tu plan actual no incluye la pantalla de <strong>Cocina & KDS</strong>. Contacta al administrador para activarlo.
-            </p>
-            <Link href="/" className="bg-[#2F4F3E] text-white px-6 py-3 rounded-xl font-bold inline-block">
-              Ir al Inicio
-            </Link>
-          </div>
-        </div>
-      );
-    }
 
     return (
       <div className="min-h-screen bg-[#F9FAFB] flex flex-col">
@@ -173,10 +141,6 @@ function DashboardContent({
         </main>
       </div>
     );
-  }
-
-  if (isKitchen) {
-    return <div className="min-h-screen bg-[#F9FAFB]">{children}</div>;
   }
 
   return (

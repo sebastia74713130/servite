@@ -318,11 +318,17 @@ export default function PublicMenuClient({
             return prev.map(o => o.id === payload.new.id ? { ...o, ...payload.new } : o);
           });
           if (table.type === 'takeaway' && payload.new.status === 'ready' && payload.old?.status !== 'ready') {
-            setServiceMessage("¡Tu pedido está listo! Por favor acércate a la barra a recogerlo.");
-            if (alarmAudioRef.current) {
-              alarmAudioRef.current.currentTime = 0;
-              alarmAudioRef.current.play().catch(() => {});
-              setIsAlarmRinging(true);
+            const isDeliveryOrder = payload.new.fulfillment_type === 'delivery';
+            if (!isDeliveryOrder) {
+              setServiceMessage("¡Tu pedido está listo! Por favor acércate a la barra a recogerlo.");
+              if (alarmAudioRef.current) {
+                alarmAudioRef.current.currentTime = 0;
+                alarmAudioRef.current.play().catch(() => {});
+                setIsAlarmRinging(true);
+              }
+            } else {
+              // En delivery no suena alarma de retiro en barra
+              setServiceMessage("¡Tu pedido ha sido preparado y va en camino con el repartidor!");
             }
           }
         } else if (payload.eventType === 'INSERT' && payload.new) {
@@ -368,11 +374,17 @@ export default function PublicMenuClient({
           filter: `food_court_session_id=eq.${foodCourtSessionId}`
         }, (payload) => {
           if (payload.new.status === 'ready' && payload.old.status !== 'ready') {
-            setServiceMessage("¡Tu pedido está listo! Por favor acércate a la barra a recogerlo.");
-            if (alarmAudioRef.current) {
-              alarmAudioRef.current.currentTime = 0;
-              alarmAudioRef.current.play().catch(() => {});
-              setIsAlarmRinging(true);
+            const isDeliveryOrder = payload.new.fulfillment_type === 'delivery';
+            if (!isDeliveryOrder) {
+              setServiceMessage("¡Tu pedido está listo! Por favor acércate a la barra a recogerlo.");
+              if (alarmAudioRef.current) {
+                alarmAudioRef.current.currentTime = 0;
+                alarmAudioRef.current.play().catch(() => {});
+                setIsAlarmRinging(true);
+              }
+            } else {
+              // En delivery no suena alarma de retiro en barra
+              setServiceMessage("¡Tu pedido ha sido preparado y va en camino con el repartidor!");
             }
           }
           // Update order status and details in the bill view
@@ -578,8 +590,8 @@ export default function PublicMenuClient({
       return;
     }
 
-    // Despertar / pre-activar audio en iOS de forma síncrona solo para takeaway
-    if (table.type === 'takeaway') {
+    // Despertar / pre-activar audio en iOS de forma síncrona solo para takeaway (Pick Up)
+    if (table.type === 'takeaway' && fulfillmentType !== 'delivery') {
       if (keepAwakeAudioRef.current) {
         keepAwakeAudioRef.current.play().catch(() => {});
       }
@@ -822,9 +834,9 @@ export default function PublicMenuClient({
       }
     }
     
-    // INICIAR AUDIO SILENCIOSO DE FORMA SÍNCRONA (Solo para Takeaway / Beeper)
-    // Esto es vital para iOS, si se hace después de un 'await', iOS lo bloquea
-    if (isPaid && table.type === 'takeaway') {
+    // INICIAR AUDIO SILENCIOSO DE FORMA SÍNCRONA (Solo para Pick Up / Para llevar)
+    // Para pedidos con delivery no se requiere alarma de beeper
+    if (isPaid && table.type === 'takeaway' && fulfillmentType !== 'delivery') {
       if (keepAwakeAudioRef.current) {
         keepAwakeAudioRef.current.play().catch(() => {});
       }
@@ -2223,7 +2235,6 @@ export default function PublicMenuClient({
                     placeholder="Ej. Juan Pérez"
                     className="w-full mt-1.5 px-4 py-3 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2"
                     style={{ '--tw-ring-color': brandColor } as React.CSSProperties}
-                    autoFocus
                   />
                 </div>
 
@@ -2633,12 +2644,14 @@ export default function PublicMenuClient({
                     <p className="text-xs text-gray-500 text-center font-medium bg-gray-100 p-2 rounded-lg w-full mb-2">
                       Sigue el estado de tu pedido aquí.
                     </p>
-                    <div className="bg-blue-50 border border-blue-100 p-3 rounded-xl text-left mb-4">
-                      <p className="text-xs text-blue-800 font-medium flex items-start gap-2">
-                        <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
-                        <span>Mantén esta pantalla abierta. Si utilizas otras apps multimedia, la alarma de 'pedido listo' no sonará.</span>
-                      </p>
-                    </div>
+                    {activeTakeawayOrder?.fulfillment_type !== 'delivery' && (
+                      <div className="bg-blue-50 border border-blue-100 p-3 rounded-xl text-left mb-4">
+                        <p className="text-xs text-blue-800 font-medium flex items-start gap-2">
+                          <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
+                          <span>Mantén esta pantalla abierta. Si utilizas otras apps multimedia, la alarma de 'pedido listo' no sonará.</span>
+                        </p>
+                      </div>
+                    )}
                     <button 
                       onClick={handleClearHistory}
                       className="w-full py-3 rounded-xl font-bold text-red-600 bg-red-50 border border-red-100 active:scale-95 transition-transform flex items-center justify-center gap-2"
