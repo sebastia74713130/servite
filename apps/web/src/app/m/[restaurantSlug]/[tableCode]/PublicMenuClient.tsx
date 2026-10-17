@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef, useMemo } from 'react';
-import { RefreshCw, ShoppingCart, X, Plus, Minus, FileText, LayoutGrid, ChevronLeft, Search, CheckCircle, CheckCircle2, AlertCircle, ChevronRight, Download, Trash2, Clock, AlertTriangle, QrCode, Banknote, CreditCard, ArrowRight, ArrowLeft, Check, Bell, Loader2, UtensilsCrossed, Bike, MapPin, ExternalLink, Info, ShieldAlert } from 'lucide-react';
+import { RefreshCw, ShoppingCart, X, Plus, Minus, FileText, LayoutGrid, ChevronLeft, Search, CheckCircle, CheckCircle2, AlertCircle, ChevronRight, Download, Trash2, Clock, AlertTriangle, QrCode, Banknote, CreditCard, ArrowRight, ArrowLeft, Check, Bell, Loader2, UtensilsCrossed, Bike, MapPin, ExternalLink, Info, ShieldAlert, Receipt } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { QRCodeSVG } from 'qrcode.react';
 import { TakeawayCountdownTimer } from '@/components/TakeawayCountdownTimer';
@@ -398,22 +398,8 @@ export default function PublicMenuClient({
     }
   }, [table.type, foodCourtSessionId, isPreviewMode]);
 
-  // Efecto para finalizar la sesión cuando todos los pedidos de la barra estén entregados
-  useEffect(() => {
-    if (isPreviewMode) return;
-    if (table.type === 'takeaway' && billOrders.length > 0) {
-      const allDelivered = billOrders.every(o => o.status === 'delivered' || o.status === 'cancelled');
-      if (allDelivered) {
-        // Le damos un pequeño retraso para que alcance a leer "¡Tu pedido está listo!" si estaba en otra vista
-        const timer = setTimeout(() => {
-          setSessionEnded(true);
-          // Borramos la sesión para que si vuelve a escanear, empiece de cero
-          localStorage.removeItem(`device_session_id_${table.id}`);
-        }, 5000); // 5 segundos después de que el último pedido se marca como entregado
-        return () => clearTimeout(timer);
-      }
-    }
-  }, [billOrders, table.id, table.type]);
+  // En takeaway (pickup y delivery), no se expulsa al usuario al entregarse sus pedidos.
+  // El usuario permanece en la aplicación con acceso a su historial, estado, factura y comprobantes.
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -537,6 +523,7 @@ export default function PublicMenuClient({
     message: string;
   } | null>(null);
   const [autoEmittedCuf, setAutoEmittedCuf] = useState<string | null>(null);
+  const [lastPaidOrderId, setLastPaidOrderId] = useState<string | null>(null);
 
   useEffect(() => {
     let pollInterval: NodeJS.Timeout;
@@ -1066,6 +1053,9 @@ export default function PublicMenuClient({
       if (emittedCuf) {
         setAutoEmittedCuf(emittedCuf);
       }
+      if (isPaid && firstOrderId) {
+        setLastPaidOrderId(firstOrderId);
+      }
 
       // Si el pedido se pagó exitosamente, redirigir a la pestaña de Mi Cuenta y actualizar los datos
       if (isPaid) {
@@ -1201,7 +1191,7 @@ export default function PublicMenuClient({
       setDeviceSessionId(null);
     }
     localStorage.removeItem(`device_session_id_${table.id}`);
-    setSessionEnded(true);
+    setShowBill(false);
     setShowClearHistoryModal(false);
   };
 
@@ -1576,30 +1566,42 @@ export default function PublicMenuClient({
         <h2 className="text-3xl font-bold text-gray-900 mb-3">¡Gracias por venir!</h2>
         <p className="text-gray-500 text-lg max-w-sm mb-8">Esperamos que hayas disfrutado tu experiencia en {restaurant?.name || 'nuestro restaurante'}. ¡Vuelve pronto!</p>
         
-        {hasInvoices && (
+        <div className="flex flex-col gap-3 w-full max-w-xs">
+          {hasInvoices && (
+            <button
+              onClick={() => {
+                const url = cufToDownload
+                  ? `/api/siat/factura/print?cuf=${cufToDownload}&tableId=${table.id}&restaurantId=${restaurant.id}`
+                  : `/api/siat/factura/print?tableId=${table.id}&restaurantId=${restaurant.id}`;
+                window.open(url, '_blank');
+              }}
+              className="flex items-center justify-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-full font-medium active:scale-95 transition-transform"
+            >
+              <FileText size={20} />
+              Ver Factura Electrónica
+            </button>
+          )}
+
+          {!hasInvoices && (
+            <button
+              onClick={() => window.open(`/api/receipt/print?tableId=${table.id}&restaurantId=${restaurant.id}`, '_blank')}
+              className="flex items-center justify-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-full font-medium active:scale-95 transition-transform"
+            >
+              <Receipt size={20} />
+              Ver Comprobante de Venta
+            </button>
+          )}
+
           <button
             onClick={() => {
-              const url = cufToDownload
-                ? `/api/siat/factura/print?cuf=${cufToDownload}&tableId=${table.id}&restaurantId=${restaurant.id}`
-                : `/api/siat/factura/print?tableId=${table.id}&restaurantId=${restaurant.id}`;
-              window.open(url, '_blank');
+              setSessionEnded(false);
+              window.location.reload();
             }}
-            className="flex items-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-full font-medium active:scale-95 transition-transform"
+            className="flex items-center justify-center gap-2 px-6 py-2.5 text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-full active:scale-95 transition-all mt-2"
           >
-            <FileText size={20} />
-            Ver Factura Electrónica
+            Volver al Menú
           </button>
-        )}
-
-        {!hasInvoices && (
-          <button
-            onClick={() => window.open(`/api/receipt/print?tableId=${table.id}&restaurantId=${restaurant.id}`, '_blank')}
-            className="flex items-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-full font-medium active:scale-95 transition-transform"
-          >
-            <FileText size={20} />
-            Ver Comprobante de Venta
-          </button>
-        )}
+        </div>
       </div>
     );
   }
@@ -2590,21 +2592,30 @@ export default function PublicMenuClient({
                             <span>Subtotal</span>
                             <span>Bs {(order.order_items && order.order_items.length > 0 ? order.order_items.reduce((sum: number, item: any) => sum + Number(item.total_price || 0), 0) : order.total).toLocaleString('es-BO')}</span>
                           </div>
-                          {(order.invoices && order.invoices.length > 0 || table.type === 'takeaway') && (
+                          {(order.invoices && order.invoices.length > 0 || table.type === 'takeaway' || order.is_paid) && (
                             <div className="mt-3 pt-3 border-t border-dashed border-gray-200 flex flex-col gap-2">
                               {order.invoices && order.invoices.length > 0 && (
                                 <button 
                                   onClick={() => window.open(`/api/siat/factura/print?cuf=${order.invoices[0].cuf}`, '_blank')}
-                                  className="w-full py-2 bg-gray-50 text-gray-700 text-sm font-bold rounded-lg flex items-center justify-center gap-2 border border-gray-200 active:bg-gray-100"
+                                  className="w-full py-2 bg-emerald-50 text-emerald-800 text-sm font-bold rounded-lg flex items-center justify-center gap-2 border border-emerald-200 active:bg-emerald-100 transition-colors"
                                 >
-                                  <FileText size={16} />
-                                  Descargar Factura (PDF)
+                                  <FileText size={16} className="text-emerald-600" />
+                                  Ver Factura Electrónica (PDF)
+                                </button>
+                              )}
+                              {(order.is_paid || table.type === 'takeaway') && (
+                                <button 
+                                  onClick={() => window.open(`/api/receipt/print?orderId=${order.id}`, '_blank')}
+                                  className="w-full py-2 bg-gray-50 hover:bg-gray-100 text-gray-800 text-sm font-bold rounded-lg flex items-center justify-center gap-2 border border-gray-200 active:scale-[0.99] transition-all"
+                                >
+                                  <Receipt size={16} className="text-orange-500" />
+                                  Ver Comprobante de Venta
                                 </button>
                               )}
                               {table.type === 'takeaway' && (
                                 <button 
                                   onClick={() => handleRepeatOrder(order)}
-                                  className="w-full py-2 bg-blue-50 text-blue-700 text-sm font-bold rounded-lg flex items-center justify-center gap-2 border border-blue-200 active:bg-blue-100"
+                                  className="w-full py-2 bg-blue-50 text-blue-700 text-sm font-bold rounded-lg flex items-center justify-center gap-2 border border-blue-200 active:bg-blue-100 transition-colors"
                                 >
                                   <RefreshCw size={16} />
                                   Repetir orden
@@ -3287,20 +3298,37 @@ export default function PublicMenuClient({
               )}
               
               <h3 className="text-xl font-bold text-gray-900 mb-2">
-                {isAlarmRinging ? "¡Atención!" : "¡Listo!"}
+                {isAlarmRinging ? "¡Atención!" : (lastPaidOrderId || autoEmittedCuf) ? "¡Pago Confirmado!" : "¡Listo!"}
               </h3>
-              <p className="text-gray-600 text-lg">{serviceMessage}</p>
+              <p className="text-gray-600 text-base">{serviceMessage}</p>
             </div>
             <div className="p-4 bg-gray-50 border-t border-gray-100 flex flex-col gap-2">
-              {autoEmittedCuf && (
+              {/* Botones de Factura y/o Comprobante de Venta tras el pago */}
+              {(autoEmittedCuf || (hasInvoices && lastPaidOrderId)) && (
                 <button
-                  onClick={() => window.open(`/api/siat/factura/print?cuf=${autoEmittedCuf}`, '_blank')}
-                  className="w-full py-3 rounded-xl font-bold text-gray-700 bg-white border border-gray-200 shadow-sm transition-all active:scale-95 text-lg flex items-center justify-center gap-2 mb-2"
+                  onClick={() => {
+                    const url = autoEmittedCuf 
+                      ? `/api/siat/factura/print?cuf=${autoEmittedCuf}` 
+                      : `/api/siat/factura/print?orderId=${lastPaidOrderId}`;
+                    window.open(url, '_blank');
+                  }}
+                  className="w-full py-3 rounded-xl font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 shadow-sm transition-all active:scale-95 text-sm flex items-center justify-center gap-2 hover:bg-emerald-100"
                 >
-                  <FileText size={20} />
-                  Descargar Factura (PDF)
+                  <FileText size={18} className="text-emerald-600" />
+                  Ver Factura Electrónica (PDF)
                 </button>
               )}
+
+              {lastPaidOrderId && (
+                <button
+                  onClick={() => window.open(`/api/receipt/print?orderId=${lastPaidOrderId}`, '_blank')}
+                  className="w-full py-3 rounded-xl font-bold text-gray-800 bg-white border border-gray-200 shadow-sm transition-all active:scale-95 text-sm flex items-center justify-center gap-2 hover:bg-gray-50"
+                >
+                  <Receipt size={18} className="text-orange-500" />
+                  Ver Comprobante de Venta
+                </button>
+              )}
+
               <button 
                 onClick={() => {
                   if (alarmAudioRef.current) {
@@ -3310,11 +3338,12 @@ export default function PublicMenuClient({
                   setIsAlarmRinging(false);
                   setServiceMessage(null);
                   setAutoEmittedCuf(null);
+                  setLastPaidOrderId(null);
                 }}
-                className={`w-full py-4 rounded-xl font-bold text-white transition-all active:scale-95 text-lg ${isAlarmRinging ? 'bg-red-500 hover:bg-red-600 shadow-[0_0_15px_rgba(239,68,68,0.5)]' : ''}`}
+                className={`w-full py-3.5 rounded-xl font-bold text-white transition-all active:scale-95 text-base ${isAlarmRinging ? 'bg-red-500 hover:bg-red-600 shadow-[0_0_15px_rgba(239,68,68,0.5)]' : ''}`}
                 style={isAlarmRinging ? {} : { backgroundColor: brandColor }}
               >
-                {isAlarmRinging ? "APAGAR ALARMA" : "Aceptar"}
+                {isAlarmRinging ? "APAGAR ALARMA" : (lastPaidOrderId || autoEmittedCuf) ? "Continuar al Seguimiento" : "Aceptar"}
               </button>
             </div>
           </div>
